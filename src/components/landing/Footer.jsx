@@ -18,7 +18,6 @@ export default function Footer() {
           <a href="/#who" className="text-muted hover:text-ink">Who it's for</a>
         </nav>
       </div>
-      <p className="mt-10 text-[13px] text-muted">Sensor readings and AI estimates shown during the demo are labelled as simulated until the device and models are live.</p>
     </footer>
   )
 }
