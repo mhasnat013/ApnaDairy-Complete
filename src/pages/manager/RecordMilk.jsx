@@ -285,7 +285,7 @@ export default function RecordMilk() {
                 <h2 className="display text-[19px] text-forest-deep">Offer to {farmer.full_name.split(' ')[0]}</h2>
                 <div className="mt-4 flex items-center justify-between gap-3 rounded-2xl bg-cream px-4 py-3">
                   <div><p className="text-[12.5px] text-muted">Market rate from the AI</p><p className="display num text-[22px]">{rs(ai.market_price)}<span className="text-[13px] font-medium text-muted"> / L</span></p></div>
-                  <p className="max-w-[160px] text-right text-[12px] text-muted">{gradeLabel[ai.quality]} grade, from your {milkLabel[farmer.milk_type].toLowerCase()} rate of {rs(ai.base_rate)}</p>
+                  <p className="max-w-[160px] text-right text-[12px] text-muted">{gradeLabel[ai.quality]} grade, on the ApnaDairy {milkLabel[farmer.milk_type].toLowerCase()} milk rate of {rs(ai.base_rate)}</p>
                 </div>
                 <label className="mt-5 block text-[13px] font-semibold" htmlFor="price">Price you pay per litre</label>
                 <div className="mt-2 flex items-center gap-2">

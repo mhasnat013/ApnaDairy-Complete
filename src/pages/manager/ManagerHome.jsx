@@ -50,7 +50,7 @@ export default function ManagerHome() {
         <Link to="/manager/orders?sale=1" className="btn-on-dark"><Icon name="cart" size={17} />New sale</Link>
       </WelcomeBanner>
       <BillReminder invoices={data?.invoices} />
-      {empty ? <Onboarding onDone={reload} /> : <Dashboard data={data} />}
+      {empty ? <Onboarding demo={c?.is_demo} onDone={reload} /> : <Dashboard data={data} />}
     </>
   )
 }
@@ -72,7 +72,7 @@ function BillReminder({ invoices }) {
   )
 }
 
-function Onboarding({ onDone }) {
+function Onboarding({ demo, onDone }) {
   const { toast } = useUi()
   const [busy, setBusy] = useState(false)
   const load = async () => {
@@ -85,12 +85,12 @@ function Onboarding({ onDone }) {
     <div className="panel grid gap-6 p-6 sm:p-8 lg:grid-cols-[1.2fr_1fr] lg:items-center">
       <div>
         <p className="text-[13px] font-semibold text-amber">Your center is ready</p>
-        <h2 className="display mt-1 text-[28px] text-forest-deep">Start with your farmers, or explore with sample data</h2>
+        <h2 className="display mt-1 text-[28px] text-forest-deep">{demo ? 'Start with your farmers, or explore with sample data' : 'Start by adding your farmers'}</h2>
         <p className="mt-2 max-w-lg text-muted">Add the farmers who bring milk to you, then record each collection. The dashboard fills in as you buy and sell milk.
-          To see how everything works first, load a month of sample activity. You can clear it any time.</p>
+          {demo && ' This is a demo account, so you can also load a month of sample activity and clear it any time.'}</p>
         <div className="mt-5 flex flex-wrap gap-2">
-          <button className="btn-primary" onClick={load} disabled={busy}>{busy ? 'Loading sample data…' : 'Load sample data'}</button>
-          <Link to="/manager/farmers?add=1" className="btn-secondary">Add your first farmer</Link>
+          {demo && <button className="btn-primary" onClick={load} disabled={busy}>{busy ? 'Loading sample data…' : 'Load sample data'}</button>}
+          <Link to="/manager/farmers?add=1" className={demo ? 'btn-secondary' : 'btn-primary'}>Add your first farmer</Link>
         </div>
       </div>
       <ol className="grid gap-3">

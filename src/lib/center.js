@@ -244,3 +244,13 @@ export const saveListing = async (l) => must(await supabase.from('products').upd
   listed_l: l.listed_l === '' || l.listed_l == null ? null : Number(l.listed_l),
   min_order_l: Number(l.min_order_l) || 1, delivers: !!l.delivers, description: l.description || null,
 }).eq('id', l.id))
+
+// ---------- market rates (set by the super admin per city) ----------
+export const myMarketRates = () => rpc('my_market_rates')
+export const marketRates = async () => must(await supabase.from('market_rates').select('*').order('city').order('milk_type'))
+export const saveMarketRate = async (city, type, rate) => must(await supabase.from('market_rates')
+  .upsert({ city: city.trim().toLowerCase(), milk_type: type, rate: Number(rate), updated_at: new Date().toISOString() }))
+export const deleteMarketCity = async (city) => must(await supabase.from('market_rates').delete().eq('city', city))
+export const centerCities = async () => must(await supabase.from('area_managers').select('city').eq('type', 'milk_center'))
+export const setDemoCenter = (userId, demo) => rpc('set_demo_center', { p_user: userId, p_demo: demo })
+export const cityLabel = (c) => (c === '*' ? 'All other cities' : c.replace(/\b\w/g, (m) => m.toUpperCase()))

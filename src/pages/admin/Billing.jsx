@@ -140,7 +140,7 @@ export default function AdminBilling() {
           <button className="btn-primary mt-5 w-full" disabled={!dirty || busy} onClick={saveSettings}>Save rules</button>
         </Card>
 
-        <Card title="Discount tiers" subtitle="Monthly fee discount by last month’s total sales">
+        <Card title="Discount tiers" subtitle="Monthly fee discount by last month’s online orders (app and bulk). Counter sales do not count, since the platform cannot verify them.">
           <div className="grid gap-2">
             {(data?.tiers ?? []).map((t) => {
               const e = tierEdits[t.name] ?? t
@@ -156,7 +156,7 @@ export default function AdminBilling() {
               )
             })}
           </div>
-          <p className="mt-3 text-[12.5px] text-muted">Example: a center that sold {rsShort(2500000)} last month pays the Gold fee this month.</p>
+          <p className="mt-3 text-[12.5px] text-muted">Example: a center with {rsShort(2500000)} of online orders last month pays the Gold fee this month.</p>
           <button className="btn-primary mt-4 w-full" disabled={!Object.keys(tierEdits).length || busy} onClick={saveTiers}>Save tiers</button>
         </Card>
       </div>

@@ -10,6 +10,7 @@ import Badge from '../../components/Badge'
 import Segmented from '../../components/Segmented'
 import EmptyState from '../../components/EmptyState'
 import { date } from '../../lib/format'
+import { setDemoCenter } from '../../lib/center'
 
 const roleFilters = ['all', 'super_admin', 'area_manager', 'business', 'farmer', 'customer']
 
@@ -30,8 +31,10 @@ export default function Users() {
       .from('profiles')
       .select('id, full_name, email, phone, role, status, created_at')
       .order('created_at', { ascending: false })
+    const { data: centers } = await supabase.from('area_managers').select('user_id, is_demo, center_name')
+    const byUser = Object.fromEntries((centers ?? []).map((c) => [c.user_id, c]))
     setError(error?.message ?? '')
-    setUsers(data ?? [])
+    setUsers((data ?? []).map((u) => ({ ...u, center: byUser[u.id] })))
     setLoading(false)
   }, [])
 
@@ -95,6 +98,7 @@ export default function Users() {
                   <td>
                     <p className="font-semibold text-ink">{u.full_name}{isMe && <span className="ml-2 text-xs font-normal text-muted">(you)</span>}</p>
                     <p className="text-[13px] text-muted">{u.email}</p>
+                    {u.center && <p className="text-[12.5px] text-muted">{u.center.center_name}{u.center.is_demo && <span className="ml-2 rounded-full bg-haldi-soft px-2 py-0.5 text-[11.5px] font-semibold text-amber">Demo</span>}</p>}
                   </td>
                   <td>{roleLabel[u.role]}</td>
                   <td>
@@ -111,6 +115,17 @@ export default function Users() {
                           <button onClick={() => run(u, 'set_admin', { p_make_admin: true }, { title: `Make ${u.full_name} an admin?`, body: 'Admins can approve accounts, suspend users and see everything on the platform.', confirmLabel: 'Make admin' })}
                             className="btn-secondary btn-sm">Make admin</button>
                         )
+                      )}
+                      {u.center && u.status === 'active' && (
+                        <button className="btn-secondary btn-sm" onClick={async () => {
+                          const demo = !u.center.is_demo
+                          if (!(await confirm(demo
+                            ? { title: `Make ${u.center.center_name} a demo account?`, body: 'It can then load sample farmers, milk, orders and reviews. Use this only for test or presentation accounts.', confirmLabel: 'Make demo' }
+                            : { title: `Turn off demo for ${u.center.center_name}?`, body: 'It can no longer load sample data. Sample data already loaded stays until the center clears it.', confirmLabel: 'Turn off' }))) return
+                          setBusy(u.id)
+                          try { await setDemoCenter(u.id, demo); toast(demo ? 'Marked as a demo account.' : 'Demo turned off.'); load() } catch (e) { toast(e.message, 'error') }
+                          setBusy(null)
+                        }}>{u.center.is_demo ? 'Demo off' : 'Make demo'}</button>
                       )}
                       {canToggle && (u.status === 'active' ? (
                         <button onClick={() => run(u, 'set_user_status', { p_status: 'suspended' }, { title: `Suspend ${u.full_name}?`, body: 'They are signed out of the portal until you reactivate them.', confirmLabel: 'Suspend', danger: true })}

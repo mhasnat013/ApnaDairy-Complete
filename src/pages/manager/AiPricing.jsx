@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react'
-import { useAuth } from '../../context/AuthContext'
-import { useUi } from '../../context/UiContext'
 import { useLoad } from '../../lib/useLoad'
-import { myCenter, settings, saveSettings, priceHistory, platformSettings, assessMilk, milkLabel, gradeLabel, riskLabel, PARAMS, inRange } from '../../lib/center'
+import { priceHistory, platformSettings, myMarketRates, assessMilk, milkLabel, gradeLabel, riskLabel, PARAMS, inRange } from '../../lib/center'
+import { date } from '../../lib/format'
 import { rs } from '../../lib/format'
 import PageHeader from '../../components/PageHeader'
 import Segmented from '../../components/Segmented'
@@ -14,36 +13,23 @@ const TYPES = ['buffalo', 'cow', 'mixed']
 const RANGES = { temperature_c: [4, 42, 0.5], ph: [6.2, 7.1, 0.01], ec_ms: [2.8, 7.5, 0.05], tds_ppm: [1200, 3800, 10] }
 
 export default function AiPricing() {
-  const { profile } = useAuth()
-  const { toast } = useUi()
-  const { data, error, reload } = useLoad(async () => {
-    const [center, s, hist, platform] = await Promise.all([myCenter(profile.id), settings(), priceHistory(30), platformSettings()])
-    return { center, settings: s, hist, platform }
-  }, [profile.id])
-  const [rates, setRates] = useState(null)
-  const [saving, setSaving] = useState(false)
+  const { data, error } = useLoad(async () => {
+    const [rates, hist, platform] = await Promise.all([myMarketRates(), priceHistory(30), platformSettings()])
+    return { rates, hist, platform }
+  })
   const [type, setType] = useState('buffalo')
   const [r, setR] = useState({ temperature_c: 34.5, ph: 6.7, ec_ms: 4.3, tds_ppm: 2150 })
   const [ai, setAi] = useState(null)
 
-  const s = data?.settings ?? { cow_rate: 170, buffalo_rate: 200, mixed_rate: 185 }
+  const rates = data?.rates ?? { cow: 170, buffalo: 200, mixed: 185 }
   const pf = data?.platform ?? { farmer_min_pct: 90, farmer_default_pct: 95, markup_suggest_pct: 20, markup_max_pct: 30, commission_pct: 5 }
-  const form = rates ?? { cow_rate: s.cow_rate, buffalo_rate: s.buffalo_rate, mixed_rate: s.mixed_rate }
-  const dirty = rates && TYPES.some((t) => Number(rates[`${t}_rate`]) !== Number(s[`${t}_rate`]))
 
   // live result while the sliders move
   useEffect(() => {
     let live = true
     const t = setTimeout(() => assessMilk(type, { ...r, reading_at: new Date().toISOString() }).then((x) => live && setAi(x)).catch(() => {}), 180)
     return () => { live = false; clearTimeout(t) }
-  }, [type, r, data?.settings])
-
-  const save = async () => {
-    if (TYPES.some((t) => !(Number(form[`${t}_rate`]) > 0))) return toast('Every rate must be more than zero.', 'error')
-    setSaving(true)
-    try { await saveSettings(data.center.id, form); toast('Rates saved. New offers use them.'); setRates(null); await reload() } catch (e) { toast(e.message, 'error') }
-    setSaving(false)
-  }
+  }, [type, r])
 
   const hist = data?.hist ?? []
   const offers = hist.filter((h) => h.price_per_l != null && h.ai_price_per_l)
@@ -53,7 +39,7 @@ export default function AiPricing() {
   const caught = hist.filter((h) => h.reject_reason === 'Failed the quality test').length
 
   // the price chain for one litre of the milk being tried
-  const market = ai?.market_price ?? Number(s[`${type}_rate`])
+  const market = ai?.market_price ?? Number(rates[type])
   const farmerGets = Math.round(market * pf.farmer_default_pct / 100)
   const sell = Math.round(farmerGets * (100 + Number(pf.markup_suggest_pct)) / 100)
   const sellMax = Math.floor(farmerGets * (100 + Number(pf.markup_max_pct)) / 100)
@@ -74,7 +60,7 @@ export default function AiPricing() {
       <Card className="mt-4 sm:mt-5" title={`One litre of ${milkLabel[type].toLowerCase()} milk`} subtitle="Who gets what, for the sample in Try it below">
         <ol className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {[
-            ['spark', 'Market rate', rs(market), ai ? `AI price for ${gradeLabel[ai.quality]?.toLowerCase() ?? 'this'} milk` : 'your base rate'],
+            ['spark', 'Market rate', rs(market), ai ? `AI price for ${gradeLabel[ai.quality]?.toLowerCase() ?? 'this'} milk` : 'ApnaDairy market rate'],
             ['users', 'Farmer gets', rs(farmerGets), `${Number(pf.farmer_default_pct)}% of market, never below ${Number(pf.farmer_min_pct)}%`],
             ['store', 'You sell at', rs(sell), `+${Number(pf.markup_suggest_pct)}% suggested, at most ${rs(sellMax)} (+${Number(pf.markup_max_pct)}%)`],
             ['wallet', 'ApnaDairy keeps', rs(fee), `${Number(pf.commission_pct)}% of app and bulk orders only`],
@@ -92,18 +78,18 @@ export default function AiPricing() {
       </Card>
 
       <div className="mt-4 grid gap-4 sm:mt-5 sm:gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]">
-        <Card title="Your base rates" subtitle="The market rate for normal, good milk in your area. The AI adjusts it for each sample.">
+        <Card title={`Market rates in ${data?.rates?.city ?? 'your city'}`} subtitle="Set by ApnaDairy for normal, good milk. The AI adjusts them for each sample. Shops cannot change them, so every farmer is paid against the same fair rate.">
           <div className="grid gap-3">
             {TYPES.map((t) => (
-              <label key={t} className="flex items-center justify-between gap-4 rounded-2xl bg-cream px-4 py-3">
+              <div key={t} className="flex items-center justify-between gap-4 rounded-2xl bg-cream px-4 py-3">
                 <span className="font-semibold">{milkLabel[t]} milk</span>
-                <span className="flex items-center gap-2"><span className="text-muted">Rs</span>
-                  <input className="input num h-11 w-28 text-right text-[17px] font-bold" type="number" min="1" value={form[`${t}_rate`]}
-                    onChange={(e) => setRates({ ...form, [`${t}_rate`]: e.target.value })} aria-label={`${milkLabel[t]} rate`} /></span>
-              </label>
+                <span className="num text-[18px] font-bold">{rs(rates[t])}<span className="text-[12.5px] font-medium text-muted"> / L</span></span>
+              </div>
             ))}
           </div>
-          <button className="btn-primary mt-4 w-full" disabled={!dirty || saving} onClick={save}>{saving ? 'Saving…' : 'Save rates'}</button>
+          <p className="mt-3 text-[12.5px] text-muted">
+            {data?.rates ? `${data.rates.own_city_rates ? `Rates for ${data.rates.city}` : 'National rates (no city rate set yet)'} · updated ${date(data.rates.updated_at)}` : ' '}
+          </p>
 
           <h3 className="mt-7 text-[14px] font-semibold">How the offer is worked out</h3>
           <ol className="mt-3 grid gap-2 text-[13.5px]">

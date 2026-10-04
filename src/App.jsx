@@ -35,6 +35,7 @@ import AiPricing from './pages/manager/AiPricing'
 import Billing from './pages/manager/Billing'
 import MyShop from './pages/manager/MyShop'
 import AdminBilling from './pages/admin/Billing'
+import MarketRates from './pages/admin/MarketRates'
 
 
 export default function App() {
@@ -60,6 +61,7 @@ export default function App() {
               <Route path="users" element={<Users />} />
               <Route path="bulk-market" element={<BulkMarket />} />
               <Route path="billing" element={<AdminBilling />} />
+              <Route path="market-rates" element={<MarketRates />} />
               <Route path="*" element={<ModuleSoon />} />
             </Route>
           </Route>
