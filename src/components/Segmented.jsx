@@ -5,9 +5,20 @@ export default function Segmented({ options, value, onChange, size = 'md' }) {
   const wrap = useRef(null)
   const [thumb, setThumb] = useState(null)
 
+  // measure the selected tab, and measure again whenever any tab changes size
+  // (counts arriving after load, fonts finishing, window resize)
   useLayoutEffect(() => {
-    const el = wrap.current?.querySelector('[aria-selected="true"]')
-    if (el) setThumb({ left: el.offsetLeft, top: el.offsetTop, width: el.offsetWidth, height: el.offsetHeight })
+    const box = wrap.current
+    if (!box) return
+    const measure = () => {
+      const el = box.querySelector('[aria-selected="true"]')
+      if (el) setThumb({ left: el.offsetLeft, top: el.offsetTop, width: el.offsetWidth, height: el.offsetHeight })
+    }
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(box)
+    box.querySelectorAll('[role="tab"]').forEach((t) => ro.observe(t))
+    return () => ro.disconnect()
   }, [value, options.length])
 
   const pad = size === 'sm' ? 'px-3 py-1.5 text-[13px]' : 'px-4 py-2 text-[14px]'
