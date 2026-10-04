@@ -5,7 +5,7 @@ import { useUi } from '../../context/UiContext'
 import { useLoad } from '../../lib/useLoad'
 import { centerOrders } from '../../lib/b2b'
 import {
-  myCenter, centerDaily, milkStock, stockBatches, activeOrders, farmersWithStats, shelfBatches, stockLeft, seedSample,
+  myCenter, centerDaily, milkStock, stockBatches, activeOrders, farmersWithStats, shelfBatches, stockLeft, seedSample, myInvoices,
   shortDay, weekday, rsShort, todayKey, orderStatusLabel, orderTone, timeOf, milkLabel,
 } from '../../lib/center'
 import { rs, litres, relative } from '../../lib/format'
@@ -25,10 +25,10 @@ export default function ManagerHome() {
   const { data, reload } = useLoad(async () => {
     const center = await myCenter(profile.id)
     if (center?.type !== 'milk_center' || center.verification_status !== 'active') return { center }
-    const [daily, stock, batches, orders, farmers, bulk] = await Promise.all([
-      centerDaily(), milkStock(), stockBatches(), activeOrders(), farmersWithStats(), centerOrders(),
+    const [daily, stock, batches, orders, farmers, bulk, invoices] = await Promise.all([
+      centerDaily(), milkStock(), stockBatches(), activeOrders(), farmersWithStats(), centerOrders(), myInvoices().catch(() => []),
     ])
-    return { center, daily, stock, batches, orders, farmers, bulk }
+    return { center, daily, stock, batches, orders, farmers, bulk, invoices }
   }, [profile.id])
 
   const c = data?.center
@@ -49,8 +49,26 @@ export default function ManagerHome() {
         <Link to="/manager/collection/new" className="btn-haldi"><Icon name="drop" size={17} />Record milk</Link>
         <Link to="/manager/orders?sale=1" className="btn-on-dark"><Icon name="cart" size={17} />New sale</Link>
       </WelcomeBanner>
+      <BillReminder invoices={data?.invoices} />
       {empty ? <Onboarding onDone={reload} /> : <Dashboard data={data} />}
     </>
+  )
+}
+
+// a gentle reminder for due bills, red once a bill is overdue
+function BillReminder({ invoices }) {
+  const due = (invoices ?? []).filter((i) => i.status === 'due').sort((a, b) => a.due_date.localeCompare(b.due_date))
+  if (!due.length) return null
+  const late = due.filter((i) => i.due_date < todayKey())
+  const total = due.reduce((n, i) => n + Number(i.amount), 0)
+  return (
+    <div className={`mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl px-4 py-3 text-[14px] ${late.length ? 'bg-[#f8e2dc] text-danger' : 'bg-haldi-soft text-forest-deep'}`}>
+      <span className="flex items-center gap-2"><Icon name={late.length ? 'alert' : 'wallet'} size={16} />
+        {late.length ? <b>Your ApnaDairy bill is overdue. Bidding and milk testing are paused until it is paid.</b>
+          : <span><b>{rs(Math.round(total))}</b> due by {new Date(`${due[0].due_date}T12:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} for {due.length === 1 ? due[0].description.toLowerCase() : `${due.length} bills`}.</span>}
+      </span>
+      <Link to="/manager/billing" className={late.length ? 'btn-danger btn-sm' : 'btn-secondary btn-sm'}>{late.length ? 'Pay now' : 'View bill'}</Link>
+    </div>
   )
 }
 

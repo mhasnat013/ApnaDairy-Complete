@@ -19,14 +19,21 @@ export const usageLabel = { products: 'Made into products', spoiled: 'Spoiled', 
 
 // normal ranges for the four iot parameters (shared by the device panel, readings page and charts)
 export const PARAMS = [
-  { key: 'ph', label: 'pH', unit: '', min: 6.0, max: 7.2, low: 6.6, high: 6.8, digits: 2,
-    help: 'Acidity. Fresh milk is 6.6 to 6.8. Below 6.4 it is turning sour.' },
-  { key: 'density', label: 'Density', unit: 'g/ml', min: 1.020, max: 1.040, low: 1.028, high: 1.034, digits: 4,
-    help: 'Low density usually means water was added.' },
-  { key: 'ec_ms', label: 'Conductivity', unit: 'mS/cm', min: 3, max: 8, low: 3.8, high: 5.5, digits: 2,
-    help: 'High conductivity points to added salt or an udder infection.' },
-  { key: 'temperature_c', label: 'Temperature', unit: '°C', min: 0, max: 45, low: 4, high: 37, digits: 1,
+  { key: 'temperature_c', label: 'Temperature', abbr: 'Temp', sensor: 'DS18B20', unit: '°C', min: 0, max: 45, low: 4, high: 37, digits: 1,
     help: 'Fresh milk arrives warm, around 33 to 37 °C. Chill it soon after.' },
+  { key: 'ph', label: 'pH', abbr: 'pH', sensor: 'pH probe', unit: '', min: 6.0, max: 7.2, low: 6.6, high: 6.8, digits: 2,
+    help: 'Acidity. Fresh milk is 6.6 to 6.8. Below 6.4 it is turning sour, above 6.9 soda may be added.' },
+  { key: 'ec_ms', label: 'Conductivity (EC)', abbr: 'EC', sensor: 'EC sensor', unit: 'mS/cm', min: 2.5, max: 8, low: 3.8, high: 5.5, digits: 2,
+    help: 'Low EC suggests added water. High EC points to salt or an udder infection.' },
+  { key: 'tds_ppm', label: 'Dissolved solids (TDS)', abbr: 'TDS', sensor: 'TDS sensor', unit: 'ppm', min: 1000, max: 4000, low: 1900, high: 2750, digits: 0,
+    help: 'About half the EC reading. Low TDS means watered milk, high TDS means something was dissolved in it.' },
+]
+// which sensor feeds which model (matches the device firmware)
+export const MODELS = [
+  { key: 'freshness', name: 'Model 1 · Freshness', inputs: ['temperature_c', 'timestamp', 'ph', 'ec_ms'],
+    outputs: 'Shelf life, freshness score, spoilage and anomaly risk' },
+  { key: 'adulteration', name: 'Model 2 · Adulteration', inputs: ['temperature_c', 'ph', 'ec_ms', 'tds_ppm'],
+    outputs: 'Adulteration risk, probability and the likely additive' },
 ]
 export const inRange = (p, v) => v >= p.low && v <= p.high
 
@@ -84,7 +91,7 @@ export const stockBatches = async () =>
     .eq('status', 'accepted').gte('collected_at', new Date(Date.now() - 4 * 864e5).toISOString()).order('collected_at', { ascending: false }))
 export const readingsSince = async (days = 14) =>
   must(await supabase.from('milk_collections')
-    .select('id, collected_at, milk_type, quantity_l, ph, density, ec_ms, temperature_c, test_source, device_serial, quality, adulteration_risk, ai_notes, status, reject_reason, farmer:farmers(full_name)')
+    .select('id, collected_at, reading_at, milk_type, quantity_l, ph, ec_ms, tds_ppm, temperature_c, test_source, device_serial, quality, freshness_hours, freshness_score, spoilage_risk, adulteration_risk, adulteration_score, suspected, ai_notes, status, reject_reason, farmer:farmers(full_name)')
     .gte('collected_at', new Date(Date.now() - days * 864e5).toISOString()).order('collected_at', { ascending: false }).limit(1000))
 export const priceHistory = async (days = 30) =>
   must(await supabase.from('milk_collections').select('collected_at, milk_type, quality, ai_price_per_l, price_per_l, status, reject_reason')
@@ -106,10 +113,11 @@ export const pastOrders = async (status, limit = 40) => {
 // ---------- writes ----------
 const rpc = async (fn, args) => must(await supabase.rpc(fn, args))
 export const assessMilk = (milkType, r) =>
-  rpc('assess_milk', { p_milk_type: milkType, p_temperature: r.temperature_c, p_ph: r.ph, p_density: r.density, p_ec: r.ec_ms })
+  rpc('assess_milk', { p_milk_type: milkType, p_temperature: r.temperature_c, p_ph: r.ph, p_ec: r.ec_ms, p_tds: r.tds_ppm, p_reading_at: r.reading_at ?? new Date().toISOString() })
 export const recordCollection = (a) => rpc('record_collection', {
   p_farmer: a.farmer, p_quantity: a.quantity, p_shift: a.shift, p_temperature: a.reading.temperature_c,
-  p_ph: a.reading.ph, p_density: a.reading.density, p_ec: a.reading.ec_ms, p_source: a.source, p_price: a.price ?? null,
+  p_ph: a.reading.ph, p_ec: a.reading.ec_ms, p_tds: a.reading.tds_ppm, p_reading_at: a.reading.reading_at ?? new Date().toISOString(),
+  p_source: a.source, p_price: a.price ?? null,
 })
 export const decideCollection = (id, accept, reason) => rpc('decide_collection', { p_id: id, p_accept: accept, p_reason: reason ?? null })
 export const payFarmer = (farmerId) => rpc('pay_farmer', { p_farmer: farmerId })
@@ -148,14 +156,16 @@ export function simulateReading(milkType = 'mixed') {
   const r = {
     temperature_c: +rnd(33, 37).toFixed(1),
     ph: +rnd(6.62, 6.78).toFixed(2),
-    density: +((milkType === 'buffalo' ? 1.0305 : milkType === 'cow' ? 1.0295 : 1.030) + rnd(-0.0015, 0.0015)).toFixed(4),
     ec_ms: +((milkType === 'buffalo' ? 4.3 : 4.7) + rnd(-0.4, 0.4)).toFixed(2),
   }
   const roll = Math.random()
-  if (roll < 0.08) r.density = +rnd(1.0235, 1.026).toFixed(4)
-  else if (roll < 0.12) r.ph = +rnd(6.3, 6.42).toFixed(2)
-  else if (roll < 0.15) r.ec_ms = +rnd(6.7, 7.3).toFixed(2)
-  else if (roll < 0.25) r.ph = +rnd(6.47, 6.54).toFixed(2)
+  if (roll < 0.08) r.ec_ms = +rnd(3.0, 3.4).toFixed(2)          // water added
+  else if (roll < 0.12) r.ph = +rnd(6.3, 6.38).toFixed(2)       // souring
+  else if (roll < 0.15) r.ec_ms = +rnd(6.7, 7.3).toFixed(2)     // salt
+  else if (roll < 0.17) r.ph = +rnd(6.95, 7.03).toFixed(2)      // soda
+  else if (roll < 0.27) r.ph = +rnd(6.47, 6.54).toFixed(2)      // slightly acidic
+  r.tds_ppm = Math.round(r.ec_ms * 1000 * rnd(0.49, 0.52))       // the tds sensor reads about half the ec
+  r.reading_at = new Date().toISOString()                        // firmware timestamp
   return r
 }
 
@@ -175,3 +185,22 @@ export function shelfBatches(batches, stockRows) {
 }
 
 export const stockLeft = (s) => Math.max(0, Number(s.bought_l) - Number(s.sold_l) - Number(s.bulk_l) - Number(s.used_l))
+
+// ---------- pricing rules and billing ----------
+export const platformSettings = async () => must(await supabase.from('platform_settings').select('*').single())
+export const billingTiers = async () => must(await supabase.from('billing_tiers').select('*').order('min_monthly_sales'))
+export const milkCost = async () => must(await supabase.from('milk_cost_14d').select('*'))
+export const billingOverview = () => rpc('billing_overview')
+export const myInvoices = async () => must(await supabase.from('center_invoices').select('*').order('issued_at', { ascending: false }))
+export const payInvoice = (id, method, ref) => rpc('pay_invoice', { p_invoice: id, p_method: method, p_ref: ref || null })
+export const adminInvoices = async () => must(await supabase.from('admin_billing').select('*').order('issued_at', { ascending: false }).limit(300))
+export const generateInvoices = (month) => rpc('generate_monthly_invoices', { p_month: month ?? null })
+export const voidInvoice = (id) => rpc('void_invoice', { p_invoice: id })
+export const savePlatformSettings = async (s) => {
+  const keys = ['device_price', 'monthly_fee', 'commission_pct', 'farmer_min_pct', 'farmer_default_pct', 'markup_suggest_pct', 'markup_max_pct', 'payment_days']
+  const row = Object.fromEntries(keys.map((k) => [k, Number(s[k])]))
+  return must(await supabase.from('platform_settings').update({ ...row, updated_at: new Date().toISOString() }).eq('id', true))
+}
+export const saveTier = async (t) => must(await supabase.from('billing_tiers').upsert({ name: t.name, min_monthly_sales: Number(t.min_monthly_sales), discount_pct: Number(t.discount_pct) }))
+export const paymentLabel = { jazzcash: 'JazzCash', easypaisa: 'EasyPaisa', bank: 'Bank transfer', cash: 'Cash' }
+export const monthLabel = (d) => (d ? new Date(`${d.slice(0, 10)}T12:00:00`).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }) : '')

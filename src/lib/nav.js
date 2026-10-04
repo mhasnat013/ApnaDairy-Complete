@@ -5,8 +5,8 @@ export const navFor = {
     { to: '/admin/approvals', label: 'Approvals', icon: 'check', ready: true },
     { to: '/admin/users', label: 'Users', icon: 'users', ready: true },
     { to: '/admin/bulk-market', label: 'Bulk market', icon: 'gavel', ready: true },
+    { to: '/admin/billing', label: 'Billing', icon: 'wallet', ready: true },
     { to: '/admin/iot-devices', label: 'IoT devices', icon: 'chip' },
-    { to: '/admin/pricing', label: 'Dynamic pricing', icon: 'tag' },
     { to: '/admin/complaints', label: 'Complaints & support', icon: 'chat' },
     { to: '/admin/analytics', label: 'Analytics', icon: 'chart' },
   ],
@@ -20,6 +20,7 @@ export const navFor = {
     { to: '/manager/bulk-orders', label: 'Bulk orders', icon: 'truck', ready: true },
     { to: '/manager/iot', label: 'IoT readings', icon: 'chip', ready: true },
     { to: '/manager/ai-pricing', label: 'AI price engine', icon: 'spark', ready: true },
+    { to: '/manager/billing', label: 'Billing', icon: 'wallet', ready: true },
     { to: '/manager/support', label: 'Support', icon: 'chat' },
   ],
   business: [

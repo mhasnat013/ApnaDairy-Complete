@@ -1,0 +1,170 @@
+import { useState } from 'react'
+import { useLoad } from '../../lib/useLoad'
+import { useUi } from '../../context/UiContext'
+import { billingOverview, myInvoices, billingTiers, payInvoice, paymentLabel, monthLabel, rsShort, todayKey } from '../../lib/center'
+import { rs, date } from '../../lib/format'
+import PageHeader from '../../components/PageHeader'
+import Card from '../../components/Card'
+import Badge from '../../components/Badge'
+import Alert from '../../components/Alert'
+import Icon from '../../components/Icon'
+import Sheet from '../../components/Sheet'
+import EmptyState from '../../components/EmptyState'
+
+const isOverdue = (i) => i.status === 'due' && i.due_date < todayKey()
+
+export default function Billing() {
+  const { data, error, reload } = useLoad(async () => {
+    const [o, invoices, tiers] = await Promise.all([billingOverview(), myInvoices(), billingTiers()])
+    return { o, invoices, tiers }
+  })
+  const [paying, setPaying] = useState(null)
+  const o = data?.o
+  const due = (data?.invoices ?? []).filter((i) => i.status === 'due')
+  const past = (data?.invoices ?? []).filter((i) => i.status !== 'due')
+  const tiers = data?.tiers ?? []
+  const nextAt = Number(o?.next_tier_at || 0)
+  const progress = o && nextAt ? Math.min(100, (Number(o.this_month_sales) / nextAt) * 100) : 100
+
+  return (
+    <>
+      <PageHeader title="Billing" description="Your ApnaDairy plan: the IoT milk tester, the monthly platform fee and the small commission on online orders." />
+      <Alert>{error}</Alert>
+
+      <div className="grid gap-4 sm:gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]">
+        <section className="furrows relative overflow-hidden rounded-[24px] bg-forest-deep p-6 text-cream">
+          <p className="text-[13px] text-cream/70">Your plan</p>
+          <p className="display mt-1 text-[28px]">ApnaDairy Center</p>
+          <dl className="mt-5 grid gap-3">
+            <div className="flex items-center justify-between rounded-2xl bg-cream/10 px-4 py-3">
+              <dt className="flex items-center gap-2 text-[14px]"><Icon name="chip" size={16} />IoT milk tester</dt>
+              <dd>{o ? (o.device_active
+                ? <span className="rounded-full bg-[#7fd39b]/20 px-2.5 py-1 text-[12.5px] font-semibold text-[#a9e6bd]">Active</span>
+                : <span className="rounded-full bg-haldi/20 px-2.5 py-1 text-[12.5px] font-semibold text-haldi">Awaiting payment</span>) : '—'}</dd>
+            </div>
+            <div className="flex items-center justify-between rounded-2xl bg-cream/10 px-4 py-3">
+              <dt className="flex items-center gap-2 text-[14px]"><Icon name="clock" size={16} />Monthly platform fee</dt>
+              <dd className="num font-semibold">{o ? rs(o.monthly_fee) : '—'}</dd>
+            </div>
+            <div className="flex items-center justify-between rounded-2xl bg-cream/10 px-4 py-3">
+              <dt className="flex items-center gap-2 text-[14px]"><Icon name="cart" size={16} />Commission</dt>
+              <dd className="text-right text-[13.5px]"><b className="num">{o ? `${Number(o.commission_pct)}%` : '—'}</b> <span className="text-cream/70">of app and bulk orders</span></dd>
+            </div>
+          </dl>
+          <p className="mt-4 text-[12.5px] leading-relaxed text-cream/65">Counter sales are free. The monthly fee drops when your sales are high, see the tiers below.</p>
+        </section>
+
+        <Card title="This month" subtitle="Sales so far decide next month’s discount">
+          <div className="grid grid-cols-3 gap-3">
+            <div className="rounded-2xl bg-cream px-3 py-3"><p className="text-[12px] text-muted">All sales</p><p className="display num mt-0.5 text-[20px] sm:text-[24px]">{o ? rsShort(o.this_month_sales) : '—'}</p></div>
+            <div className="rounded-2xl bg-cream px-3 py-3"><p className="text-[12px] text-muted">Online orders</p><p className="display num mt-0.5 text-[20px] sm:text-[24px]">{o ? rsShort(o.this_month_online) : '—'}</p></div>
+            <div className="rounded-2xl bg-cream px-3 py-3"><p className="text-[12px] text-muted">Commission so far</p><p className="display num mt-0.5 text-[20px] sm:text-[24px]">{o ? rs(Math.round(o.commission_so_far)) : '—'}</p></div>
+          </div>
+          <div className="mt-5">
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <p className="text-[14px]"><b>{o?.tier_now ?? '—'}</b>{o?.tier_now_discount ? ` · ${o.tier_now_discount}% off` : ''}</p>
+              {o?.next_tier ? <p className="text-[13px] text-muted">{rs(Math.max(0, Math.round(nextAt - o.this_month_sales)))} more to reach <b className="text-ink">{o.next_tier}</b> ({o.next_tier_discount}% off)</p>
+                : <p className="text-[13px] font-semibold text-forest">Top tier reached</p>}
+            </div>
+            <div className="mt-2 h-3 rounded-full bg-cream-2"><div className="h-3 rounded-full bg-haldi transition-all" style={{ width: `${progress}%` }} /></div>
+          </div>
+          <ul className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {tiers.map((t) => (
+              <li key={t.name} className={`rounded-2xl border px-3 py-2.5 ${o?.tier_now === t.name ? 'border-forest bg-mint-soft' : 'border-line'}`}>
+                <p className="text-[13px] font-semibold">{t.name}</p>
+                <p className="text-[12px] text-muted">{Number(t.min_monthly_sales) ? `from ${rsShort(t.min_monthly_sales)} a month` : 'any sales'}</p>
+                <p className="num mt-1 text-[15px] font-bold text-forest">{t.discount_pct}% off</p>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      </div>
+
+      <h2 className="display mb-3 mt-8 text-[22px] text-forest-deep">To pay</h2>
+      {data && due.length === 0 && <div className="panel"><EmptyState title="Nothing to pay">You are all paid up. Thank you.</EmptyState></div>}
+      <div className="grid gap-3 lg:grid-cols-2">
+        {due.map((i) => (
+          <article key={i.id} className={`panel animate-rise p-5 sm:p-6 ${isOverdue(i) ? 'border-[#efc6bb]' : ''}`}>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="font-semibold">{i.description}</p>
+                <p className={`mt-0.5 text-[13px] ${isOverdue(i) ? 'font-semibold text-danger' : 'text-muted'}`}>{isOverdue(i) ? `Overdue since ${date(i.due_date)}. Bidding and testing are paused.` : `Due ${date(i.due_date)}`}</p>
+              </div>
+              <p className="display num shrink-0 text-[26px]">{rs(i.amount)}</p>
+            </div>
+            <Breakdown i={i} />
+            <button className="btn-primary mt-4 w-full" onClick={() => setPaying(i)}><Icon name="wallet" size={17} />Pay {rs(i.amount)}</button>
+          </article>
+        ))}
+      </div>
+
+      <Card className="mt-6" title="Payment history" bodyClass="pt-3">
+        <div className="overflow-x-auto">
+          <table className="table min-w-[640px]">
+            <thead><tr><th>Bill</th><th className="text-right">Amount</th><th>Paid</th><th>Status</th></tr></thead>
+            <tbody>
+              {data && past.length === 0 && <tr><td colSpan={4} className="py-8 text-center text-muted">No payments yet.</td></tr>}
+              {past.map((i) => (
+                <tr key={i.id}>
+                  <td><p className="font-semibold">{i.kind === 'device' ? 'IoT milk tester' : monthLabel(i.period_month)}</p><p className="text-[12.5px] text-muted">{i.description}</p></td>
+                  <td className="num text-right font-semibold">{rs(i.amount)}</td>
+                  <td className="num">{i.paid_at ? date(i.paid_at) : '—'}<p className="text-[12.5px] text-muted">{paymentLabel[i.payment_method] ?? ''}{i.payment_ref ? ` · ${i.payment_ref}` : ''}</p></td>
+                  <td><Badge tone={i.status === 'paid' ? 'green' : 'grey'}>{i.status === 'paid' ? 'Paid' : 'Cancelled'}</Badge></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+
+      <PaySheet key={paying?.id ?? 'closed'} invoice={paying} onClose={() => setPaying(null)} onPaid={reload} />
+    </>
+  )
+}
+
+export function Breakdown({ i }) {
+  const rows = []
+  if (Number(i.device_fee)) rows.push(['IoT milk tester', rs(i.device_fee)])
+  if (Number(i.subscription_fee)) {
+    rows.push(['Platform fee', rs(i.subscription_fee)])
+    if (i.discount_pct) rows.push([`${i.tier} discount (${i.discount_pct}%), on ${rsShort(i.sales_basis)} sales last month`, `−${rs(Math.round(i.subscription_fee * i.discount_pct) / 100)}`])
+  }
+  if (Number(i.commission)) rows.push([`Commission ${Number(i.commission_pct)}% of ${rs(i.online_sales)} online orders`, rs(i.commission)])
+  return (
+    <dl className="mt-4 grid gap-1.5 rounded-2xl bg-cream px-4 py-3 text-[13.5px]">
+      {rows.map(([l, v]) => <div key={l} className="flex justify-between gap-3"><dt className="text-muted">{l}</dt><dd className="num shrink-0 font-medium">{v}</dd></div>)}
+    </dl>
+  )
+}
+
+function PaySheet({ invoice, onClose, onPaid }) {
+  const { toast } = useUi()
+  const [method, setMethod] = useState('jazzcash')
+  const [ref, setRef] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+  const submit = async () => {
+    if (!ref.trim()) return setErr('Enter the transaction ID from your payment.')
+    setBusy(true); setErr('')
+    try { await payInvoice(invoice.id, method, ref); toast(`Payment of ${rs(invoice.amount)} received. Thank you.`); onPaid(); onClose() } catch (e) { setErr(e.message) }
+    setBusy(false)
+  }
+  return (
+    <Sheet open={!!invoice} onClose={onClose} title={`Pay ${invoice ? rs(invoice.amount) : ''}`} subtitle={invoice?.description}
+      footer={<><button className="btn-secondary" onClick={onClose}>Cancel</button><button className="btn-primary" onClick={submit} disabled={busy}>{busy ? 'Confirming…' : 'Confirm payment'}</button></>}>
+      <Alert>{err}</Alert>
+      <p className="text-[13px] font-semibold">How did you pay?</p>
+      <div className="mt-2 grid gap-2">
+        {['jazzcash', 'easypaisa', 'bank'].map((m) => (
+          <button key={m} type="button" onClick={() => setMethod(m)}
+            className={`flex items-center justify-between rounded-2xl border px-4 py-3 text-left transition-all ${method === m ? 'border-forest bg-mint-soft ring-2 ring-forest/15' : 'border-line bg-white hover:border-forest/40'}`}>
+            <span className="font-semibold">{paymentLabel[m]}</span>
+            <span className={`grid h-5 w-5 place-items-center rounded-full border-2 ${method === m ? 'border-forest' : 'border-line'}`}>{method === m && <span className="h-2.5 w-2.5 rounded-full bg-forest" />}</span>
+          </button>
+        ))}
+      </div>
+      <div className="field mt-5"><label htmlFor="ref">Transaction ID</label><input id="ref" className="input" placeholder="e.g. 0123456789" value={ref} onChange={(e) => setRef(e.target.value)} /></div>
+      <p className="mt-4 rounded-2xl bg-cream px-4 py-3 text-[12.5px] text-muted">Demo payment: it is confirmed straight away. A JazzCash and EasyPaisa gateway will be connected before launch.</p>
+    </Sheet>
+  )
+}

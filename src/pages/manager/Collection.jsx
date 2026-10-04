@@ -127,14 +127,14 @@ function Mini({ label, value, tone }) {
   )
 }
 
-const short = { ph: 'pH', density: 'Density', ec_ms: 'EC' }
-const fixed = { ph: 2, density: 3, ec_ms: 1 }
+const short = { ph: 'pH', ec_ms: 'EC', tds_ppm: 'TDS' }
+const fixed = { ph: 2, ec_ms: 1, tds_ppm: 0 }
 
-// compact pH / density / conductivity chips, red when outside the normal range
+// compact pH / EC / TDS chips, red when outside the normal range
 function Readings({ c }) {
   return (
     <div className="flex flex-wrap gap-1">
-      {PARAMS.slice(0, 3).map((p) => {
+      {PARAMS.filter((p) => short[p.key] && c[p.key] != null).map((p) => {
         const v = Number(c[p.key])
         const ok = inRange(p, v)
         return (

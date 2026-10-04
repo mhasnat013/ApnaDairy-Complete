@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useLoad } from '../../lib/useLoad'
 import { useUi } from '../../context/UiContext'
 import {
-  milkStock, stockBatches, usageLog, products, productSales, recordUsage, saveProduct, setProduct, shelfBatches, stockLeft,
+  milkStock, stockBatches, usageLog, products, productSales, recordUsage, saveProduct, setProduct, shelfBatches, stockLeft, milkCost, platformSettings,
   milkLabel, categoryLabel, usageLabel, timeOf, todayKey,
 } from '../../lib/center'
 import { rs, litres, date, relative } from '../../lib/format'
@@ -19,8 +19,8 @@ const TYPES = ['buffalo', 'cow', 'mixed']
 export default function Inventory() {
   const [tab, setTab] = useState('milk')
   const { data, error, reload } = useLoad(async () => {
-    const [stock, batches, usage, prods, sales] = await Promise.all([milkStock(), stockBatches(), usageLog(), products(), productSales()])
-    return { stock, batches, usage, prods, sales }
+    const [stock, batches, usage, prods, sales, cost, platform] = await Promise.all([milkStock(), stockBatches(), usageLog(), products(), productSales(), milkCost(), platformSettings()])
+    return { stock, batches, usage, prods, sales, cost, platform }
   })
   const [usage, setUsage] = useState(null)
   const [product, setProductForm] = useState(null)
@@ -36,7 +36,7 @@ export default function Inventory() {
       <Alert>{error}</Alert>
       {tab === 'milk' ? <MilkStock data={data} onUse={setUsage} /> : <Products data={data} reload={reload} onEdit={setProductForm} />}
       <UsageForm key={usage ? 'usage-' + (usage.milk_type ?? '') : 'usage-closed'} value={usage} stock={data?.stock} onClose={() => setUsage(null)} onSaved={reload} />
-      <ProductForm key={product ? product.id ?? 'product-new' : 'product-closed'} value={product} onClose={() => setProductForm(null)} onSaved={reload} />
+      <ProductForm key={product ? product.id ?? 'product-new' : 'product-closed'} value={product} guide={(t) => milkGuide(data, t)} onClose={() => setProductForm(null)} onSaved={reload} />
     </>
   )
 }
@@ -115,6 +115,19 @@ function MilkStock({ data, onUse }) {
   )
 }
 
+// fair price for fresh milk: what the center paid farmers, plus the suggested and maximum markup
+function milkGuide(data, type) {
+  const c = data?.cost?.find((x) => x.milk_type === type)
+  if (!c?.avg_cost || !data?.platform) return null
+  const cost = Number(c.avg_cost)
+  return {
+    cost,
+    suggest: Math.round(cost * (100 + Number(data.platform.markup_suggest_pct)) / 100),
+    max: Math.floor(cost * (100 + Number(data.platform.markup_max_pct)) / 100),
+    suggestPct: Number(data.platform.markup_suggest_pct), maxPct: Number(data.platform.markup_max_pct),
+  }
+}
+
 // dynamic pricing (sample rule until the ai pricing model is connected):
 // suggest a discount as products near their expiry date
 function priceTip(p) {
@@ -142,6 +155,8 @@ function Products({ data, reload, onEdit }) {
         const tip = priceTip(p)
         const qty = p.category === 'milk' ? stock[p.milk_type] ?? 0 : Number(p.stock_qty)
         const finalPrice = p.price * (100 - p.discount_pct) / 100
+        const guide = p.category === 'milk' ? milkGuide(data, p.milk_type) : null
+        const over = guide && Number(p.price) > guide.max
         return (
           <div key={p.id} className={`panel animate-rise flex flex-col p-5 ${p.is_available ? '' : 'opacity-70'}`}>
             <div className="flex items-start justify-between gap-3">
@@ -166,6 +181,12 @@ function Products({ data, reload, onEdit }) {
               <div className="rounded-xl bg-cream px-3 py-2"><dt className="text-muted">Sold, 30 days</dt><dd className="num font-semibold">{s ? rs(Math.round(s.revenue)) : 'Rs 0'}</dd></div>
             </dl>
             {p.expires_on && <p className="mt-2 text-[12.5px] text-muted">Made {date(p.made_on)} · use by {date(p.expires_on)}</p>}
+            {guide && (
+              <div className={`mt-3 rounded-xl px-3 py-2 text-[12.5px] ${over ? 'bg-[#f8e2dc] text-danger' : 'bg-mint-soft text-forest'}`}>
+                <p>You pay farmers {rs(Math.round(guide.cost))} a litre. Fair price {rs(guide.suggest)} (+{guide.suggestPct}%), at most {rs(guide.max)}.</p>
+                {over && <button className="mt-1 font-semibold underline" onClick={() => act(p, { price: guide.suggest }, `${p.name} now ${rs(guide.suggest)} a litre.`)}>Set to {rs(guide.suggest)}</button>}
+              </div>
+            )}
             {tip && (
               <div className={`mt-3 flex items-center justify-between gap-2 rounded-xl px-3 py-2 text-[13px] ${tip.kind === 'expired' ? 'bg-[#f8e2dc] text-danger' : 'bg-haldi-soft text-forest-deep'}`}>
                 <span className="flex items-center gap-1.5"><Icon name="spark" size={14} />{tip.text}</span>
@@ -215,7 +236,7 @@ function UsageForm({ value, stock, onClose, onSaved }) {
   )
 }
 
-function ProductForm({ value, onClose, onSaved }) {
+function ProductForm({ value, guide, onClose, onSaved }) {
   const { toast } = useUi()
   const [p, setP] = useState(() => ({ category: 'yogurt', unit: 'kg', milk_type: 'buffalo', discount_pct: 0, is_available: true, made_on: todayKey(), ...value }))
   const [err, setErr] = useState('')
@@ -227,6 +248,8 @@ function ProductForm({ value, onClose, onSaved }) {
     if (!p.name?.trim()) return setErr('Enter a product name.')
     if (!(Number(p.price) > 0)) return setErr('Enter a price.')
     if (p.expires_on && p.made_on && p.expires_on < p.made_on) return setErr('Use-by date is before the made date.')
+    const g = isMilk ? guide(p.milk_type) : null
+    if (g && Number(p.price) > g.max) return setErr(`Fresh milk can be at most ${g.maxPct}% above your buying price: ${rs(g.max)} a litre or less.`)
     setBusy(true)
     try { await saveProduct(p); toast(p.id ? 'Product updated.' : `${p.name} added.`); onSaved(); onClose() } catch (ex) { setErr(ex.message) }
     setBusy(false)
@@ -259,7 +282,13 @@ function ProductForm({ value, onClose, onSaved }) {
           <div className="field"><label htmlFor="pd">Discount %</label><input id="pd" className="input num" type="number" min="0" max="90" value={p.discount_pct} onChange={set('discount_pct')} /></div>
         </div>
         {isMilk ? (
-          <p className="rounded-2xl bg-cream px-4 py-3 text-[13.5px] text-muted">Fresh milk sells from your milk stock, so there is no separate quantity to enter.</p>
+          <div className="rounded-2xl bg-cream px-4 py-3 text-[13.5px] text-muted">
+            <p>Fresh milk sells from your milk stock, so there is no separate quantity to enter.</p>
+            {guide(p.milk_type) && (() => { const g = guide(p.milk_type); return (
+              <p className="mt-2 text-forest">You pay farmers {rs(Math.round(g.cost))} a litre. Suggested {rs(g.suggest)} (+{g.suggestPct}%), at most {rs(g.max)} (+{g.maxPct}%).
+                {' '}<button type="button" className="font-semibold underline" onClick={() => setP({ ...p, price: g.suggest })}>Use {rs(g.suggest)}</button></p>
+            ) })()}
+          </div>
         ) : (
           <>
             <div className="field"><label htmlFor="ps">In stock ({p.unit})</label><input id="ps" className="input num w-40" type="number" min="0" step="0.5" value={p.stock_qty ?? ''} onChange={set('stock_qty')} /></div>

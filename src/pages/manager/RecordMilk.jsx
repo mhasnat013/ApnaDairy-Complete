@@ -3,7 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useLoad } from '../../lib/useLoad'
 import { useUi } from '../../context/UiContext'
 import {
-  farmersWithStats, settings, assessMilk, recordCollection, decideCollection, simulateReading, currentShift,
+  farmersWithStats, settings, assessMilk, recordCollection, decideCollection, simulateReading, currentShift, billingOverview,
   milkLabel, gradeLabel, riskLabel, PARAMS, inRange,
 } from '../../lib/center'
 import { rs, litres } from '../../lib/format'
@@ -20,8 +20,8 @@ export default function RecordMilk() {
   const nav = useNavigate()
   const { toast } = useUi()
   const { data } = useLoad(async () => {
-    const [farmers, s] = await Promise.all([farmersWithStats(), settings()])
-    return { farmers: farmers.filter((f) => f.is_active), settings: s }
+    const [farmers, s, billing] = await Promise.all([farmersWithStats(), settings(), billingOverview().catch(() => null)])
+    return { farmers: farmers.filter((f) => f.is_active), settings: s, billing }
   })
   const [step, setStep] = useState(0)
   const [q, setQ] = useState('')
@@ -39,6 +39,8 @@ export default function RecordMilk() {
   const [err, setErr] = useState('')
 
   const farmer = data?.farmers.find((f) => f.id === farmerId)
+  const deviceOff = data?.billing && !data.billing.device_active
+  const overdue = data?.billing && !data.billing.billing_ok
   const list = useMemo(() => (data?.farmers ?? []).filter((f) => `${f.full_name} ${f.village ?? ''}`.toLowerCase().includes(q.toLowerCase())), [data, q])
   const qty = Number(quantity)
 
@@ -51,14 +53,14 @@ export default function RecordMilk() {
   useEffect(() => {
     if (!reading || !farmer) return
     let live = true
-    assessMilk(farmer.milk_type, reading).then((r) => { if (live) { setAi(r); setPrice(r.price_per_l ?? '') } }).catch((e) => setErr(e.message))
+    assessMilk(farmer.milk_type, reading).then((r) => { if (live) { setAi(r); setPrice(r.offer_price ?? '') } }).catch((e) => setErr(e.message))
     return () => { live = false }
   }, [reading, farmer])
 
   const save = async () => {
     setSaving(true); setErr('')
     try {
-      const id = await recordCollection({ farmer: farmerId, quantity: qty, shift, reading, source, price: ai?.accept ? Number(price) : null })
+      const id = await recordCollection({ farmer: farmerId, quantity: qty, shift, reading: { ...reading, reading_at: reading.reading_at ?? new Date().toISOString() }, source, price: ai?.accept ? Number(price) : null })
       setDone({ id, accepted: ai?.accept })
     } catch (e) { setErr(e.message) }
     setSaving(false)
@@ -110,6 +112,12 @@ export default function RecordMilk() {
         ))}
       </ol>
       <Alert>{err}</Alert>
+      {overdue && (
+        <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-[#f8e2dc] px-4 py-3 text-[14px] text-danger">
+          <span className="flex items-center gap-2 font-semibold"><Icon name="alert" size={16} />Your ApnaDairy bill is overdue, so recording milk is paused.</span>
+          <Link to="/manager/billing" className="btn-danger btn-sm">Pay now</Link>
+        </div>
+      )}
 
       {step === 0 && (
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
@@ -176,9 +184,17 @@ export default function RecordMilk() {
             </div>
             <p className="mt-6 text-center text-[14px] text-cream/80">{scanning ? 'Reading the sample…' : reading ? `Read at ${new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}` : 'Dip the probe in the sample, then take a reading.'}</p>
             <div className="mt-5 flex flex-wrap justify-center gap-2">
-              <button className="btn-haldi" onClick={scan} disabled={scanning}>{reading ? 'Read again' : 'Take reading'}</button>
-              <button className="btn-on-dark" onClick={() => { setManual(true); setSource('manual'); setReading(reading ?? { temperature_c: 34, ph: 6.7, density: 1.03, ec_ms: 4.6 }) }}>Enter by hand</button>
+              <button className="btn-haldi" onClick={scan} disabled={scanning || deviceOff}>{reading ? 'Read again' : 'Take reading'}</button>
+              <button className="btn-on-dark" onClick={() => { setManual(true); setSource('manual'); setReading(reading ?? { temperature_c: 34, ph: 6.7, ec_ms: 4.5, tds_ppm: 2250, reading_at: new Date().toISOString() }) }}>Enter by hand</button>
             </div>
+            {deviceOff && (
+              <p className="mt-4 rounded-2xl bg-cream/10 px-4 py-3 text-center text-[13px] text-cream/80">
+                Your device activates once its invoice is paid. <Link to="/manager/billing" className="font-semibold text-haldi underline">Go to billing</Link>. You can enter readings by hand meanwhile.
+              </p>
+            )}
+            <ul className="mt-5 flex flex-wrap justify-center gap-1.5 text-[11.5px] text-cream/60">
+              {PARAMS.map((p) => <li key={p.key} className="rounded-full bg-cream/5 px-2.5 py-1">{p.sensor}</li>)}
+            </ul>
           </section>
 
           <section className="panel p-5 sm:p-6">
@@ -192,7 +208,7 @@ export default function RecordMilk() {
                     <div className="flex items-baseline justify-between gap-3">
                       <span className="text-[14px] font-semibold">{p.label}</span>
                       {manual ? (
-                        <input className="input num h-9 w-28 text-right" type="number" step={p.key === 'density' ? 0.0005 : 0.01} value={reading[p.key]}
+                        <input className="input num h-9 w-28 text-right" type="number" step={{ ph: 0.01, ec_ms: 0.05, tds_ppm: 10, temperature_c: 0.1 }[p.key]} value={reading[p.key]}
                           onChange={(e) => setReading({ ...reading, [p.key]: Number(e.target.value) })} aria-label={p.label} />
                       ) : (
                         <span className={`num text-[18px] font-bold ${inRange(p, reading[p.key]) ? 'text-ink' : 'text-danger'}`}>{Number(reading[p.key]).toFixed(p.digits)} <span className="text-[12px] font-medium text-muted">{p.unit}</span></span>
@@ -212,25 +228,24 @@ export default function RecordMilk() {
       )}
 
       {step === 2 && ai && (
-        <div className="grid gap-5 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
           <section className={`panel p-5 sm:p-6 ${ai.accept ? '' : 'border-[#efc6bb]'}`}>
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="flex items-center gap-2 text-[13px] font-semibold text-muted"><Icon name="spark" size={16} />AI assessment</p>
-              <span className="rounded-full bg-cream-2 px-2.5 py-0.5 text-[11.5px] text-muted">sample model</span>
+              <span className="rounded-full bg-cream-2 px-2.5 py-0.5 text-[11.5px] text-muted">sample models</span>
             </div>
-            {ai.accept ? (
-              <h2 className="display mt-3 text-[30px] text-forest-deep">{gradeLabel[ai.quality]} milk</h2>
-            ) : (
-              <h2 className="display mt-3 text-[30px] text-danger">Do not buy this milk</h2>
-            )}
-            <div className="mt-5 grid grid-cols-3 gap-3">
-              <Fact label="Quality score" value={`${ai.score}/100`} />
-              <Fact label="Shelf life" value={`${ai.freshness_hours} h`} hint="once chilled" />
-              <Fact label="Adulteration risk" value={riskLabel[ai.adulteration_risk]} bad={ai.adulteration_risk !== 'low'} />
+            <h2 className={`display mt-3 text-[30px] ${ai.accept ? 'text-forest-deep' : 'text-danger'}`}>{ai.accept ? `${gradeLabel[ai.quality]} milk` : 'Do not buy this milk'}</h2>
+            <p className="mt-1 text-[14px] text-muted">Quality score {ai.score}/100</p>
+
+            <div className="mt-5 grid gap-3 sm:grid-cols-2">
+              <ModelCard title="Model 1 · Freshness" inputs="temperature, time, pH, EC" bad={ai.spoilage_risk === 'high'} warn={ai.spoilage_risk === 'medium'}
+                facts={[['Shelf life', `${ai.freshness_hours} h`, 'once chilled'], ['Spoilage risk', riskLabel[ai.spoilage_risk]]]} />
+              <ModelCard title="Model 2 · Adulteration" inputs="temperature, pH, EC, TDS" bad={ai.adulteration_risk === 'high'} warn={ai.adulteration_risk === 'medium'}
+                facts={[['Risk', riskLabel[ai.adulteration_risk], `${ai.adulteration_score}% probability`], ['Likely additive', ai.suspected ? ai.suspected.charAt(0).toUpperCase() + ai.suspected.slice(1) : 'None']]} />
             </div>
-            <ul className="mt-5 grid gap-2">
+            <ul className="mt-4 grid gap-2">
               {ai.notes.map((n) => (
-                <li key={n} className={`flex items-start gap-2 rounded-xl px-3 py-2 text-[14px] ${ai.accept && ai.adulteration_risk === 'low' && n.startsWith('All') ? 'bg-mint-soft text-forest' : 'bg-cream text-ink'}`}>
+                <li key={n} className={`flex items-start gap-2 rounded-xl px-3 py-2 text-[14px] ${n.startsWith('All') ? 'bg-mint-soft text-forest' : 'bg-cream text-ink'}`}>
                   <Icon name={n.startsWith('All') ? 'check' : 'alert'} size={16} className="mt-0.5 shrink-0" />{n}
                 </li>
               ))}
@@ -241,31 +256,40 @@ export default function RecordMilk() {
             {ai.accept ? (
               <>
                 <h2 className="display text-[19px] text-forest-deep">Offer to {farmer.full_name.split(' ')[0]}</h2>
-                <p className="mt-1 text-[13.5px] text-muted">Your rate for {milkLabel[farmer.milk_type].toLowerCase()} milk is {rs(ai.base_rate)}. The AI adjusts it for this grade.</p>
-                <label className="mt-5 block text-[13px] font-semibold" htmlFor="price">Price per litre</label>
+                <div className="mt-4 flex items-center justify-between gap-3 rounded-2xl bg-cream px-4 py-3">
+                  <div><p className="text-[12.5px] text-muted">Market rate from the AI</p><p className="display num text-[22px]">{rs(ai.market_price)}<span className="text-[13px] font-medium text-muted"> / L</span></p></div>
+                  <p className="max-w-[160px] text-right text-[12px] text-muted">{gradeLabel[ai.quality]} grade, from your {milkLabel[farmer.milk_type].toLowerCase()} rate of {rs(ai.base_rate)}</p>
+                </div>
+                <label className="mt-5 block text-[13px] font-semibold" htmlFor="price">Price you pay per litre</label>
                 <div className="mt-2 flex items-center gap-2">
                   <span className="text-[18px] font-semibold text-muted">Rs</span>
-                  <input id="price" className="input num h-14 w-full text-[26px] font-bold" type="number" min="1" value={price} onChange={(e) => setPrice(e.target.value)} />
+                  <input id="price" className={`input num h-14 w-full text-[26px] font-bold ${Number(price) < ai.min_price ? 'border-danger' : ''}`} type="number" min={ai.min_price} value={price} onChange={(e) => setPrice(e.target.value)} />
                 </div>
-                {Number(price) !== Number(ai.price_per_l) && (
-                  <button className="mt-2 self-start text-[13px] font-semibold text-forest hover:underline" onClick={() => setPrice(ai.price_per_l)}>Use AI price {rs(ai.price_per_l)}</button>
-                )}
-                <div className="mt-5 rounded-2xl bg-cream px-4 py-3">
-                  <div className="flex justify-between text-[14px] text-muted"><span>{litres(qty)} × {rs(price || 0)}</span></div>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {[[Number(ai.farmer_min_pct), ai.min_price], [Number(ai.farmer_default_pct), ai.offer_price], [100, ai.market_price]].map(([pct, v]) => (
+                    <button key={pct} type="button" onClick={() => setPrice(v)}
+                      className={`rounded-full px-3 py-1 text-[12.5px] font-semibold transition-colors ${Number(price) === Number(v) ? 'bg-forest text-cream' : 'bg-cream-2 text-muted hover:text-ink'}`}>{pct}% · {rs(v)}</button>
+                  ))}
+                </div>
+                <p className={`mt-2 text-[12.5px] ${Number(price) < ai.min_price ? 'font-semibold text-danger' : 'text-muted'}`}>
+                  Farmers get at least {Number(ai.farmer_min_pct)}% of the market rate ({rs(ai.min_price)}). We suggest {Number(ai.farmer_default_pct)}%.
+                </p>
+                <div className="mt-4 rounded-2xl bg-cream px-4 py-3">
+                  <div className="flex justify-between text-[14px] text-muted"><span>{litres(qty)} × {rs(price || 0)}</span><span>{Math.round((Number(price) / ai.market_price) * 100)}% of market</span></div>
                   <p className="display num mt-1 text-[30px]">{rs(Math.round(qty * (Number(price) || 0)))}</p>
                 </div>
                 <div className="mt-auto flex justify-between gap-2 pt-6">
                   <button className="btn-ghost" onClick={() => setStep(1)}>Back</button>
-                  <button className="btn-primary" disabled={saving || !(Number(price) > 0)} onClick={save}>{saving ? 'Sending…' : 'Send offer'}</button>
+                  <button className="btn-primary" disabled={saving || !(Number(price) >= ai.min_price) || overdue} onClick={save}>{saving ? 'Sending…' : 'Send offer'}</button>
                 </div>
               </>
             ) : (
               <>
                 <h2 className="display text-[19px] text-forest-deep">Return the milk</h2>
-                <p className="mt-2 text-muted">The sample failed the test, so it should not go into your stock. We will save the test so the farmer can see why.</p>
+                <p className="mt-2 text-muted">The sample failed the test, so it should not go into your stock. We save the test so the farmer can see why.</p>
                 <div className="mt-auto flex justify-between gap-2 pt-6">
                   <button className="btn-ghost" onClick={() => setStep(1)}>Test again</button>
-                  <button className="btn-danger" disabled={saving} onClick={save}>{saving ? 'Saving…' : 'Record as not bought'}</button>
+                  <button className="btn-danger" disabled={saving || overdue} onClick={save}>{saving ? 'Saving…' : 'Record as not bought'}</button>
                 </div>
               </>
             )}
@@ -276,12 +300,21 @@ export default function RecordMilk() {
   )
 }
 
-function Fact({ label, value, hint, bad }) {
+// one ai model's result: which sensors it used and what it concluded
+function ModelCard({ title, inputs, facts, bad, warn }) {
   return (
-    <div className="rounded-2xl bg-cream px-3 py-3">
-      <p className="text-[12px] text-muted">{label}</p>
-      <p className={`display num mt-0.5 text-[20px] sm:text-[22px] ${bad ? 'text-danger' : ''}`}>{value}</p>
-      {hint && <p className="text-[11.5px] text-muted">{hint}</p>}
+    <div className={`rounded-2xl border p-4 ${bad ? 'border-[#efc6bb] bg-[#fbeee9]' : warn ? 'border-[#efd59a] bg-haldi-soft/60' : 'border-line bg-cream'}`}>
+      <p className="text-[13px] font-semibold text-forest-deep">{title}</p>
+      <p className="text-[11.5px] text-muted">from {inputs}</p>
+      <dl className="mt-3 grid grid-cols-2 gap-2">
+        {facts.map(([label, value, hint]) => (
+          <div key={label}>
+            <dt className="text-[12px] text-muted">{label}</dt>
+            <dd className={`display num text-[20px] ${bad && /risk/i.test(label) ? 'text-danger' : ''}`}>{value}</dd>
+            {hint && <p className="text-[11.5px] text-muted">{hint}</p>}
+          </div>
+        ))}
+      </dl>
     </div>
   )
 }

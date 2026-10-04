@@ -32,6 +32,8 @@ import Inventory from './pages/manager/Inventory'
 import ShopOrders from './pages/manager/ShopOrders'
 import IotReadings from './pages/manager/IotReadings'
 import AiPricing from './pages/manager/AiPricing'
+import Billing from './pages/manager/Billing'
+import AdminBilling from './pages/admin/Billing'
 
 
 export default function App() {
@@ -56,6 +58,7 @@ export default function App() {
               <Route path="approvals" element={<Approvals />} />
               <Route path="users" element={<Users />} />
               <Route path="bulk-market" element={<BulkMarket />} />
+              <Route path="billing" element={<AdminBilling />} />
               <Route path="*" element={<ModuleSoon />} />
             </Route>
           </Route>
@@ -74,6 +77,7 @@ export default function App() {
               <Route path="orders" element={<ShopOrders />} />
               <Route path="iot" element={<IotReadings />} />
               <Route path="ai-pricing" element={<AiPricing />} />
+              <Route path="billing" element={<Billing />} />
               <Route path="*" element={<ModuleSoon />} />
             </Route>
           </Route>

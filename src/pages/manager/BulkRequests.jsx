@@ -52,7 +52,7 @@ export default function BulkRequests() {
         <div className="panel overflow-x-auto">
           <table className="table min-w-[900px]">
             <thead>
-              <tr><th>Buyer</th><th>Needs</th><th>Delivery</th><th className="text-right">Target / L</th><th className="text-right">Bids</th><th>Closes</th><th>Your bid</th></tr>
+              <tr><th>Buyer</th><th>Needs</th><th>Delivery</th><th className="text-right">Target / L</th><th className="text-right">Offers</th><th>Closes</th><th>Your bid</th></tr>
             </thead>
             <tbody>
               {loading && <SkeletonRows cols={7} />}
@@ -72,7 +72,7 @@ export default function BulkRequests() {
                     </td>
                     <td className="num">{date(r.required_date)}<p className="text-[13px] text-muted">{r.delivery_city}</p></td>
                     <td className="num text-right">{r.target_price ? rs(r.target_price) : <span className="text-muted">Open</span>}</td>
-                    <td className="num text-right">{r.bid_count}</td>
+                    <td className="num text-right">{r.bid_count}{r.lowest_offer ? <p className="text-[12.5px] font-semibold text-forest">from {rs(r.lowest_offer)}</p> : null}</td>
                     <td className="text-muted">{relative(r.bid_deadline)}</td>
                     <td>{mine && mine.status === 'submitted' ? <Badge tone="green">{rs(mine.price_per_l)}</Badge> : <span className="btn-secondary btn-sm">Bid</span>}</td>
                   </tr>
