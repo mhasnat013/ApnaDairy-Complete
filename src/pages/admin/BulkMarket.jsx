@@ -35,7 +35,7 @@ export default function BulkMarket() {
         <StatCard label="Taking bids" value={data ? data.reqs.filter((r) => r.status === 'open').length : null} note="open requirements" />
         <StatCard label="Bids placed" value={data ? data.reqs.reduce((n, r) => n + r.bids.length, 0) : null} note="all time" />
         <StatCard label="Orders" value={data ? live.length : null} note={data ? `${litres(live.reduce((n, o) => n + Number(o.quantity_l), 0))} of milk` : null} />
-        <StatCard label="Order value" value={data ? rs(live.reduce((n, o) => n + Number(o.total_amount), 0)) : null} note="excluding cancelled" />
+        <StatCard label="Order value" value={data ? rs(live.reduce((n, o) => n + Number(o.total_amount), 0)) : null} note={data ? `${rs((data.orders ?? []).filter((o) => o.status === 'delivered').reduce((n, o) => n + Number(o.total_amount), 0))} delivered` : null} />
       </StatRow>
 
       <div className="mb-4 mt-10">

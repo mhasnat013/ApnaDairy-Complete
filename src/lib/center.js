@@ -121,7 +121,8 @@ export const recordCollection = (a) => rpc('record_collection', {
   p_source: a.source, p_price: a.price ?? null, p_manual_reason: a.manualReason || null,
 })
 export const recordSale = (items, name) => rpc('record_sale', { p_items: items, p_customer_name: name || null })
-export const updateShopOrder = (id, status) => rpc('update_shop_order', { p_id: id, p_status: status })
+// returns null when done, or a message when the customer's delivery code was wrong
+export const updateShopOrder = (id, status, code) => rpc('update_shop_order', { p_id: id, p_status: status, p_code: code ?? null })
 export const seedSample = () => rpc('seed_sample_data_v2')
 export const clearSample = () => rpc('clear_sample_data')
 
@@ -240,7 +241,7 @@ export const createListing = async (type, price) => must(await supabase.from('pr
 }).select().single())
 export const saveListing = async (l) => must(await supabase.from('products').update({
   price: Number(l.price), discount_pct: Number(l.discount_pct) || 0, is_available: !!l.is_available,
-  listed_l: l.listed_l === '' || l.listed_l == null ? null : Number(l.listed_l),
+  listed_l: null,
   min_order_l: Number(l.min_order_l) || 1, delivers: !!l.delivers, description: l.description || null,
 }).eq('id', l.id))
 
@@ -275,5 +276,9 @@ export const adminDisputes = async () => must(await supabase.from('farmer_payout
 export const adminUsageAudit = async () => must(await supabase.from('usage_audit')
   .select('*, center:area_managers(center_name, city)').order('created_at', { ascending: false }).limit(100))
 export const auditLabel = { cancelled: 'Cancelled', corrected: 'Corrected', expired: 'Offer expired', usage_undone: 'Stock entry undone' }
+// ---------- stock and orders: fresh stock, delivery codes, bid limits ----------
+export const myMilkShelf = () => rpc('my_milk_shelf')
+export const myBidCapacity = (type) => rpc('my_bid_capacity', { p_type: type }).then((r) => (Array.isArray(r) ? r[0] : r))
+export const demoDeliveryCode = (kind, id) => rpc('demo_delivery_code', { p_kind: kind, p_order: id })
 export const payoutStatusLabel = { sent: 'Waiting for farmer', confirmed: 'Confirmed', disputed: 'Disputed by farmer' }
 export const payoutTone = { sent: 'amber', confirmed: 'green', disputed: 'red' }

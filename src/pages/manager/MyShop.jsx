@@ -71,7 +71,7 @@ function Listings({ data, guide, reload }) {
   return (
     <div className="grid gap-4">
       <p className="rounded-2xl bg-mint-soft px-4 py-3 text-[13.5px] text-forest">
-        Milk you buy from farmers goes straight into these listings. Customers see the litres in stock, your price, your city and a freshness score from the AI.
+        Milk you buy from farmers goes straight into these listings. Customers see the fresh litres in stock, your price, your city and a freshness score from the AI.
       </p>
       {TYPES.map((t) => {
         const l = data.listings.find((x) => x.milk_type === t)
@@ -90,9 +90,8 @@ function ListingCard({ listing, pub, stock, guide, reload }) {
   const [l, setL] = useState(listing)
   const [busy, setBusy] = useState(false)
   const set = (k) => (e) => setL({ ...l, [k]: e.target.type === 'checkbox' ? e.target.checked : e.target.value })
-  const dirty = ['price', 'discount_pct', 'is_available', 'listed_l', 'min_order_l', 'delivers', 'description'].some((k) => String(l[k] ?? '') !== String(listing[k] ?? ''))
+  const dirty = ['price', 'discount_pct', 'is_available', 'min_order_l', 'delivers', 'description'].some((k) => String(l[k] ?? '') !== String(listing[k] ?? ''))
   const over = guide && Number(l.price) > guide.max
-  const limited = l.listed_l != null && l.listed_l !== ''
   const save = async (patch) => {
     const next = { ...l, ...patch }
     if (guide && Number(next.price) > guide.max) return toast(`The most you can charge is ${rs(guide.max)} a litre (${guide.maxPct}% above what you pay farmers).`, 'error')
@@ -115,8 +114,8 @@ function ListingCard({ listing, pub, stock, guide, reload }) {
       </div>
 
       <div className="mt-4 grid grid-cols-3 gap-2">
-        <Stat label="On the app now" value={pub ? litres(+Number(pub.available_l).toFixed(1)) : litres(+stock.toFixed(1))} />
-        <Stat label="Freshness" value={pub ? `${pub.freshness_score}/100` : '—'} hint={pub?.hours_left ? `about ${Math.round(pub.hours_left)} h left` : 'no milk in stock'} />
+        <Stat label={pub ? 'Fresh on the app' : 'In stock'} value={pub ? litres(+Number(pub.available_l).toFixed(1)) : litres(+stock.toFixed(1))} />
+        <Stat label="Freshness" value={pub ? `${pub.freshness_score}/100` : '—'} hint={pub?.hours_left ? `about ${Math.round(pub.hours_left)} h left` : 'no fresh milk'} />
         <Stat label="Price on the app" value={rs(Math.round(l.price * (100 - (Number(l.discount_pct) || 0)) / 100))} hint="per litre" />
       </div>
 
@@ -138,10 +137,8 @@ function ListingCard({ listing, pub, stock, guide, reload }) {
           <span className="hint">Shown as a deal in the app</span>
         </div>
         <div className="field">
-          <span className="label">Litres to show</span>
-          <Segmented size="sm" value={limited ? 'limit' : 'all'} onChange={(v) => setL({ ...l, listed_l: v === 'all' ? null : Math.floor(stock) })}
-            options={[{ value: 'all', label: 'All my stock' }, { value: 'limit', label: 'Up to a limit' }]} />
-          {limited && <div className="mt-2 flex items-center gap-2"><input className="input num w-28" type="number" min="0" value={l.listed_l} onChange={set('listed_l')} aria-label="Litre limit" /><span className="text-[13px] text-muted">litres, keep the rest for the counter</span></div>}
+          <span className="label">Litres on the app</span>
+          <p className="rounded-2xl bg-cream px-4 py-3 text-[13px] text-muted">All your fresh stock. Every app order, counter sale and bulk dispatch takes its litres out straight away, and milk past its shelf life is never shown.</p>
         </div>
         <div className="field">
           <label htmlFor={`m-${listing.id}`}>Smallest order</label>

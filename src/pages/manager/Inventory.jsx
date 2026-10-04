@@ -3,7 +3,7 @@ import { useLoad } from '../../lib/useLoad'
 import { useUi } from '../../context/UiContext'
 import { Link } from 'react-router-dom'
 import {
-  milkStock, stockBatches, usageLog, recordUsage, undoUsage, shelfBatches, stockLeft, milkLabel, usageLabel, timeOf,
+  milkStock, myMilkShelf, stockBatches, usageLog, recordUsage, undoUsage, shelfBatches, stockLeft, milkLabel, usageLabel, timeOf,
 } from '../../lib/center'
 import { litres, date, relative } from '../../lib/format'
 import PageHeader from '../../components/PageHeader'
@@ -18,8 +18,8 @@ const TYPES = ['buffalo', 'cow', 'mixed']
 
 export default function Inventory() {
   const { data, error, reload } = useLoad(async () => {
-    const [stock, batches, usage] = await Promise.all([milkStock(), stockBatches(), usageLog()])
-    return { stock, batches, usage }
+    const [stock, batches, usage, shelf] = await Promise.all([milkStock(), stockBatches(), usageLog(), myMilkShelf()])
+    return { stock, batches, usage, shelf }
   })
   const [usage, setUsage] = useState(null)
 
@@ -52,16 +52,26 @@ function MilkStock({ data, onUse, onChanged }) {
           const s = data?.stock.find((x) => x.milk_type === t)
           const left = s ? stockLeft(s) : 0
           const mine = shelf.filter((b) => b.milk_type === t)
-          const soon = mine.filter((b) => b.hoursLeft < 12).reduce((n, b) => n + b.remaining, 0)
+          const soon = mine.filter((b) => b.hoursLeft > 0 && b.hoursLeft < 12).reduce((n, b) => n + b.remaining, 0)
+          // from the database: milk past its shelf life cannot be sold on the app, at the counter or in bulk
+          const sh = data?.shelf?.find((x) => x.milk_type === t)
+          const expired = Math.round(Number(sh?.expired_l ?? 0) * 10) / 10
           return (
             <div key={t} className="panel animate-rise p-5">
               <p className="text-[13px] font-semibold text-muted">{milkLabel[t]} milk</p>
               <p className="display num mt-2 text-[34px]">{data ? litres(Math.round(left)) : '—'}</p>
-              <p className="text-[13px] text-muted">{left <= 0 ? 'Nothing in stock' : soon > 0 ? <span className="font-semibold text-amber">{Math.round(soon)} L to sell within 12 h</span> : `freshest from ${mine[mine.length - 1] ? relative(mine[mine.length - 1].collected_at) : 'today'}`}</p>
+              <p className="text-[13px] text-muted">{left <= 0 ? 'Nothing in stock' : expired > 0 ? `${litres(Math.round(Number(sh.sellable_l) * 10) / 10)} fresh to sell` : soon > 0 ? <span className="font-semibold text-amber">{Math.round(soon)} L to sell within 12 h</span> : `freshest from ${mine[mine.length - 1] ? relative(mine[mine.length - 1].collected_at) : 'today'}`}</p>
+              {expired > 0 && (
+                <div className="mt-3 rounded-2xl bg-[#f8e2dc] px-3 py-2.5 text-[13px] text-danger">
+                  <p className="font-semibold">{litres(expired)} past shelf life</p>
+                  <p className="mt-0.5 text-[12px]">It can no longer be sold. Throw it away and record it.</p>
+                  <button className="btn-danger btn-sm mt-2" onClick={() => onUse({ milk_type: t, litres: expired, reason: 'spoiled', note: 'Past shelf life' })}>Record as spoiled</button>
+                </div>
+              )}
               {s && (
                 <dl className="mt-4 grid grid-cols-3 gap-2 border-t border-line pt-3 text-[12px] text-muted">
                   <div><dt>Bought</dt><dd className="num font-semibold text-ink">{Math.round(s.bought_l)} L</dd></div>
-                  <div><dt>Sold</dt><dd className="num font-semibold text-ink">{Math.round(Number(s.sold_l) + Number(s.bulk_l))} L</dd></div>
+                  <div><dt>Sold or ordered</dt><dd className="num font-semibold text-ink">{Math.round(Number(s.sold_l) + Number(s.bulk_l))} L</dd></div>
                   <div><dt>Used</dt><dd className="num font-semibold text-ink">{Math.round(s.used_l)} L</dd></div>
                 </dl>
               )}

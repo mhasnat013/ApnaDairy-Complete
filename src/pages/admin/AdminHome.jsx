@@ -25,7 +25,8 @@ export default function AdminHome() {
       count('bulk_requirements', { status: 'open' }),
       supabase.from('bulk_orders').select('total_amount, status').then(({ data }) => data ?? []),
     ])
-    const live = orders.filter((o) => o.status !== 'cancelled')
+    // sales count once delivered, the same rule as center dashboards and billing
+    const live = orders.filter((o) => o.status === 'delivered')
     return { users, pending: pm + pb, am, bb, open, value: live.reduce((n, o) => n + Number(o.total_amount), 0) }
   })
 
@@ -45,7 +46,7 @@ export default function AdminHome() {
       <div className="mt-4">
         <StatRow cols={3}>
           <StatCard label="Bulk requests open" value={s?.open} note="taking bids now" />
-          <StatCard label="Bulk order value" value={s?.value} format={(n) => rs(Math.round(n))} note="excluding cancelled" tone="green" />
+          <StatCard label="Bulk sales" value={s?.value} format={(n) => rs(Math.round(n))} note="delivered orders" tone="green" />
         </StatRow>
       </div>
     </>

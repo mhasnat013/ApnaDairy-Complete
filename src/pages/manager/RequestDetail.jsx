@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { requirementForCenter, placeBid, withdrawBid, milkLabel, qualityLabel, qualityHint } from '../../lib/b2b'
 import { useLoad } from '../../lib/useLoad'
+import { myBidCapacity } from '../../lib/center'
 import { useUi } from '../../context/UiContext'
 import { rs, litres, date, dateTime, relative, cap } from '../../lib/format'
 import PageHeader from '../../components/PageHeader'
@@ -27,6 +28,11 @@ function BidForm({ req, onSaved }) {
   const [today] = useState(() => new Date().toISOString().slice(0, 10))
   const [busy, setBusy] = useState(false)
   const set = (k) => (e) => setF((p) => ({ ...p, [k]: e?.target ? e.target.value : e }))
+  // a center can promise at most 2 days of the milk it collects, the database enforces it
+  const { data: capacity } = useLoad(() => myBidCapacity(req.milk_type), [req.milk_type])
+  const maxBid = capacity ? Math.min(Number(req.quantity_l), Number(capacity.max_bid_l)) : Number(req.quantity_l)
+  const overCap = capacity && Number(f.quantity) > Number(capacity.max_bid_l)
+  const kind = req.milk_type === 'mixed' ? 'milk' : milkLabel[req.milk_type]?.toLowerCase()
 
   const total = Number(f.price || 0) * Number(f.quantity || 0)
   const t = Number(req.target_price)
@@ -88,13 +94,21 @@ function BidForm({ req, onSaved }) {
       <div className="grid grid-cols-2 gap-3">
         <div className="field">
           <label htmlFor="q">Litres</label>
-          <input id="q" type="number" min="1" max={req.quantity_l} step="1" required className="input num" value={f.quantity} onChange={set('quantity')} />
+          <input id="q" type="number" min="1" max={maxBid || undefined} step="1" required className={`input num ${overCap ? 'border-danger' : ''}`} value={f.quantity} onChange={set('quantity')} />
         </div>
         <div className="field">
           <label htmlFor="d">Delivery date</label>
           <input id="d" type="date" required className="input num" min={today} value={f.delivery_date} onChange={set('delivery_date')} />
         </div>
       </div>
+      {capacity && (
+        <p className={`-mt-2 rounded-2xl px-4 py-3 text-[12.5px] ${overCap || Number(capacity.max_bid_l) < 1 ? 'bg-[#f8e2dc] text-danger' : 'bg-cream text-muted'}`}>
+          {Number(capacity.max_bid_l) < 1
+            ? `Record a few days of ${kind} collection first. Bids are limited to 2 days of the milk you collect.`
+            : <>You collect about <b className="num">{litres(Math.round(capacity.daily_l))}</b> of {kind} a day, so you can bid up to <b className="num">{litres(capacity.max_bid_l)}</b> (2 days of milk). {litres(Math.round(capacity.fresh_now_l))} fresh in stock now.
+              {overCap && <button type="button" className="ml-1 font-semibold underline" onClick={() => set('quantity')(String(maxBid))}>Use {litres(maxBid)}</button>}</>}
+        </p>
+      )}
 
       <div className="field">
         <span className="label">How fresh on arrival?</span>
@@ -126,7 +140,7 @@ function BidForm({ req, onSaved }) {
         <span className="font-medium text-muted">Order value</span>
         <span className="display num text-[28px] text-forest-deep">{rs(total)}</span>
       </div>
-      <button className="btn-primary h-12 w-full text-[15.5px]" disabled={busy}>{busy ? 'Sending…' : live ? 'Update my bid' : 'Send bid'}</button>
+      <button className="btn-primary h-12 w-full text-[15.5px]" disabled={busy || overCap}>{busy ? 'Sending…' : live ? 'Update my bid' : 'Send bid'}</button>
       {live && <button type="button" className="btn-danger w-full" disabled={busy} onClick={withdraw}>Withdraw bid</button>}
     </form>
   )

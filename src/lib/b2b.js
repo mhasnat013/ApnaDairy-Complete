@@ -119,4 +119,6 @@ export const placeBid = (a) => rpc('place_bid', a)
 export const withdrawBid = (id) => rpc('withdraw_bid', { p_bid: id })
 export const acceptBid = (id) => rpc('accept_bid', { p_bid: id })
 export const cancelRequirement = (id) => rpc('cancel_requirement', { p_requirement: id })
-export const updateBulkOrder = (id, status) => rpc('update_bulk_order', { p_order: id, p_status: status })
+// returns null when done, or a message when the delivery code was wrong
+export const updateBulkOrder = (id, status, code) => rpc('update_bulk_order', { p_order: id, p_status: status, p_code: code ?? null })
+export const myDeliveryCodes = async () => { const { data, error } = await supabase.from('delivery_codes').select('order_id, code').eq('order_kind', 'bulk'); if (error) throw error; return data }

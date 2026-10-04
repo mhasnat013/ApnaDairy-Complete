@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useLoad } from '../../lib/useLoad'
+import { useAuth } from '../../context/AuthContext'
 import { useUi } from '../../context/UiContext'
 import {
-  activeOrders, pastOrders, products, milkStock, recordSale, updateShopOrder, stockLeft,
+  activeOrders, pastOrders, products, myMilkShelf, myCenter, recordSale, updateShopOrder,
   orderStatusLabel, orderTone, nextOrderStep, timeOf,
 } from '../../lib/center'
 import { rs, date, relative } from '../../lib/format'
@@ -15,6 +16,7 @@ import Icon from '../../components/Icon'
 import Sheet from '../../components/Sheet'
 import EmptyState from '../../components/EmptyState'
 import { SkeletonRows } from '../../components/Skeleton'
+import DeliverySheet from '../../components/DeliverySheet'
 
 const COLUMNS = ['pending', 'preparing', 'out_for_delivery']
 const qtyText = (i) => `${Number(i.quantity)} ${i.unit === 'litre' ? 'L' : i.unit === 'kg' || Number(i.quantity) === 1 ? i.unit : `${i.unit}s`}`
@@ -48,12 +50,17 @@ export default function ShopOrders() {
 
 function Board({ data, loading, reload }) {
   const { toast, confirm } = useUi()
+  const { profile } = useAuth()
+  const { data: center } = useLoad(() => myCenter(profile.id), [profile.id])
   const [busy, setBusy] = useState(null)
+  const [delivering, setDelivering] = useState(null)
   const move = async (o, status) => {
     if (status === 'cancelled') {
-      const ok = await confirm({ title: 'Cancel this order?', body: `${o.customer_name}’s order of ${rs(o.total_amount)}. Packed products go back into stock.`, confirmLabel: 'Cancel order', danger: true, cancelLabel: 'Keep order' })
+      const ok = await confirm({ title: 'Cancel this order?', body: `${o.customer_name}’s order of ${rs(o.total_amount)}. The milk goes back into your stock.`, confirmLabel: 'Cancel order', danger: true, cancelLabel: 'Keep order' })
       if (!ok) return
     }
+    // app orders are delivered with the customer's code
+    if (status === 'delivered' && o.channel === 'app') return setDelivering(o)
     setBusy(o.id)
     try { await updateShopOrder(o.id, status); toast(status === 'cancelled' ? 'Order cancelled.' : `${o.customer_name}: ${orderStatusLabel[status].toLowerCase()}.`); await reload() } catch (e) { toast(e.message, 'error') }
     setBusy(null)
@@ -63,6 +70,10 @@ function Board({ data, loading, reload }) {
   }
   return (
     <div className="grid gap-4 lg:grid-cols-3">
+      <DeliverySheet key={delivering?.id ?? 'closed'} order={delivering} kind="shop" demo={center?.is_demo}
+        title={delivering ? `Deliver to ${delivering.customer_name}` : ''} subtitle={delivering ? `${rs(delivering.total_amount)} · ${delivering.delivery_address ?? ''}` : ''}
+        submit={(code) => updateShopOrder(delivering.id, 'delivered', code)}
+        onClose={() => setDelivering(null)} onDone={() => { toast(`${delivering.customer_name}: delivered.`); reload() }} />
       {COLUMNS.map((col) => {
         const list = (data ?? []).filter((o) => o.status === col)
         return (
@@ -127,16 +138,17 @@ function History({ rows, loading }) {
 // counter sale: tap products, adjust quantities, record. stock is checked by the database.
 function SaleForm({ open, onClose, onSaved }) {
   const { toast } = useUi()
-  const { data } = useLoad(async () => (open ? Promise.all([products(), milkStock()]) : null), [open])
+  // every milk listing can be sold at the counter, even one hidden from the app; only fresh milk counts
+  const { data } = useLoad(async () => (open ? Promise.all([products(), myMilkShelf()]) : null), [open])
   const [cart, setCart] = useState({})
   const [name, setName] = useState('')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
   const [prods, stock] = data ?? [[], []]
-  const avail = prods.filter((p) => p.is_available)
-  const left = (p) => (p.category === 'milk' ? stockLeft(stock.find((s) => s.milk_type === p.milk_type) ?? { bought_l: 0, sold_l: 0, bulk_l: 0, used_l: 0 }) : Number(p.stock_qty))
+  const avail = prods.filter((p) => p.category === 'milk')
+  const left = (p) => Math.max(0, Number(stock.find((s) => s.milk_type === p.milk_type)?.sellable_l ?? 0))
   const price = (p) => p.price * (100 - p.discount_pct) / 100
-  const step = (p) => (p.unit === 'bottle' || p.unit === 'pack' ? 1 : p.category === 'milk' ? 1 : 0.5)
+  const step = () => 0.5
   const change = (p, d) => setCart((c) => {
     const v = Math.max(0, Math.min(left(p), +((c[p.id] || 0) + d * step(p)).toFixed(2)))
     return { ...c, [p.id]: v }
@@ -164,6 +176,7 @@ function SaleForm({ open, onClose, onSaved }) {
       <Alert>{err}</Alert>
       <div className="field mb-4"><label htmlFor="cn">Customer name (optional)</label><input id="cn" className="input" placeholder="Walk-in customer" value={name} onChange={(e) => setName(e.target.value)} /></div>
       {!data && <div className="grid gap-2">{[1, 2, 3, 4].map((i) => <div key={i} className="skeleton h-16" />)}</div>}
+      {data && avail.length === 0 && <EmptyState title="No milk to sell yet">Add a milk listing on the My shop page first.</EmptyState>}
       <ul className="grid gap-2">
         {avail.map((p) => {
           const q = cart[p.id] || 0
@@ -172,7 +185,7 @@ function SaleForm({ open, onClose, onSaved }) {
             <li key={p.id} className={`flex items-center gap-3 rounded-2xl border px-3 py-2.5 transition-colors ${q > 0 ? 'border-forest bg-mint-soft' : 'border-line bg-white'}`}>
               <div className="min-w-0 flex-1">
                 <p className="truncate font-semibold">{p.name}</p>
-                <p className="text-[12.5px] text-muted">{rs(Math.round(price(p)))} per {p.unit}{p.discount_pct ? ` · ${p.discount_pct}% off` : ''} · {+max.toFixed(1)} left</p>
+                <p className="text-[12.5px] text-muted">{rs(Math.round(price(p)))} per {p.unit}{p.discount_pct ? ` · ${p.discount_pct}% off` : ''} · {+max.toFixed(1)} L fresh</p>
               </div>
               <div className="flex items-center gap-1">
                 <button type="button" className="grid h-9 w-9 place-items-center rounded-full border border-line bg-white disabled:opacity-40" onClick={() => change(p, -1)} disabled={q <= 0} aria-label={`Less ${p.name}`}><Icon name="minus" size={16} /></button>
