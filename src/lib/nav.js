@@ -15,6 +15,7 @@ export const navFor = {
     { to: '/manager/collection', label: 'Milk collection', icon: 'drop', ready: true },
     { to: '/manager/farmers', label: 'Farmers', icon: 'users', ready: true },
     { to: '/manager/inventory', label: 'Inventory', icon: 'box', ready: true },
+    { to: '/manager/shop', label: 'My shop', icon: 'store', ready: true },
     { to: '/manager/orders', label: 'Shop orders', icon: 'cart', ready: true },
     { to: '/manager/bulk-requests', label: 'Bulk requests', icon: 'gavel', ready: true },
     { to: '/manager/bulk-orders', label: 'Bulk orders', icon: 'truck', ready: true },

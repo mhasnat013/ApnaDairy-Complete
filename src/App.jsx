@@ -33,6 +33,7 @@ import ShopOrders from './pages/manager/ShopOrders'
 import IotReadings from './pages/manager/IotReadings'
 import AiPricing from './pages/manager/AiPricing'
 import Billing from './pages/manager/Billing'
+import MyShop from './pages/manager/MyShop'
 import AdminBilling from './pages/admin/Billing'
 
 
@@ -78,6 +79,7 @@ export default function App() {
               <Route path="iot" element={<IotReadings />} />
               <Route path="ai-pricing" element={<AiPricing />} />
               <Route path="billing" element={<Billing />} />
+              <Route path="shop" element={<MyShop />} />
               <Route path="*" element={<ModuleSoon />} />
             </Route>
           </Route>

@@ -3,7 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useLoad } from '../../lib/useLoad'
 import { useUi } from '../../context/UiContext'
 import {
-  farmersWithStats, settings, assessMilk, recordCollection, decideCollection, simulateReading, currentShift, billingOverview,
+  farmersWithStats, settings, assessMilk, recordCollection, decideCollection, simulateReading, currentShift, billingOverview, milkListings, createListing,
   milkLabel, gradeLabel, riskLabel, PARAMS, inRange,
 } from '../../lib/center'
 import { rs, litres } from '../../lib/format'
@@ -20,8 +20,8 @@ export default function RecordMilk() {
   const nav = useNavigate()
   const { toast } = useUi()
   const { data } = useLoad(async () => {
-    const [farmers, s, billing] = await Promise.all([farmersWithStats(), settings(), billingOverview().catch(() => null)])
-    return { farmers: farmers.filter((f) => f.is_active), settings: s, billing }
+    const [farmers, s, billing, listings] = await Promise.all([farmersWithStats(), settings(), billingOverview().catch(() => null), milkListings().catch(() => [])])
+    return { farmers: farmers.filter((f) => f.is_active), settings: s, billing, listings }
   })
   const [step, setStep] = useState(0)
   const [q, setQ] = useState('')
@@ -65,9 +65,24 @@ export default function RecordMilk() {
     } catch (e) { setErr(e.message) }
     setSaving(false)
   }
+  const listing = data?.listings?.find((l) => l.milk_type === farmer?.milk_type)
   const farmerSays = async (yes) => {
-    try { await decideCollection(done.id, yes); toast(yes ? `${litres(qty)} added to stock.` : 'Recorded as refused.'); nav('/manager/collection') }
-    catch (e) { toast(e.message, 'error') }
+    try {
+      await decideCollection(done.id, yes)
+      if (!yes) { toast('Recorded as refused.'); return nav('/manager/collection') }
+      toast(listing?.is_available ? `${litres(qty)} added to stock and to your ${milkLabel[farmer.milk_type].toLowerCase()} milk listing on the app.` : `${litres(qty)} added to stock.`)
+      setDone({ ...done, answered: true })
+    } catch (e) { toast(e.message, 'error') }
+  }
+  const listNow = async () => {
+    try {
+      if (listing) { nav('/manager/shop'); return }
+      // start at the suggested markup over what was just paid
+      const listPrice = Math.round(Number(price) * 1.2) || ({ cow: 205, buffalo: 240, mixed: 210 })[farmer.milk_type]
+      await createListing(farmer.milk_type, listPrice)
+      toast(`${milkLabel[farmer.milk_type]} milk is on the app at ${rs(listPrice)} a litre.`)
+      nav('/manager/shop')
+    } catch (e) { toast(e.message, 'error') }
   }
   const again = () => { setStep(0); setFarmerId(''); setQuantity(''); setReading(null); setAi(null); setPrice(''); setDone(null); setQ('') }
 
@@ -84,10 +99,22 @@ export default function RecordMilk() {
               ? <>{farmer.full_name} sees {litres(qty)} at {rs(price)} per litre ({rs(Math.round(qty * price))}) in the ApnaDairy app and can accept or refuse it. If they answer at the counter, record it here.</>
               : <>The milk failed the quality test, so it was not added to stock. {farmer.full_name} can see the test result in the app.</>}
           </p>
-          {done.accepted && (
+          {done.accepted && !done.answered && (
             <div className="mt-6 flex flex-wrap justify-center gap-2">
               <button className="btn-primary" onClick={() => farmerSays(true)}><Icon name="check" size={17} />Farmer accepted</button>
               <button className="btn-secondary" onClick={() => farmerSays(false)}>Farmer refused</button>
+            </div>
+          )}
+          {done.answered && (
+            <div className="mt-6 rounded-2xl bg-mint-soft px-4 py-4 text-left text-[14px] text-forest">
+              {listing?.is_available ? (
+                <p><b>{litres(qty)} is now in stock</b> and shows in your {milkLabel[farmer.milk_type].toLowerCase()} milk listing on the customer app.</p>
+              ) : (
+                <>
+                  <p><b>{litres(qty)} is now in stock.</b> {listing ? `Your ${milkLabel[farmer.milk_type].toLowerCase()} milk listing is hidden from the app.` : `List ${milkLabel[farmer.milk_type].toLowerCase()} milk so customers can order it in the app.`}</p>
+                  <button className="btn-primary btn-sm mt-3" onClick={listNow}><Icon name="store" size={15} />{listing ? 'Open my shop' : 'List it on the app'}</button>
+                </>
+              )}
             </div>
           )}
           <div className="mt-4 flex flex-wrap justify-center gap-2">

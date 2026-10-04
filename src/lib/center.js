@@ -204,3 +204,43 @@ export const savePlatformSettings = async (s) => {
 export const saveTier = async (t) => must(await supabase.from('billing_tiers').upsert({ name: t.name, min_monthly_sales: Number(t.min_monthly_sales), discount_pct: Number(t.discount_pct) }))
 export const paymentLabel = { jazzcash: 'JazzCash', easypaisa: 'EasyPaisa', bank: 'Bank transfer', cash: 'Cash' }
 export const monthLabel = (d) => (d ? new Date(`${d.slice(0, 10)}T12:00:00`).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }) : '')
+
+// ---------- milk shop on the app: listings, profile, photos, reviews ----------
+export const myPublicListings = async (centerId) => must(await supabase.from('public_listings').select('*').eq('shop_id', centerId))
+export const myPublicShop = async (centerId) => must(await supabase.from('public_shops').select('*').eq('id', centerId).maybeSingle())
+export const shopProfile = async () => must(await supabase.from('shop_profiles').select('*').maybeSingle())
+export const saveShopProfile = async (centerId, p) => must(await supabase.from('shop_profiles').upsert({
+  area_manager_id: centerId, tagline: p.tagline || null, description: p.description || null, phone: p.phone || null,
+  whatsapp: p.whatsapp || null, opening_hours: p.opening_hours || null,
+  delivery_radius_km: p.delivery_radius_km === '' || p.delivery_radius_km == null ? null : Number(p.delivery_radius_km),
+  updated_at: new Date().toISOString(),
+}))
+export const shopPhotos = async () => must(await supabase.from('shop_photos').select('*').order('sort').order('created_at'))
+export const photoUrl = (path) => supabase.storage.from('shop-photos').getPublicUrl(path).data.publicUrl
+export async function uploadShopPhoto(centerId, file, sort = 0) {
+  const ext = (file.name.split('.').pop() || 'jpg').toLowerCase()
+  const path = `${centerId}/${Date.now()}-${Math.random().toString(36).slice(2, 7)}.${ext}`
+  const { error } = await supabase.storage.from('shop-photos').upload(path, file, { contentType: file.type, upsert: false })
+  if (error) throw error
+  return must(await supabase.from('shop_photos').insert({ path, sort }).select().single())
+}
+export async function deleteShopPhoto(photo) {
+  await supabase.storage.from('shop-photos').remove([photo.path])
+  return must(await supabase.from('shop_photos').delete().eq('id', photo.id))
+}
+export const setCoverPhoto = async (photos, id) => {
+  // the cover is the first photo: move the chosen one to the front
+  const ordered = [photos.find((p) => p.id === id), ...photos.filter((p) => p.id !== id)]
+  for (let i = 0; i < ordered.length; i++) await supabase.from('shop_photos').update({ sort: i }).eq('id', ordered[i].id)
+}
+export const myReviews = async () => must(await supabase.from('shop_reviews').select('*').order('created_at', { ascending: false }).limit(200))
+export const replyReview = (id, reply) => rpc('reply_review', { p_review: id, p_reply: reply })
+export const milkListings = async () => must(await supabase.from('products').select('*').eq('category', 'milk'))
+export const createListing = async (type, price) => must(await supabase.from('products').insert({
+  name: `Fresh ${({ cow: 'cow', buffalo: 'buffalo', mixed: 'mixed' })[type]} milk`, category: 'milk', milk_type: type, unit: 'litre', price, is_available: true,
+}).select().single())
+export const saveListing = async (l) => must(await supabase.from('products').update({
+  price: Number(l.price), discount_pct: Number(l.discount_pct) || 0, is_available: !!l.is_available,
+  listed_l: l.listed_l === '' || l.listed_l == null ? null : Number(l.listed_l),
+  min_order_l: Number(l.min_order_l) || 1, delivers: !!l.delivers, description: l.description || null,
+}).eq('id', l.id))
