@@ -24,6 +24,14 @@ import PublicRequests from './pages/PublicRequests'
 import Home from './pages/Home'
 import ManagerHome from './pages/manager/ManagerHome'
 import BusinessHome from './pages/business/BusinessHome'
+import Collection from './pages/manager/Collection'
+import RecordMilk from './pages/manager/RecordMilk'
+import Farmers from './pages/manager/Farmers'
+import FarmerDetail from './pages/manager/FarmerDetail'
+import Inventory from './pages/manager/Inventory'
+import ShopOrders from './pages/manager/ShopOrders'
+import IotReadings from './pages/manager/IotReadings'
+import AiPricing from './pages/manager/AiPricing'
 
 
 export default function App() {
@@ -58,6 +66,14 @@ export default function App() {
               <Route path="bulk-requests" element={<BulkRequests />} />
               <Route path="bulk-requests/:id" element={<RequestDetail />} />
               <Route path="bulk-orders" element={<BulkOrders />} />
+              <Route path="collection" element={<Collection />} />
+              <Route path="collection/new" element={<RecordMilk />} />
+              <Route path="farmers" element={<Farmers />} />
+              <Route path="farmers/:id" element={<FarmerDetail />} />
+              <Route path="inventory" element={<Inventory />} />
+              <Route path="orders" element={<ShopOrders />} />
+              <Route path="iot" element={<IotReadings />} />
+              <Route path="ai-pricing" element={<AiPricing />} />
               <Route path="*" element={<ModuleSoon />} />
             </Route>
           </Route>
