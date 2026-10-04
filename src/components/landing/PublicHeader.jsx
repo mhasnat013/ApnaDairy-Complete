@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext'
 import { homeFor } from '../../lib/roles'
 import Logo from '../Logo'
 import Icon from '../Icon'
+import JoinButton from './JoinButton'
 
 const links = [
   ['/#how', 'How it works'],
@@ -31,35 +32,17 @@ export default function PublicHeader() {
             <a key={to} href={to} className="rounded-full px-4 py-2 text-[14.5px] font-medium text-ink/80 transition-colors hover:bg-cream-2 hover:text-ink">{label}</a>
           ))}
         </nav>
-        <div className="flex items-center gap-2">
-          {profile ? (
-            <Link to={homeFor(profile.role)} className="btn-primary btn-sm">Open your portal</Link>
-          ) : (
-            <>
-              <Link to="/login" className="btn-ghost btn-sm hidden sm:inline-flex">Sign in</Link>
-             <Link
-  to="/signup"
-  className="join-cta"
-  onMouseMove={(e) => {
-    const r = e.currentTarget.getBoundingClientRect()
-    e.currentTarget.style.setProperty('--x', `${e.clientX - r.left}px`)
-    e.currentTarget.style.setProperty('--y', `${e.clientY - r.top}px`)
-  }}
->
-  <span className="join-cta-label">Join ApnaDairy</span>
-  <span className="join-cta-arrow" aria-hidden>
-    <svg className="a1" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
-    <svg className="a2" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
-  </span>
-</Link>
-            </>
+        <div className="flex items-center gap-3">
+          {!profile && (
+            <Link to="/login" className="btn-ghost btn-sm hidden sm:inline-flex">Sign in</Link>
           )}
+          <JoinButton to={profile ? homeFor(profile.role) : '/signup'} />
           <button className="btn-ghost h-10 w-10 p-0 lg:hidden" aria-label="Menu" aria-expanded={open} onClick={() => setOpen(!open)}><Icon name="menu" /></button>
         </div>
       </div>
       {open && (
         <nav className="animate-rise border-t border-line bg-cream px-4 pb-4 lg:hidden" aria-label="Site">
-          {[...links, ['/login', 'Sign in']].map(([to, label]) => (
+          {[...links, ...(profile ? [] : [['/login', 'Sign in']])].map(([to, label]) => (
             <a key={to} href={to} onClick={() => setOpen(false)} className="block rounded-xl px-3 py-3 text-[16px] font-medium hover:bg-cream-2">{label}</a>
           ))}
         </nav>

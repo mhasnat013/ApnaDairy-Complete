@@ -133,64 +133,96 @@ html { scroll-behavior: smooth; scroll-padding-top: 68px; }
 @keyframes dial-spin { to { transform: rotate(360deg); } }
 .dial-spin { transform-origin: 50px 50px; animation: dial-spin 60s linear infinite; }
 
-/* ---------- header "Join ApnaDairy" button ---------- */
-@property --angle { syntax: '<angle>'; initial-value: 0deg; inherits: false; }
+/* ---- Join ApnaDairy: premium header button ---- */
+@property --beam { syntax: '<angle>'; initial-value: 0deg; inherits: false; }
 
-.join-cta {
-  --x: 50%; --y: 50%;
-  position: relative; isolation: isolate; overflow: hidden;
+.jb {
+  --gold: #e2a93b; --gold-hi: #ffe9b0;
+  position: relative; isolation: isolate;
   display: inline-flex; align-items: center; gap: 12px;
-  height: 44px; padding: 0 6px 0 20px; border-radius: 999px;
-  background: #173a28; color: #f7f1e3;
-  font-size: 14.5px; font-weight: 600; letter-spacing: .01em; white-space: nowrap;
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / .12), 0 10px 24px -12px rgb(23 58 40 / .75);
-  transition: transform .2s ease, box-shadow .3s ease;
+  height: 46px; padding: 0 5px 0 20px; border-radius: 999px;
+  color: #fdf8ec; font-size: 14.5px; font-weight: 650; letter-spacing: .01em;
+  text-decoration: none; white-space: nowrap;
+  background:
+    radial-gradient(120% 140% at 50% -40%, rgb(255 255 255 / .16), transparent 55%),
+    var(--color-forest-deep);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / .14),
+    inset 0 0 0 1px rgb(226 169 59 / .28),
+    0 1px 2px rgb(23 58 40 / .4),
+    0 10px 24px -14px rgb(23 58 40 / .9);
+  transition: transform .35s cubic-bezier(.2,.8,.2,1), box-shadow .35s ease;
 }
+.jb:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / .18),
+    inset 0 0 0 1px rgb(226 169 59 / .5),
+    0 2px 4px rgb(23 58 40 / .35),
+    0 18px 34px -14px rgb(226 169 59 / .65);
+}
+.jb:active { transform: translateY(0) scale(.98); }
 
-/* a thin light that travels around the border */
-/* a bright light that travels around the border, with a soft glow trailing it */
-.join-cta::before {
-  content: ''; position: absolute; inset: 0; z-index: -1; border-radius: inherit; padding: 2.5px;
-  background: conic-gradient(from var(--angle),
-    rgb(226 169 59 / .25) 0%,          /* faint gold all the way round, so the edge is always visible */
-    rgb(226 169 59 / .25) 55%,
-    #e2a93b 70%,
-    #fff3cc 78%,                        /* bright tip of the light */
-    #e2a93b 84%,
-    rgb(226 169 59 / .25) 95%);
+/* thin golden comet running round the edge */
+.jb-beam {
+  position: absolute; inset: 0; z-index: -1; border-radius: inherit; padding: 2px; pointer-events: none;
+  background: conic-gradient(from var(--beam), transparent 0 78%, rgb(226 169 59 / 0) 78%, var(--gold) 92%, var(--gold-hi) 97%, transparent 100%);
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   -webkit-mask-composite: xor; mask-composite: exclude;
-  animation: join-orbit 2.6s linear infinite;
+  animation: jb-spin 3.6s linear infinite;
 }
-@keyframes join-orbit { to { --angle: 360deg; } }
-@keyframes join-orbit { to { --angle: 360deg; } }
+.jb:hover .jb-beam { animation-duration: 1.6s; }
 
-/* warm spotlight that follows the cursor */
-.join-cta::after {
-  content: ''; position: absolute; inset: 0; z-index: -2; border-radius: inherit;
-  background: radial-gradient(110px circle at var(--x) var(--y), rgb(226 169 59 / .38), transparent 65%);
+/* light that follows the cursor */
+.jb::before {
+  content: ''; position: absolute; inset: 0; z-index: -1; border-radius: inherit; pointer-events: none;
+  background: radial-gradient(90px circle at var(--x, 50%) var(--y, 50%), rgb(255 233 176 / .16), transparent 70%);
   opacity: 0; transition: opacity .3s ease;
 }
-.join-cta:hover::after { opacity: 1; }
-.join-cta:hover { transform: translateY(-1px); box-shadow: inset 0 1px 0 rgb(255 255 255 / .16), 0 16px 30px -14px rgb(23 58 40 / .85); }
-.join-cta:active { transform: translateY(0) scale(.97); }
+.jb:hover::before { opacity: 1; }
 
-/* yellow circle with an arrow that swaps on hover */
-.join-cta-arrow {
-  position: relative; overflow: hidden; display: grid; place-items: center;
-  width: 32px; height: 32px; border-radius: 999px;
-  background: #e2a93b; color: #173a28;
-  transition: transform .3s ease;
+/* letters roll up one by one into gold */
+.jb-roll { display: inline-flex; height: 1.25em; line-height: 1.25em; overflow: hidden; }
+.jb-roll > span {
+  position: relative; display: inline-block;
+  transition: transform .5s cubic-bezier(.7,0,.2,1);
+  transition-delay: calc(var(--i) * 16ms);
 }
-.join-cta-arrow svg { position: absolute; transition: transform .35s cubic-bezier(.6,0,.2,1); }
-.join-cta-arrow .a2 { transform: translateX(-180%); }
-.join-cta:hover .join-cta-arrow .a1 { transform: translateX(180%); }
-.join-cta:hover .join-cta-arrow .a2 { transform: translateX(0); }
-.join-cta:hover .join-cta-arrow { transform: scale(1.06); }
+.jb-roll > span::after {
+  content: attr(data-c); position: absolute; left: 0; top: 100%; color: var(--gold-hi);
+}
+.jb:hover .jb-roll > span { transform: translateY(-100%); }
 
+/* gold badge with an arrow that flies out and comes back */
+.jb-badge {
+  position: relative; display: grid; place-items: center; overflow: hidden;
+  width: 36px; height: 36px; border-radius: 999px;
+  color: var(--color-forest-deep);
+  background: linear-gradient(180deg, #f0c160, var(--gold));
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / .45), 0 2px 6px -2px rgb(0 0 0 / .35);
+  transition: transform .45s cubic-bezier(.2,.8,.2,1);
+}
+.jb:hover .jb-badge { transform: rotate(-45deg) scale(1.06); }
+.jb-badge svg { position: absolute; width: 16px; height: 16px; transition: transform .45s cubic-bezier(.7,0,.2,1); }
+.jb-badge svg + svg { transform: translateX(-180%); }
+.jb:hover .jb-badge svg:first-child { transform: translateX(180%); }
+.jb:hover .jb-badge svg + svg { transform: translateX(0); transition-delay: .08s; }
+
+/* tiny sparkles near the badge on hover */
+.jb-spark { position: absolute; width: 6px; height: 6px; pointer-events: none; opacity: 0;
+  background: var(--gold-hi); clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%); }
+.jb-spark.s1 { right: 2px; top: -4px; }
+.jb-spark.s2 { right: 40px; bottom: -3px; width: 5px; height: 5px; }
+.jb-spark.s3 { right: -5px; bottom: 6px; width: 4px; height: 4px; }
+.jb:hover .jb-spark { animation: jb-twinkle 1.4s ease-in-out infinite; }
+.jb:hover .jb-spark.s2 { animation-delay: .35s; }
+.jb:hover .jb-spark.s3 { animation-delay: .7s; }
+
+@keyframes jb-spin { to { --beam: 360deg; } }
+@keyframes jb-twinkle { 0%, 100% { opacity: 0; transform: scale(.4) rotate(0deg); } 50% { opacity: 1; transform: scale(1) rotate(45deg); } }
 @media (prefers-reduced-motion: reduce) {
-  .join-cta::before { animation: none; }
-  .join-cta-arrow svg { transition: none; }
+  .jb-beam, .jb-spark { animation: none !important; }
+  .jb-roll > span, .jb-badge, .jb-badge svg { transition: none; }
 }
 
 /* hero "Watch the film" card */
