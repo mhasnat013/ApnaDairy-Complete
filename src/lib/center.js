@@ -114,16 +114,15 @@ export const pastOrders = async (status, limit = 40) => {
 const rpc = async (fn, args) => must(await supabase.rpc(fn, args))
 export const assessMilk = (milkType, r) =>
   rpc('assess_milk', { p_milk_type: milkType, p_temperature: r.temperature_c, p_ph: r.ph, p_ec: r.ec_ms, p_tds: r.tds_ppm, p_reading_at: r.reading_at ?? new Date().toISOString() })
+// the reading time is set by the server, so it is not sent
 export const recordCollection = (a) => rpc('record_collection', {
   p_farmer: a.farmer, p_quantity: a.quantity, p_shift: a.shift, p_temperature: a.reading.temperature_c,
-  p_ph: a.reading.ph, p_ec: a.reading.ec_ms, p_tds: a.reading.tds_ppm, p_reading_at: a.reading.reading_at ?? new Date().toISOString(),
-  p_source: a.source, p_price: a.price ?? null,
+  p_ph: a.reading.ph, p_ec: a.reading.ec_ms, p_tds: a.reading.tds_ppm,
+  p_source: a.source, p_price: a.price ?? null, p_manual_reason: a.manualReason || null,
 })
-export const decideCollection = (id, accept, reason) => rpc('decide_collection', { p_id: id, p_accept: accept, p_reason: reason ?? null })
-export const payFarmer = (farmerId) => rpc('pay_farmer', { p_farmer: farmerId })
 export const recordSale = (items, name) => rpc('record_sale', { p_items: items, p_customer_name: name || null })
 export const updateShopOrder = (id, status) => rpc('update_shop_order', { p_id: id, p_status: status })
-export const seedSample = () => rpc('seed_sample_data')
+export const seedSample = () => rpc('seed_sample_data_v2')
 export const clearSample = () => rpc('clear_sample_data')
 
 export const saveFarmer = async (f) => {
@@ -254,3 +253,27 @@ export const deleteMarketCity = async (city) => must(await supabase.from('market
 export const centerCities = async () => must(await supabase.from('area_managers').select('city').eq('type', 'milk_center'))
 export const setDemoCenter = (userId, demo) => rpc('set_demo_center', { p_user: userId, p_demo: demo })
 export const cityLabel = (c) => (c === '*' ? 'All other cities' : c.replace(/\b\w/g, (m) => m.toUpperCase()))
+
+// ---------- farmer protection: offers, corrections, payments the farmer confirms ----------
+export const OFFER_HOURS = 2
+export const offerExpiresAt = (c) => new Date(c.collected_at).getTime() + OFFER_HOURS * 36e5
+export const expireMyOffers = () => rpc('expire_my_offers')
+export const demoFarmerAnswer = (id, accept) => rpc('demo_farmer_answer', { p_id: id, p_accept: accept })
+export const cancelCollection = (id, reason) => rpc('cancel_collection', { p_id: id, p_reason: reason })
+export const correctCollection = (id, quantity, reason) => rpc('correct_collection', { p_id: id, p_quantity: Number(quantity), p_reason: reason })
+export const collectionAudit = async (ids) => must(await supabase.from('collection_audit').select('*').in('collection_id', ids).order('created_at'))
+export const sendPayout = (farmerId, method, reference) => rpc('send_payout', { p_farmer: farmerId, p_method: method, p_reference: reference || null })
+export const demoAnswerPayout = (id, confirm) => rpc('demo_farmer_answer_payout', { p_id: id, p_confirm: confirm })
+export const farmerPayouts = async (farmerId) => must(await supabase.from('farmer_payouts').select('*').eq('farmer_id', farmerId).order('created_at', { ascending: false }).limit(50))
+export const collectionById = async (id) => must(await supabase.from('milk_collections').select('*, farmer:farmers(id, full_name, village)').eq('id', id).single())
+export const undoUsage = (id) => rpc('undo_usage', { p_id: id })
+export const adminAudit = async () => must(await supabase.from('collection_audit')
+  .select('*, center:area_managers(center_name, city), collection:milk_collections(quantity_l, milk_type, farmer:farmers(full_name))')
+  .order('created_at', { ascending: false }).limit(200))
+export const adminDisputes = async () => must(await supabase.from('farmer_payouts')
+  .select('*, center:area_managers(center_name, city), farmer:farmers(full_name, phone)').eq('status', 'disputed').order('answered_at', { ascending: false }).limit(100))
+export const adminUsageAudit = async () => must(await supabase.from('usage_audit')
+  .select('*, center:area_managers(center_name, city)').order('created_at', { ascending: false }).limit(100))
+export const auditLabel = { cancelled: 'Cancelled', corrected: 'Corrected', expired: 'Offer expired', usage_undone: 'Stock entry undone' }
+export const payoutStatusLabel = { sent: 'Waiting for farmer', confirmed: 'Confirmed', disputed: 'Disputed by farmer' }
+export const payoutTone = { sent: 'amber', confirmed: 'green', disputed: 'red' }

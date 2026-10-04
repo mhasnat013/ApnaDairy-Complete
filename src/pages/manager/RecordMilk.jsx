@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useLoad } from '../../lib/useLoad'
+import { useAuth } from '../../context/AuthContext'
 import { useUi } from '../../context/UiContext'
 import {
-  farmersWithStats, settings, assessMilk, recordCollection, decideCollection, simulateReading, currentShift, billingOverview, milkListings, createListing,
+  farmersWithStats, settings, assessMilk, recordCollection, demoFarmerAnswer, collectionById, myCenter, OFFER_HOURS, simulateReading, currentShift, billingOverview, milkListings, createListing,
   milkLabel, gradeLabel, riskLabel, PARAMS, inRange,
 } from '../../lib/center'
 import { rs, litres } from '../../lib/format'
@@ -12,6 +13,7 @@ import Segmented from '../../components/Segmented'
 import Icon from '../../components/Icon'
 import Alert from '../../components/Alert'
 import { RangeBar } from '../../components/charts'
+import Receipt from '../../components/Receipt'
 
 const STEPS = ['Farmer and quantity', 'Test the milk', 'Price and offer']
 
@@ -19,9 +21,10 @@ export default function RecordMilk() {
   const [params] = useSearchParams()
   const nav = useNavigate()
   const { toast } = useUi()
+  const { profile } = useAuth()
   const { data } = useLoad(async () => {
-    const [farmers, s, billing, listings] = await Promise.all([farmersWithStats(), settings(), billingOverview().catch(() => null), milkListings().catch(() => [])])
-    return { farmers: farmers.filter((f) => f.is_active), settings: s, billing, listings }
+    const [farmers, s, billing, listings, center] = await Promise.all([farmersWithStats(), settings(), billingOverview().catch(() => null), milkListings().catch(() => []), myCenter(profile.id).catch(() => null)])
+    return { farmers: farmers.filter((f) => f.is_active), settings: s, billing, listings, center }
   })
   const [step, setStep] = useState(0)
   const [q, setQ] = useState('')
@@ -32,6 +35,8 @@ export default function RecordMilk() {
   const [source, setSource] = useState('simulated')
   const [scanning, setScanning] = useState(false)
   const [manual, setManual] = useState(false)
+  const [manualReason, setManualReason] = useState('')
+  const [receipt, setReceipt] = useState(null)
   const [ai, setAi] = useState(null)
   const [price, setPrice] = useState('')
   const [saving, setSaving] = useState(false)
@@ -40,6 +45,8 @@ export default function RecordMilk() {
 
   const farmer = data?.farmers.find((f) => f.id === farmerId)
   const deviceOff = data?.billing && !data.billing.device_active
+  // with a working device, typed readings need a reason so a shop cannot quietly bypass the tester
+  const needReason = manual && !deviceOff && !manualReason.trim()
   const overdue = data?.billing && !data.billing.billing_ok
   const list = useMemo(() => (data?.farmers ?? []).filter((f) => `${f.full_name} ${f.village ?? ''}`.toLowerCase().includes(q.toLowerCase())), [data, q])
   const qty = Number(quantity)
@@ -60,18 +67,21 @@ export default function RecordMilk() {
   const save = async () => {
     setSaving(true); setErr('')
     try {
-      const id = await recordCollection({ farmer: farmerId, quantity: qty, shift, reading: { ...reading, reading_at: reading.reading_at ?? new Date().toISOString() }, source, price: ai?.accept ? Number(price) : null })
-      setDone({ id, accepted: ai?.accept })
+      const id = await recordCollection({ farmer: farmerId, quantity: qty, shift, reading, source, price: ai?.accept ? Number(price) : null, manualReason: source === 'manual' ? manualReason.trim() : null })
+      setDone({ id, accepted: ai?.accept, until: Date.now() + OFFER_HOURS * 36e5 })
     } catch (e) { setErr(e.message) }
     setSaving(false)
   }
   const listing = data?.listings?.find((l) => l.milk_type === farmer?.milk_type)
+  // demo accounts only: stands in for the farmer answering in the app
   const farmerSays = async (yes) => {
     try {
-      await decideCollection(done.id, yes)
-      if (!yes) { toast('Recorded as refused.'); return nav('/manager/collection') }
-      toast(listing?.is_available ? `${litres(qty)} added to stock and to your ${milkLabel[farmer.milk_type].toLowerCase()} milk listing on the app.` : `${litres(qty)} added to stock.`)
-      setDone({ ...done, answered: true })
+      const r = await demoFarmerAnswer(done.id, yes)
+      if (r === 'expired') { toast('This offer had expired, so it was closed.', 'error'); return nav('/manager/collection') }
+      if (!yes) { toast(`${farmer.full_name} refused the offer.`); return nav('/manager/collection') }
+      const row = await collectionById(done.id)
+      setDone({ ...done, answered: true, row })
+      setReceipt(row)
     } catch (e) { toast(e.message, 'error') }
   }
   const listNow = async () => {
@@ -84,7 +94,7 @@ export default function RecordMilk() {
       nav('/manager/shop')
     } catch (e) { toast(e.message, 'error') }
   }
-  const again = () => { setStep(0); setFarmerId(''); setQuantity(''); setReading(null); setAi(null); setPrice(''); setDone(null); setQ('') }
+  const again = () => { setStep(0); setFarmerId(''); setQuantity(''); setReading(null); setAi(null); setPrice(''); setDone(null); setQ(''); setManual(false); setManualReason(''); setSource('simulated') }
 
   if (done) {
     return (
@@ -93,17 +103,29 @@ export default function RecordMilk() {
           <span className={`mx-auto grid h-16 w-16 place-items-center rounded-full ${done.accepted ? 'bg-mint-soft text-forest' : 'bg-[#f8e2dc] text-danger'}`}>
             <Icon name={done.accepted ? 'check' : 'x'} size={30} />
           </span>
-          <h1 className="display mt-4 text-[28px] text-forest-deep">{done.accepted ? 'Offer sent to the farmer' : 'Recorded as not bought'}</h1>
+          <h1 className="display mt-4 text-[28px] text-forest-deep">{done.answered ? 'Farmer accepted' : done.accepted ? 'Offer sent to the farmer' : 'Recorded as not bought'}</h1>
           <p className="mt-2 text-muted">
-            {done.accepted
-              ? <>{farmer.full_name} sees {litres(qty)} at {rs(price)} per litre ({rs(Math.round(qty * price))}) in the ApnaDairy app and can accept or refuse it. If they answer at the counter, record it here.</>
+            {done.answered
+              ? <>{farmer.full_name} accepted {litres(qty)} at {rs(price)} per litre. Receipt {done.row?.receipt_no} was generated.</>
+              : done.accepted
+              ? <>{farmer.full_name} sees {litres(qty)} at {rs(price)} per litre ({rs(Math.round(qty * price))}) in the ApnaDairy app and accepts or refuses it there. Unanswered offers close at {new Date(done.until).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}.</>
               : <>The milk failed the quality test, so it was not added to stock. {farmer.full_name} can see the test result in the app.</>}
           </p>
           {done.accepted && !done.answered && (
-            <div className="mt-6 flex flex-wrap justify-center gap-2">
-              <button className="btn-primary" onClick={() => farmerSays(true)}><Icon name="check" size={17} />Farmer accepted</button>
-              <button className="btn-secondary" onClick={() => farmerSays(false)}>Farmer refused</button>
+            <div className="mt-5 rounded-2xl bg-cream px-4 py-3 text-left text-[13px] text-muted">
+              <p className="flex items-center gap-2 font-semibold text-ink"><Icon name="clock" size={15} />Waiting for {farmer.full_name.split(' ')[0]}</p>
+              <p className="mt-1">The milk joins your stock only after the farmer accepts. You can follow it on the collection page.</p>
+              {data?.center?.is_demo && (
+                <div className="mt-3 flex flex-wrap gap-2 border-t border-line pt-3">
+                  <span className="w-full text-[12px]">Demo account: answer as the farmer would in the app</span>
+                  <button className="btn-primary btn-sm" onClick={() => farmerSays(true)}><Icon name="check" size={15} />Accepts (demo)</button>
+                  <button className="btn-secondary btn-sm" onClick={() => farmerSays(false)}>Refuses (demo)</button>
+                </div>
+              )}
             </div>
+          )}
+          {done.answered && done.row?.receipt_no && (
+            <button className="mt-3 text-[13.5px] font-semibold text-forest hover:underline" onClick={() => setReceipt(done.row)}>View receipt {done.row.receipt_no}</button>
           )}
           {done.answered && (
             <div className="mt-6 rounded-2xl bg-mint-soft px-4 py-4 text-left text-[14px] text-forest">
@@ -122,6 +144,7 @@ export default function RecordMilk() {
             <Link to="/manager/collection" className="btn-ghost">Back to collection</Link>
           </div>
         </div>
+        <Receipt kind="collection" data={receipt} center={data?.center} onClose={() => setReceipt(null)} />
       </div>
     )
   }
@@ -246,9 +269,16 @@ export default function RecordMilk() {
                 ))}
               </div>
             )}
+            {manual && (
+              <div className="field mt-5">
+                <label htmlFor="mreason">Why typed by hand?{deviceOff ? ' (optional)' : ''}</label>
+                <input id="mreason" className="input" placeholder={deviceOff ? 'Device not active yet' : 'e.g. probe being cleaned, battery low'} value={manualReason} onChange={(e) => setManualReason(e.target.value)} />
+                <p className="mt-1 text-[12px] text-muted">The farmer and ApnaDairy see that these readings were typed, with your reason.</p>
+              </div>
+            )}
             <div className="mt-6 flex justify-between gap-2">
               <button className="btn-ghost" onClick={() => setStep(0)}>Back</button>
-              <button className="btn-primary" disabled={!reading || scanning || !ai} onClick={() => setStep(2)}>See AI result <Icon name="arrow" size={17} /></button>
+              <button className="btn-primary" disabled={!reading || scanning || !ai || needReason} onClick={() => setStep(2)}>See AI result <Icon name="arrow" size={17} /></button>
             </div>
           </section>
         </div>

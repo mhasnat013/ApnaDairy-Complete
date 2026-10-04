@@ -262,7 +262,7 @@ function FarmersToPay({ farmers }) {
               <div className="mt-1.5 h-2 rounded-full bg-cream-2">
                 <div className="h-2 rounded-full bg-haldi" style={{ width: `${(Number(f.stats.unpaid_amount) / top) * 100}%` }} />
               </div>
-              <p className="mt-1 text-[12px] text-muted">Last milk {f.stats.last_collected_at ? relative(f.stats.last_collected_at) : 'never'}</p>
+              <p className="mt-1 text-[12px] text-muted">{Number(f.stats.awaiting_confirmation) > 0 ? `${rs(Math.round(f.stats.awaiting_confirmation))} sent, waiting for the farmer to confirm` : `Last milk ${f.stats.last_collected_at ? relative(f.stats.last_collected_at) : 'never'}`}</p>
             </Link>
           </li>
         ))}

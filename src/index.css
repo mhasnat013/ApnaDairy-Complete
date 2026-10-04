@@ -263,3 +263,12 @@ html { scroll-behavior: smooth; scroll-padding-top: 68px; }
 .film-cta:hover .film-cta-play { background: #e2a93b; transform: scale(1.1); }
 @keyframes film-pulse { from { transform: scale(1); opacity: .9; } to { transform: scale(1.8); opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .film-cta-play::before { animation: none; } }
+
+/* printing a receipt: only the receipt card, on white */
+@media print {
+  body:has(.receipt-overlay) > #root { display: none; }
+  .receipt-overlay { position: static !important; padding: 0 !important; }
+  .receipt-overlay .no-print { display: none !important; }
+  .receipt-sheet { max-width: 360px !important; animation: none !important; }
+  .receipt-sheet article { box-shadow: none !important; border: 1px solid #ddd; }
+}

@@ -3,7 +3,7 @@ import { useLoad } from '../../lib/useLoad'
 import { useUi } from '../../context/UiContext'
 import { Link } from 'react-router-dom'
 import {
-  milkStock, stockBatches, usageLog, recordUsage, shelfBatches, stockLeft, milkLabel, usageLabel, timeOf,
+  milkStock, stockBatches, usageLog, recordUsage, undoUsage, shelfBatches, stockLeft, milkLabel, usageLabel, timeOf,
 } from '../../lib/center'
 import { litres, date, relative } from '../../lib/format'
 import PageHeader from '../../components/PageHeader'
@@ -30,13 +30,20 @@ export default function Inventory() {
         <button className="btn-primary" onClick={() => setUsage({})}><Icon name="minus" size={17} />Take milk out</button>
       </PageHeader>
       <Alert>{error}</Alert>
-      <MilkStock data={data} onUse={setUsage} />
+      <MilkStock data={data} onUse={setUsage} onChanged={reload} />
       <UsageForm key={usage ? 'usage-' + (usage.milk_type ?? '') : 'usage-closed'} value={usage} stock={data?.stock} onClose={() => setUsage(null)} onSaved={reload} />
     </>
   )
 }
 
-function MilkStock({ data, onUse }) {
+function MilkStock({ data, onUse, onChanged }) {
+  const { toast, confirm } = useUi()
+  // a wrong entry can be taken back for 15 minutes, after that it stays in the history
+  const canUndo = (u) => Date.now() - new Date(u.created_at) < 15 * 6e4
+  const undo = async (u) => {
+    if (!(await confirm({ title: 'Undo this entry?', body: `${litres(u.litres)} ${usageLabel[u.reason].toLowerCase()} goes back into stock. The undo is saved in the history.`, confirmLabel: 'Undo' }))) return
+    try { await undoUsage(u.id); toast(`${litres(u.litres)} back in stock.`); onChanged() } catch (e) { toast(e.message, 'error') }
+  }
   const shelf = shelfBatches(data?.batches, data?.stock)
   return (
     <div className="grid gap-4 sm:gap-5">
@@ -100,7 +107,10 @@ function MilkStock({ data, onUse }) {
                   <p className="truncate text-[14px] font-semibold">{usageLabel[u.reason]}</p>
                   <p className="truncate text-[12.5px] text-muted">{u.note ?? milkLabel[u.milk_type]} · {date(u.created_at)}, {timeOf(u.created_at)}</p>
                 </div>
-                <span className={`num shrink-0 text-[14px] font-semibold ${u.reason === 'spoiled' ? 'text-danger' : ''}`}>−{litres(u.litres)}</span>
+                <span className="flex shrink-0 items-center gap-3">
+                  {canUndo(u) && <button className="text-[12.5px] font-semibold text-forest hover:underline" onClick={() => undo(u)}>Undo</button>}
+                  <span className={`num text-[14px] font-semibold ${u.reason === 'spoiled' ? 'text-danger' : ''}`}>−{litres(u.litres)}</span>
+                </span>
               </li>
             ))}
           </ul>
