@@ -4,10 +4,12 @@ import { rs, litres, date } from '../lib/format'
 
 // every live offer on a request, cheapest first — visible to everyone
 export default function OffersList({ requirementId, target, highlight, dark = false }) {
-  const { data, loading } = useLoad(() => publicBids(requirementId), [requirementId])
+  const { data, loading, error } = useLoad(() => publicBids(requirementId), [requirementId])
   const muted = dark ? 'text-cream/65' : 'text-muted'
 
   if (loading) return <div className="space-y-2">{[0, 1].map((i) => <div key={i} className="skeleton h-16 rounded-2xl" />)}</div>
+  // a missing view (05_open_bids.sql not run) or any other failure should show, not look like "no offers"
+  if (error) return <p className="rounded-2xl bg-[#f8e2dc] px-4 py-3 text-[14px] text-danger">Offers could not load: {error}</p>
   if (!data?.length) return <p className={`text-[14.5px] ${muted}`}>No offers yet. The first center to bid sets the pace.</p>
 
   return (
