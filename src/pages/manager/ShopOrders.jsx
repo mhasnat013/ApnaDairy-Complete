@@ -115,7 +115,7 @@ function History({ rows, loading, status }) {
     <>
     {!loading && rows?.length > 0 && (
       <div className="mb-4 grid grid-cols-3 gap-3">
-        {[[status === 'delivered' ? 'Orders delivered' : 'Orders cancelled', rows.length], ['Milk', `${+litres.toFixed(1)} L`], [status === 'delivered' ? 'Sales' : 'Value', rs(Math.round(total))]].map(([k, v]) => (
+        {[[status === 'delivered' ? 'Orders delivered' : 'Orders cancelled', rows.length], (litres > 0 ? ['Milk', `${+litres.toFixed(1)} L`] : ['Items', (rows ?? []).reduce((n, o) => n + o.items.length, 0)]), [status === 'delivered' ? 'Sales' : 'Value', rs(Math.round(total))]].map(([k, v]) => (
           <div key={k} className="rounded-[18px] border border-line bg-surface px-4 py-3"><p className="text-[12.5px] text-muted">{k}</p><p className="display num mt-0.5 text-[20px] text-forest-deep sm:text-[22px]">{v}</p></div>
         ))}
       </div>

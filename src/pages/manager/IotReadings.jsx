@@ -49,9 +49,11 @@ export default function IotReadings() {
           <p className="text-[13px] text-cream/70">Milk tester</p>
           <p className="display mt-1 text-[26px]">{data?.device?.serial ?? 'No device yet'}</p>
           <span className="mt-3 inline-flex items-center gap-2 rounded-full bg-cream/10 px-3 py-1 text-[12.5px] font-semibold">
-            {data?.device
-              ? <><span className="relative flex h-2.5 w-2.5"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#7fd39b] opacity-60" /><span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-[#7fd39b]" /></span>Connected · live readings</>
-              : <><span className="h-2.5 w-2.5 rounded-full bg-cream/40" />No device linked</>}
+            {!data?.device
+              ? <><span className="h-2.5 w-2.5 rounded-full bg-cream/40" />No device linked</>
+              : data.device.is_active === false
+                ? <><span className="h-2.5 w-2.5 rounded-full bg-[#f0a08c]" />Switched off by ApnaDairy</>
+                : <><span className="h-2.5 w-2.5 rounded-full bg-[#7fd39b]" />Ready to test</>}
           </span>
           <dl className="mt-6 grid grid-cols-2 gap-3">
             <div className="rounded-2xl bg-cream/10 p-3"><dt className="text-[12px] text-cream/65">Tests today</dt><dd className="display num text-[26px]">{data ? today.length : '—'}</dd></div>

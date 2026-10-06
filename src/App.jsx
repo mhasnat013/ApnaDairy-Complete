@@ -1,3 +1,5 @@
+import { lazy, Suspense } from 'react'
+import Loader from './components/Loader'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from './context/AuthContext'
 import { UiProvider } from './context/UiContext'
@@ -8,39 +10,41 @@ import DashboardLayout from './layouts/DashboardLayout'
 import Login from './pages/auth/Login'
 import Signup from './pages/auth/Signup'
 import Pending from './pages/auth/Pending'
+import ForgotPassword from './pages/auth/ForgotPassword'
+import ResetPassword from './pages/auth/ResetPassword'
 import MobileOnly from './pages/auth/MobileOnly'
-import AdminHome from './pages/admin/AdminHome'
-import Approvals from './pages/admin/Approvals'
-import Users from './pages/admin/Users'
-import BulkMarket from './pages/admin/BulkMarket'
-import BulkRequests from './pages/manager/BulkRequests'
-import RequestDetail from './pages/manager/RequestDetail'
-import BulkOrders from './pages/manager/BulkOrders'
-import Requirements from './pages/business/Requirements'
-import NewRequirement from './pages/business/NewRequirement'
-import RequirementDetail from './pages/business/RequirementDetail'
-import BusinessOrders from './pages/business/BusinessOrders'
+const AdminHome = lazy(() => import('./pages/admin/AdminHome'))
+const Approvals = lazy(() => import('./pages/admin/Approvals'))
+const Users = lazy(() => import('./pages/admin/Users'))
+const BulkMarket = lazy(() => import('./pages/admin/BulkMarket'))
+const BulkRequests = lazy(() => import('./pages/manager/BulkRequests'))
+const RequestDetail = lazy(() => import('./pages/manager/RequestDetail'))
+const BulkOrders = lazy(() => import('./pages/manager/BulkOrders'))
+const Requirements = lazy(() => import('./pages/business/Requirements'))
+const NewRequirement = lazy(() => import('./pages/business/NewRequirement'))
+const RequirementDetail = lazy(() => import('./pages/business/RequirementDetail'))
+const BusinessOrders = lazy(() => import('./pages/business/BusinessOrders'))
 import PublicRequests from './pages/PublicRequests'
 import Home from './pages/Home'
-import ManagerHome from './pages/manager/ManagerHome'
-import BusinessHome from './pages/business/BusinessHome'
-import Collection from './pages/manager/Collection'
-import RecordMilk from './pages/manager/RecordMilk'
-import Farmers from './pages/manager/Farmers'
-import FarmerDetail from './pages/manager/FarmerDetail'
-import Inventory from './pages/manager/Inventory'
-import ShopOrders from './pages/manager/ShopOrders'
-import IotReadings from './pages/manager/IotReadings'
-import AiPricing from './pages/manager/AiPricing'
-import Billing from './pages/manager/Billing'
-import MyShop from './pages/manager/MyShop'
-import AdminBilling from './pages/admin/Billing'
-import MarketRates from './pages/admin/MarketRates'
-import Audit from './pages/admin/Audit'
-import IotDevices from './pages/admin/IotDevices'
-import Analytics from './pages/admin/Analytics'
-import Admins from './pages/admin/Admins'
-import Products from './pages/seller/Products'
+const ManagerHome = lazy(() => import('./pages/manager/ManagerHome'))
+const BusinessHome = lazy(() => import('./pages/business/BusinessHome'))
+const Collection = lazy(() => import('./pages/manager/Collection'))
+const RecordMilk = lazy(() => import('./pages/manager/RecordMilk'))
+const Farmers = lazy(() => import('./pages/manager/Farmers'))
+const FarmerDetail = lazy(() => import('./pages/manager/FarmerDetail'))
+const Inventory = lazy(() => import('./pages/manager/Inventory'))
+const ShopOrders = lazy(() => import('./pages/manager/ShopOrders'))
+const IotReadings = lazy(() => import('./pages/manager/IotReadings'))
+const AiPricing = lazy(() => import('./pages/manager/AiPricing'))
+const Billing = lazy(() => import('./pages/manager/Billing'))
+const MyShop = lazy(() => import('./pages/manager/MyShop'))
+const AdminBilling = lazy(() => import('./pages/admin/Billing'))
+const MarketRates = lazy(() => import('./pages/admin/MarketRates'))
+const Audit = lazy(() => import('./pages/admin/Audit'))
+const IotDevices = lazy(() => import('./pages/admin/IotDevices'))
+const Analytics = lazy(() => import('./pages/admin/Analytics'))
+const Admins = lazy(() => import('./pages/admin/Admins'))
+const Products = lazy(() => import('./pages/seller/Products'))
 import MilkOnly from './components/MilkOnly'
 
 
@@ -49,11 +53,14 @@ export default function App() {
     <AuthProvider>
       <UiProvider>
       <BrowserRouter>
+        <Suspense fallback={<Loader />}>
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
           <Route path="/pending" element={<Pending />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/requests" element={<PublicRequests />} />
 
           <Route element={<ProtectedRoute allow={['farmer', 'customer']} />}>
@@ -110,6 +117,7 @@ export default function App() {
 
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
+        </Suspense>
       </BrowserRouter>
       </UiProvider>
     </AuthProvider>

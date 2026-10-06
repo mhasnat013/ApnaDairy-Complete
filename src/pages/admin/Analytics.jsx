@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useLoad } from '../../lib/useLoad'
 import { adminAnalytics, rsShort, shortDay, weekday, monthLabel } from '../../lib/center'
-import { rs, litres } from '../../lib/format'
+import { rs, litres, plural } from '../../lib/format'
 import PageHeader from '../../components/PageHeader'
 import Segmented from '../../components/Segmented'
 import Card, { Kpi } from '../../components/Card'
@@ -43,7 +43,7 @@ export default function Analytics() {
       <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
         <Kpi accent label="Milk bought from farmers" value={data ? litres(Math.round(sum(daily, 'collected_l'))) : null} icon={<Icon name="drop" size={16} />} note={data ? `${rs(Math.round(sum(daily, 'paid')))} paid to farmers` : ''} />
         <Kpi label="Sold by centers" value={data ? rsShort(sum(daily, 'sales')) : null} note="delivered app and bulk orders" />
-        <Kpi label="Passed the quality test" value={data ? `${tests ? Math.round(((tests - failed) / tests) * 100) : 0}%` : null} note={data ? `${tests} tests, ${failed} failed` : ''} />
+        <Kpi label="Passed the quality test" value={data ? `${tests ? Math.round(((tests - failed) / tests) * 100) : 0}%` : null} note={data ? `${plural(tests, 'tests')}, ${failed} failed` : ''} />
         <Kpi label="ApnaDairy income" value={data ? rsShort(income6) : null} note="devices and fees, last 6 months" />
       </div>
 
@@ -75,7 +75,7 @@ export default function Analytics() {
       </div>
 
       <div className="mt-4 grid gap-4 sm:mt-5 sm:gap-5 lg:grid-cols-3">
-        <Card className="lg:col-span-2" title="Milk centers" subtitle={`Ranked by milk bought in the last ${range} days`} bodyClass="pt-3">
+        <Card className="lg:col-span-2" title="Milk centers" subtitle={`Ranked by milk bought in the last ${plural(range, 'days')}`} bodyClass="pt-3">
           <div className="overflow-x-auto">
             <table className="table min-w-[640px]">
               <thead><tr><th>Center</th><th className="text-right">Milk bought</th><th className="text-right">Sold</th><th className="text-right">Premium</th><th className="text-right">Farmers</th><th>Account</th></tr></thead>

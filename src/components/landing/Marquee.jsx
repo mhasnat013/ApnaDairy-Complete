@@ -7,7 +7,7 @@ const items = [
   'Farmers see the price before they sell',
   'Open bids anyone can see',
   'Every batch traced to its farm',
-  'Simulated sensor readings are always labelled',
+  'Bulk milk tested again before dispatch',
 ]
 
 export default function Marquee() {

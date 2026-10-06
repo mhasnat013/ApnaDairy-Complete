@@ -20,3 +20,5 @@ export const relative = (d) => {
 }
 
 export const cap = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1).replace(/_/g, ' ') : '')
+// 1 farmer, 2 farmers
+export const plural = (n, word) => `${n} ${Number(n) === 1 ? word.replace(/s$/, '') : word}`

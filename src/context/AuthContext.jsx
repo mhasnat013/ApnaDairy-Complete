@@ -22,14 +22,16 @@ export function AuthProvider({ children }) {
   }, [])
 
   // 2. load the profile (role + status) whenever the user changes
+  const [profileError, setProfileError] = useState(null)
+  // the profile row is made by a trigger at signup, so try a few times before giving up
   const loadProfile = useCallback(async (userId) => {
-    setLoading(true)
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('id, full_name, email, phone, role, status')
-      .eq('id', userId)
-      .single()
-    if (error) console.error(error)
+    setLoading(true); setProfileError(null)
+    let data = null, error = null
+    for (let i = 0; i < 3 && !data; i++) {
+      if (i) await new Promise((r) => setTimeout(r, 1200))
+      ;({ data, error } = await supabase.from('profiles').select('id, full_name, email, phone, role, status').eq('id', userId).maybeSingle())
+    }
+    if (!data) setProfileError(error?.message ?? 'Your account could not be found.')
     setProfile(data ?? null)
     setLoading(false)
   }, [])
@@ -43,7 +45,7 @@ export function AuthProvider({ children }) {
 
   return (
     <AuthContext.Provider
-      value={{ session, user: session?.user ?? null, profile, loading, signOut, refreshProfile: () => userId && loadProfile(userId) }}
+      value={{ session, user: session?.user ?? null, profile, profileError, loading, signOut, refreshProfile: () => userId && loadProfile(userId) }}
     >
       {children}
     </AuthContext.Provider>

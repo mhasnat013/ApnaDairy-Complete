@@ -7,21 +7,21 @@ import Icon from '../Icon'
 // the four modules of the platform, around one dial
 const modules = [
   {
-    id: 'collection', label: 'Milk collection', icon: 'drop', pos: { x: 50, y: 15 }, status: 'In development',
+    id: 'collection', label: 'Milk collection', icon: 'drop', pos: { x: 50, y: 15 }, status: 'Live now',
     img: '/media/farm-collection.webp', alt: 'A farmer pouring fresh milk into steel churns at his farm',
     title: 'Every litre, on record from the first pour',
     text: 'Area managers register farmers and their farms, record each delivery, and turn purchased milk into traceable inventory batches.',
     points: ['Farmer and farm registration at the center', 'Quantity, milk type and time logged per delivery', 'Purchase history and earnings for every farmer'],
   },
   {
-    id: 'iot', label: 'IoT testing', icon: 'chip', pos: { x: 85, y: 50 }, status: 'Device in build',
+    id: 'iot', label: 'IoT testing', icon: 'chip', pos: { x: 85, y: 50 }, status: 'Live now',
     img: '/media/ai-quality-monitoring.webp', alt: 'A dairy technician checking milk in a steel tank with a sensor and tablet',
     title: 'A sensor reads the milk, not a guess',
-    text: 'A milk-testing device at each center measures temperature, pH, density and conductivity and sends the readings straight to ApnaDairy.',
-    points: ['Readings tagged with device and time', 'Linked to the exact delivery that was tested', 'Simulated readings clearly labelled until the device is live'],
+    text: 'A milk-testing device at each center measures temperature, pH, conductivity and dissolved solids and sends the readings straight to ApnaDairy.',
+    points: ['Readings tagged with device and time', 'Linked to the exact delivery that was tested', 'A one-minute test, averaged over many readings'],
   },
   {
-    id: 'ai', label: 'AI pricing', icon: 'spark', pos: { x: 50, y: 85 }, status: 'Model in training',
+    id: 'ai', label: 'AI pricing', icon: 'spark', pos: { x: 50, y: 85 }, status: 'Live now',
     img: '/media/farmer-hero.webp', alt: 'An area manager showing a farmer the recommended price on a tablet',
     title: 'A fair price the farmer can see',
     text: 'Quality readings and quantity go into a model that recommends a price per litre. The farmer sees it and decides whether to sell.',

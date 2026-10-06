@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext'
 import { useLoad } from '../../lib/useLoad'
 import { rs } from '../../lib/format'
 import WelcomeBanner from '../../components/WelcomeBanner'
+import Alert from '../../components/Alert'
 import StatCard, { StatRow } from '../../components/StatCard'
 
 const count = async (table, filter = {}) => {
@@ -15,7 +16,7 @@ const count = async (table, filter = {}) => {
 
 export default function AdminHome() {
   const { profile } = useAuth()
-  const { data: s } = useLoad(async () => {
+  const { data: s, error } = useLoad(async () => {
     const [users, pm, pb, am, bb, open, orders] = await Promise.all([
       count('profiles'),
       count('area_managers', { verification_status: 'pending' }),
@@ -37,6 +38,7 @@ export default function AdminHome() {
         <Link to="/admin/approvals" className="btn-haldi">Review approvals</Link>
         <Link to="/admin/analytics" className="btn-on-dark">Analytics</Link>
       </WelcomeBanner>
+      {error && <div className="mt-4"><Alert>{error}</Alert></div>}
       <StatRow>
         <StatCard label="Waiting for approval" value={s?.pending} note="centers and businesses" tone="haldi" />
         <StatCard label="Verified centers" value={s?.am} note="area managers" />

@@ -3,7 +3,7 @@ import { useAuth } from '../../context/AuthContext'
 import { useLoad } from '../../lib/useLoad'
 import { products, activeOrders, billingOverview, myInvoices, categoryLabel, todayKey, timeOf, orderStatusLabel, orderTone } from '../../lib/center'
 import { centerOrders, requestBoard, qtyText, reqTitle } from '../../lib/b2b'
-import { rs, relative, date } from '../../lib/format'
+import { rs, relative, date, plural } from '../../lib/format'
 import WelcomeBanner from '../../components/WelcomeBanner'
 import Card, { Kpi } from '../../components/Card'
 import Badge from '../../components/Badge'
@@ -39,7 +39,7 @@ export default function SellerHome({ center }) {
 
       <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
         <Kpi accent label="Sales this month" value={data?.overview ? rs(Math.round(data.overview.this_month_online)) : data ? rs(0) : null} icon={<Icon name="wallet" size={16} />} note="delivered app and bulk orders" />
-        <Kpi label="Products on the app" value={data ? live.length : null} note={data ? `of ${items.length} products` : ''} />
+        <Kpi label="Products on the app" value={data ? live.length : null} note={data ? `of ${plural(items.length, 'products')}` : ''} />
         <Kpi label="Shop orders to handle" value={data ? data.orders.length : null} note="from the customer app" />
         <Kpi label="Bulk orders to deliver" value={data ? bulkOpen.length : null} note={data ? `${data.board.length} open ${data.board.length === 1 ? 'request' : 'requests'} to bid on` : ''} />
       </div>

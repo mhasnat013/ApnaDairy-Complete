@@ -7,11 +7,12 @@ import { rs, date, relative } from '../../lib/format'
 import WelcomeBanner from '../../components/WelcomeBanner'
 import StatCard, { StatRow } from '../../components/StatCard'
 import Badge from '../../components/Badge'
+import Alert from '../../components/Alert'
 import EmptyState from '../../components/EmptyState'
 
 export default function BusinessHome() {
   const { profile } = useAuth()
-  const { data } = useLoad(async () => {
+  const { data, error } = useLoad(async () => {
     const [{ data: biz }, reqs, orders] = await Promise.all([
       supabase.from('business_profiles').select('business_name, business_type, city').eq('user_id', profile.id).single(),
       myRequirements(),
@@ -30,6 +31,7 @@ export default function BusinessHome() {
         <Link to="/business/requirements/new" className="btn-haldi">Post a requirement</Link>
         <Link to="/business/orders" className="btn-on-dark">Track orders</Link>
       </WelcomeBanner>
+      {error && <div className="mt-4"><Alert>{error}</Alert></div>}
 
       <StatRow>
         <StatCard label="Taking bids" value={data ? open.length : null} note="open requirements" />

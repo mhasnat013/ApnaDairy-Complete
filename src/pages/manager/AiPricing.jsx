@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useLoad } from '../../lib/useLoad'
 import { priceHistory, platformSettings, myMarketRates, assessMilk, milkLabel, gradeLabel, riskLabel, PARAMS, inRange } from '../../lib/center'
-import { date } from '../../lib/format'
+import { date, plural } from '../../lib/format'
 import { rs } from '../../lib/format'
 import PageHeader from '../../components/PageHeader'
 import Segmented from '../../components/Segmented'
@@ -50,10 +50,10 @@ export default function AiPricing() {
       <Alert>{error}</Alert>
 
       <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
-        <Kpi accent label="Farmers’ share of market rate" value={data ? `${Math.round(share * 100)}%` : null} note={`average over ${offers.length} offers, 30 days`} />
+        <Kpi accent label="Farmers’ share of market rate" value={data ? `${Math.round(share * 100)}%` : null} note={`average over ${plural(offers.length, 'offers')}, 30 days`} />
         <Kpi label="Farmers accepted" value={data ? `${answered.length ? Math.round((acceptedOffers / answered.length) * 100) : 0}%` : null} note="of offers they answered" />
         <Kpi label="Bad milk caught" value={data ? caught : null} note="samples the models rejected" />
-        <Kpi label="Models" value="2 sample" note="rule-based until the trained models are connected" />
+        <Kpi label="Models" value="2" note="quality and freshness" />
       </div>
 
       <Card className="mt-4 sm:mt-5" title={`One litre of ${milkLabel[type].toLowerCase()} milk`} subtitle="Who gets what, for the sample in Try it below">

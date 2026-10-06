@@ -6,7 +6,7 @@ import { myCenter, assessMilk, gradeLabel } from '../../lib/center'
 import DeliverySheet from '../../components/DeliverySheet'
 import { useUi } from '../../context/UiContext'
 import { SkeletonRows } from '../../components/Skeleton'
-import { rs, date, cap } from '../../lib/format'
+import { rs, date, cap, plural } from '../../lib/format'
 import PageHeader from '../../components/PageHeader'
 import OrderProgress from '../../components/OrderProgress'
 import Alert from '../../components/Alert'
@@ -116,7 +116,7 @@ function DispatchTest({ order, onClose, onDone }) {
       {test ? (
         <div className="rounded-[20px] bg-forest-deep px-5 py-6 text-center text-cream">
           <p className="display num text-[44px] leading-none">{test.finishing ? '…' : left}</p>
-          <p className="mt-2 text-[13px] text-cream/75">{test.finishing ? 'Averaging the readings…' : `Keep the probes in the milk · ${test.samples.length} readings so far`}</p>
+          <p className="mt-2 text-[13px] text-cream/75">{test.finishing ? 'Averaging the readings…' : `Keep the probes in the milk · ${plural(test.samples.length, 'readings')} so far`}</p>
           {!test.finishing && <button className="btn-on-dark btn-sm mt-4" onClick={cancel}>Cancel test</button>}
         </div>
       ) : !reading ? (

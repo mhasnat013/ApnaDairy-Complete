@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, Suspense } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { navFor } from '../lib/nav'
@@ -7,6 +7,7 @@ import { myCenter } from '../lib/center'
 import { roleLabel } from '../lib/roles'
 import Logo from '../components/Logo'
 import Icon from '../components/Icon'
+import Loader from '../components/Loader'
 
 export default function DashboardLayout() {
   const { profile, signOut } = useAuth()
@@ -78,7 +79,7 @@ export default function DashboardLayout() {
           <button onClick={() => setOpen(true)} aria-label="Open menu" className="btn-ghost h-10 w-10 p-0"><Icon name="menu" /></button>
           <Logo />
         </header>
-        <main className="mx-auto max-w-[1180px] px-4 py-8 sm:px-8 lg:py-10"><Outlet context={{ center }} /></main>
+        <main className="mx-auto max-w-[1180px] px-4 py-8 sm:px-8 lg:py-10"><Suspense fallback={<Loader />}><Outlet context={{ center }} /></Suspense></main>
       </div>
     </div>
   )

@@ -4,7 +4,7 @@ import Reveal from './Reveal'
 // the procurement chain from the project brief — each stage is a separate record
 const steps = [
   { title: 'Farmer brings milk', text: 'A registered farmer arrives at their nearby collection center. The area manager logs the quantity. It is not bought yet.', img: '/media/farm-collection.webp', alt: 'A farmer pouring milk into steel churns' },
-  { title: 'The milk is tested', text: 'The testing device reads temperature, pH, density and conductivity, and the readings are saved against this delivery.', img: '/media/ai-quality-monitoring.webp', alt: 'A technician testing milk in a steel tank' },
+  { title: 'The milk is tested', text: 'The testing device reads temperature, pH, conductivity and dissolved solids, and the readings are saved against this delivery.', img: '/media/ai-quality-monitoring.webp', alt: 'A technician testing milk in a steel tank' },
   { title: 'A price is recommended', text: 'The pricing model suggests a rate per litre from the quality and quantity. The area manager shows it to the farmer.', img: '/media/farmer-hero.webp', alt: 'An area manager showing a farmer the price on a tablet' },
   { title: 'The farmer decides', text: 'If the farmer accepts, the center completes the purchase and the farmer’s history updates. If not, nothing is bought.', img: '/media/farmer-hero.webp', alt: 'A farmer and an area manager agreeing on a sale' },
   { title: 'Milk becomes stock', text: 'Purchased milk becomes an inventory batch, linked to its farm, its test and the time it was collected.', img: '/media/dairy-facility.webp', alt: 'A bottle of milk and a steel can in a clean dairy' },

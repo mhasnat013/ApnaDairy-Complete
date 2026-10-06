@@ -38,7 +38,7 @@ export function TrendChart({ data, series, xKey = 'day', xFormat = (v) => v, yFo
   const w = Math.max(width, 200)
   const iw = w - pad.l - pad.r
   const ih = height - pad.t - pad.b
-  // yDomain [min, max] for measures that never sit near zero (pH, density); bars always start at zero
+  // yDomain [min, max] for measures that never sit near zero (pH); bars always start at zero
   const lo = yDomain ? yDomain[0] : 0
   const max = yDomain ? yDomain[1] : niceMax(Math.max(1, ...data.flatMap((d) => series.map((s) => Number(d[s.key]) || 0))))
   const step = iw / Math.max(data.length, 1)
@@ -49,7 +49,16 @@ export function TrendChart({ data, series, xKey = 'day', xFormat = (v) => v, yFo
   const ticks = [0, 0.25, 0.5, 0.75, 1].map((t) => lo + t * (max - lo))
   const every = Math.ceil(data.length / Math.max(2, Math.floor(iw / 64)))
 
-  const linePath = (key) => data.map((d, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(d[key] ?? lo).toFixed(1)}`).join('')
+  // days with no value leave a gap in the line instead of dropping to the floor
+  const linePath = (key) => {
+    let out = '', pen = false
+    data.forEach((d, i) => {
+      if (d[key] == null) { pen = false; return }
+      out += `${pen ? 'L' : 'M'}${x(i).toFixed(1)},${y(d[key]).toFixed(1)}`; pen = true
+    })
+    return out
+  }
+  const lone = (key) => data.map((d, i) => d[key] != null && data[i - 1]?.[key] == null && data[i + 1]?.[key] == null ? i : -1).filter((i) => i >= 0)
   const onMove = (e) => {
     const r = e.currentTarget.getBoundingClientRect()
     const i = Math.floor((e.clientX - r.left - pad.l) / step)
@@ -89,8 +98,11 @@ export function TrendChart({ data, series, xKey = 'day', xFormat = (v) => v, yFo
           {series.filter((s) => s.type !== 'bar').map((s) => (
             <path key={`l${s.key}`} d={linePath(s.key)} fill="none" stroke={s.color} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
           ))}
-          {h && series.filter((s) => s.type !== 'bar').map((s) => (
-            <circle key={`d${s.key}`} cx={x(hover)} cy={y(h[s.key] ?? lo)} r="4.5" fill={s.color} stroke={C.surface} strokeWidth="2" />
+          {series.filter((s) => s.type !== 'bar').flatMap((s) => lone(s.key).map((i) => (
+            <circle key={`o${s.key}${i}`} cx={x(i)} cy={y(data[i][s.key])} r="3" fill={s.color} />
+          )))}
+          {h && series.filter((s) => s.type !== 'bar' && h[s.key] != null).map((s) => (
+            <circle key={`d${s.key}`} cx={x(hover)} cy={y(h[s.key])} r="4.5" fill={s.color} stroke={C.surface} strokeWidth="2" />
           ))}
           {data.map((d, i) => (i % every === 0 || i === data.length - 1) && (i === data.length - 1 || data.length - 1 - i >= every / 2) ? (
             <text key={`x${i}`} x={x(i)} y={height - 7} textAnchor="middle" fontSize="11" fill={C.muted}>{xFormat(d[xKey], i)}</text>
@@ -105,7 +117,7 @@ export function TrendChart({ data, series, xKey = 'day', xFormat = (v) => v, yFo
           {series.map((s) => (
             <p key={s.key} className="flex items-center justify-between gap-2 text-muted">
               <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full" style={{ background: s.color }} />{s.label}</span>
-              <span className="num font-semibold text-ink">{yFormat(h[s.key] || 0, true)}</span>
+              <span className="num font-semibold text-ink">{h[s.key] == null && s.type !== 'bar' ? '—' : yFormat(h[s.key] || 0, true)}</span>
             </p>
           ))}
           {tooltipExtra?.(h)}

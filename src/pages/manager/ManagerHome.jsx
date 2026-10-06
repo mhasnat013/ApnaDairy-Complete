@@ -8,7 +8,7 @@ import {
   myCenter, centerDaily, milkStock, stockBatches, activeOrders, farmersWithStats, shelfBatches, stockLeft, seedSample, myInvoices,
   shortDay, weekday, rsShort, todayKey, orderStatusLabel, orderTone, timeOf, milkLabel,
 } from '../../lib/center'
-import { rs, litres, relative } from '../../lib/format'
+import { rs, litres, relative, plural } from '../../lib/format'
 import SellerHome from '../seller/SellerHome'
 import WelcomeBanner from '../../components/WelcomeBanner'
 import Card, { Kpi } from '../../components/Card'
@@ -16,6 +16,7 @@ import Badge from '../../components/Badge'
 import Segmented from '../../components/Segmented'
 import EmptyState from '../../components/EmptyState'
 import Icon from '../../components/Icon'
+import Alert from '../../components/Alert'
 import { TrendChart, Legend, Sparkline, Donut, SplitBar, C } from '../../components/charts'
 
 const sum = (rows, key) => rows.reduce((n, r) => n + Number(r[key] || 0), 0)
@@ -23,7 +24,7 @@ const typeColor = { buffalo: C.g1, cow: C.g2, mixed: C.g3 }
 
 export default function ManagerHome() {
   const { profile } = useAuth()
-  const { data, reload } = useLoad(async () => {
+  const { data, error, reload } = useLoad(async () => {
     const center = await myCenter(profile.id)
     if (center?.type !== 'milk_center' || center.verification_status !== 'active') return { center }
     const [daily, stock, batches, orders, farmers, bulk, invoices] = await Promise.all([
@@ -43,6 +44,7 @@ export default function ManagerHome() {
         <Link to="/manager/collection/new" className="btn-haldi"><Icon name="drop" size={17} />Record milk</Link>
         <Link to="/manager/orders" className="btn-on-dark"><Icon name="cart" size={17} />Shop orders</Link>
       </WelcomeBanner>
+      {error && <div className="mt-4"><Alert>{error}</Alert></div>}
       <BillReminder invoices={data?.invoices} />
       {empty ? <Onboarding demo={c?.is_demo} onDone={reload} /> : <Dashboard data={data} />}
     </>
@@ -121,7 +123,7 @@ function Dashboard({ data }) {
       {/* the four numbers a shop owner checks first */}
       <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
         <Kpi accent label="Sales today" value={loading ? null : rs(Math.round(today.sales))} icon={<Icon name="wallet" size={16} />}
-          note={loading ? ' ' : `${today.orders} orders · yesterday ${rsShort(yesterday.sales)}`}>
+          note={loading ? ' ' : `${plural(today.orders, 'orders')} · yesterday ${rsShort(yesterday.sales)}`}>
           <Sparkline values={last14.map((d) => Number(d.sales))} color="#e2a93b" width={140} height={30} />
         </Kpi>
         <Kpi label="Profit this month" value={loading ? null : rs(Math.round(monthProfit))} icon={<Icon name="chart" size={16} />}
@@ -129,7 +131,7 @@ function Dashboard({ data }) {
           <Sparkline values={last14.map((d) => Number(d.sales) - Number(d.milk_cost))} color={C.green} width={140} height={30} />
         </Kpi>
         <Kpi label="Milk bought today" value={loading ? null : litres(Math.round(today.bought_l))} icon={<Icon name="drop" size={16} />}
-          note={loading ? ' ' : `${today.farmers} farmers${today.failed ? ` · ${today.failed} failed the test` : ''}${today.awaiting ? ` · ${today.awaiting} awaiting farmer` : ''}`}>
+          note={loading ? ' ' : `${plural(today.farmers, 'farmers')}${today.failed ? ` · ${today.failed} failed the test` : ''}${today.awaiting ? ` · ${today.awaiting} awaiting farmer` : ''}`}>
           <Sparkline values={last14.map((d) => Number(d.bought_l))} color={C.gold} width={140} height={30} />
         </Kpi>
         <Kpi label="Milk in stock" value={loading ? null : litres(Math.round(totalStock))} icon={<Icon name="box" size={16} />}
@@ -242,7 +244,7 @@ function FarmersToPay({ farmers }) {
   const total = owed.reduce((n, f) => n + Number(f.stats.unpaid_amount), 0)
   const top = owed[0] ? Number(owed[0].stats.unpaid_amount) : 1
   return (
-    <Card title="Farmers to pay" subtitle={farmers ? `${rs(Math.round(total))} owed to ${owed.length} farmers` : ' '}
+    <Card title="Farmers to pay" subtitle={farmers ? `${rs(Math.round(total))} owed to ${plural(owed.length, 'farmers')}` : ' '}
       action={<Link to="/manager/farmers" className="text-[13.5px] font-semibold text-forest hover:underline">All farmers</Link>}>
       {farmers && owed.length === 0 && <p className="py-6 text-center text-muted">Everyone is paid up.</p>}
       <ul className="grid gap-3">

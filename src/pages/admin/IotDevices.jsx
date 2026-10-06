@@ -11,8 +11,8 @@ import Icon from '../../components/Icon'
 import Sheet from '../../components/Sheet'
 import EmptyState from '../../components/EmptyState'
 
-// where the device writes in firebase: the live folder, or a folder of typed values for demos
-const FOLDERS = [['Result', 'Live device'], ['Demo', 'Demo values']]
+// where the device writes in firebase: the live folder, or a test folder for calibration
+const FOLDERS = [['Result', 'Live device'], ['Demo', 'Test values']]
 const DEFAULT_DB = 'https://milk123-3b7d4-default-rtdb.firebaseio.com'
 
 export default function IotDevices() {
@@ -139,7 +139,7 @@ function DeviceSheet({ device, devices, centers, onClose, onSaved }) {
                 <span className="num">/{k}</span> · {l}</button>
             ))}
           </div>
-          <span className="hint">{f.path === 'Demo' ? 'Readings come from values typed into the Demo folder in Firebase. Use this only for demos.' : 'Readings come from what the ESP32 sends.'}</span></div>
+          <span className="hint">{f.path === 'Demo' ? 'Readings come from the Demo folder in Firebase. Use it to check or calibrate a center before its device is set up.' : 'Readings come from what the ESP32 sends.'}</span></div>
         <div className="field"><label htmlFor="dc">Given to</label>
           <select id="dc" className="input" value={f.center} onChange={set('center')}>
             <option value="">Nobody yet</option>

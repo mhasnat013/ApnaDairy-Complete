@@ -7,7 +7,7 @@ import {
   farmersWithStats, settings, assessMilk, recordCollection, recordFarmerAnswer, collectionById, myCenter, myDevice, startDeviceTest, takeDeviceSample, finishDeviceTest, farmerUsual, OFFER_HOURS, currentShift, billingOverview, milkListings,
   milkLabel, gradeLabel, riskLabel, PARAMS, inRange,
 } from '../../lib/center'
-import { rs, litres } from '../../lib/format'
+import { rs, litres, plural } from '../../lib/format'
 import PageHeader from '../../components/PageHeader'
 import Segmented from '../../components/Segmented'
 import Icon from '../../components/Icon'
@@ -272,7 +272,7 @@ export default function RecordMilk() {
               <span className={`grid h-24 w-24 place-items-center rounded-full bg-cream/10 ${badReading && !scanning ? 'text-[#f3a08c]' : 'text-haldi'}`}><Icon name={reading && !scanning ? (badReading ? 'alert' : 'check') : 'chip'} size={40} /></span>
             </div>
             )}
-            <p className="mt-6 text-center text-[14px] text-cream/80">{testing ? (test.finishing ? 'Averaging the readings…' : `Keep the probes in the milk · ${test.samples.length} readings so far`) : scanning ? 'Reading the sample…' : reading ? `Tested on the device, ${new Date(reading.reading_at ?? Date.now()).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}` : 'Dip the probes in the sample, then take a reading.'}</p>
+            <p className="mt-6 text-center text-[14px] text-cream/80">{testing ? (test.finishing ? 'Averaging the readings…' : `Keep the probes in the milk · ${plural(test.samples.length, 'readings')} so far`) : scanning ? 'Reading the sample…' : reading ? `Tested on the device, ${new Date(reading.reading_at ?? Date.now()).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}` : 'Dip the probes in the sample, then take a reading.'}</p>
             <div className="mt-5 flex flex-wrap justify-center gap-2">
               {device && (testing
                 ? <button className="btn-on-dark" onClick={() => { cancelTest.current = true }} disabled={test.finishing}>Cancel test</button>
@@ -362,7 +362,7 @@ export default function RecordMilk() {
           <section className={`panel p-5 sm:p-6 ${ai.accept ? '' : 'border-[#efc6bb]'}`}>
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="flex items-center gap-2 text-[13px] font-semibold text-muted"><Icon name="spark" size={16} />AI assessment</p>
-              <span className="rounded-full bg-cream-2 px-2.5 py-0.5 text-[11.5px] text-muted">sample models</span>
+              <span className="rounded-full bg-cream-2 px-2.5 py-0.5 text-[11.5px] text-muted">quality and freshness models</span>
             </div>
             <h2 className={`display mt-3 text-[30px] ${ai.accept ? 'text-forest-deep' : 'text-danger'}`}>{ai.accept ? `${gradeLabel[ai.quality]} milk` : 'Do not buy this milk'}</h2>
             <p className="mt-1 text-[14px] text-muted">Quality score {ai.score}/100</p>

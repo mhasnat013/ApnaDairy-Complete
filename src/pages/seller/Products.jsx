@@ -3,7 +3,7 @@ import { useLoad } from '../../lib/useLoad'
 import { useUi } from '../../context/UiContext'
 import { products as loadProducts, saveProduct, setProduct, categoryLabel, todayKey } from '../../lib/center'
 import { qtyText, perUnit, defaultUnit, PRODUCTS } from '../../lib/b2b'
-import { rs, date } from '../../lib/format'
+import { rs, date, plural } from '../../lib/format'
 import PageHeader from '../../components/PageHeader'
 import { Kpi } from '../../components/Card'
 import Alert from '../../components/Alert'
@@ -33,7 +33,7 @@ export default function Products() {
       <Alert>{error}</Alert>
 
       <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
-        <Kpi accent label="On the app" value={data ? live.length : null} icon={<Icon name="store" size={16} />} note={data ? `of ${list.length} products` : ''} />
+        <Kpi accent label="On the app" value={data ? live.length : null} icon={<Icon name="store" size={16} />} note={data ? `of ${plural(list.length, 'products')}` : ''} />
         <Kpi label="Stock value" value={data ? rs(Math.round(value)) : null} note="at your current prices" />
         <Kpi label="Running low" value={data ? low.length : null} note="under 5 left" />
         <Kpi label="Expiring soon" value={data ? expiring.length : null} note="within 7 days" />
