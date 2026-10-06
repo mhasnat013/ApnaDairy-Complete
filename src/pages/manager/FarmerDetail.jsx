@@ -5,7 +5,7 @@ import { useLoad } from '../../lib/useLoad'
 import { useAuth } from '../../context/AuthContext'
 import { useUi } from '../../context/UiContext'
 import {
-  farmerCollections, sendPayout, demoAnswerPayout, farmerPayouts, myCenter, payoutStatusLabel, payoutTone, paymentLabel, dayKey, shortDay, weekday, timeOf, milkLabel, gradeLabel, gradeTone,
+  farmerCollections, sendPayout, demoAnswerPayout, farmerPayouts, myCenter, confirmFarmerLink, payoutStatusLabel, payoutTone, paymentLabel, dayKey, shortDay, weekday, timeOf, milkLabel, gradeLabel, gradeTone,
 } from '../../lib/center'
 import { rs, litres, date, dateTime } from '../../lib/format'
 import PageHeader from '../../components/PageHeader'
@@ -78,6 +78,10 @@ export default function FarmerDetail() {
         {f?.is_active && <Link to={`/manager/collection/new?farmer=${id}`} className="btn-primary"><Icon name="drop" size={17} />Record milk</Link>}
       </PageHeader>
       <Alert>{error}</Alert>
+      {f?.link_request && <LinkRequest f={f} onDone={reload} />}
+      {f && !f.link_request && (
+        <p className="mb-4 flex items-center gap-2 text-[13px] text-muted"><Icon name="users" size={15} />{f.profile_id ? 'Linked to the ApnaDairy farmer app: the farmer sees milk, receipts and payments there.' : 'Not using the ApnaDairy farmer app yet.'}</p>
+      )}
 
       <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
         <Kpi accent label="You owe" value={data ? rs(Math.round(unpaid)) : null}
@@ -182,5 +186,29 @@ function PaySheet({ farmer, amount, onClose, onSent }) {
         {farmer.full_name.split(' ')[0]} gets a message in the ApnaDairy app to confirm the money arrived. The milk counts as paid only after they confirm, and a receipt is generated. If they say it did not arrive, it goes back to unpaid.
       </p>
     </Sheet>
+  )
+}
+
+// someone signed up in the farmer app with this farmer's phone. only the center knows it is really them.
+function LinkRequest({ f, onDone }) {
+  const { toast, confirm } = useUi()
+  const [busy, setBusy] = useState(false)
+  const answer = async (yes) => {
+    if (yes && !(await confirm({ title: `Is this really ${f.full_name}?`, body: `Ask ${f.full_name.split(' ')[0]} to show you the farmer app on their phone (${f.phone}). Once linked, they see their milk, receipts and payments, and confirm payments in the app.`, confirmLabel: 'Yes, link it' }))) return
+    setBusy(true)
+    try { await confirmFarmerLink(f.id, yes); toast(yes ? `${f.full_name}'s app account is linked.` : 'Request declined. Nothing was shared.'); await onDone() } catch (e) { toast(e.message, 'error') }
+    setBusy(false)
+  }
+  return (
+    <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-[20px] border border-[#efd59a] bg-haldi-soft px-5 py-4">
+      <div className="min-w-0">
+        <p className="font-semibold text-forest-deep">Someone wants to link the farmer app to {f.full_name}</p>
+        <p className="text-[13px] text-amber">They signed up with {f.phone}. Link it only after checking it is really {f.full_name}.</p>
+      </div>
+      <div className="flex gap-2">
+        <button className="btn-primary btn-sm" disabled={busy} onClick={() => answer(true)}>Link account</button>
+        <button className="btn-secondary btn-sm" disabled={busy} onClick={() => answer(false)}>Decline</button>
+      </div>
+    </div>
   )
 }

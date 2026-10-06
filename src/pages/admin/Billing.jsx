@@ -65,6 +65,11 @@ export default function AdminBilling() {
     if (!(await confirm({ title: `Record ${rs(i.amount)} from ${i.center_name}?`, body: 'Use this when the center paid in cash or by bank at the office.', confirmLabel: 'Mark paid' }))) return
     try { await payInvoice(i.id, 'cash'); toast('Marked as paid.'); await reload() } catch (e) { toast(e.message, 'error') }
   }
+  // the center sent a transaction id; the admin checks the money arrived
+  const confirmPaid = async (i) => {
+    if (!(await confirm({ title: `Confirm ${rs(i.amount)} from ${i.center_name}?`, body: `They paid by ${paymentLabel[i.payment_method]}, transaction ID ${i.payment_ref}. Confirm only after checking it reached ApnaDairy's account.`, confirmLabel: 'Mark paid' }))) return
+    try { await payInvoice(i.id, i.payment_method, i.payment_ref); toast('Marked as paid.'); await reload() } catch (e) { toast(e.message, 'error') }
+  }
   const cancel = async (i) => {
     if (!(await confirm({ title: 'Cancel this bill?', body: `${i.description} for ${i.center_name}.`, confirmLabel: 'Cancel bill', danger: true, cancelLabel: 'Keep it' }))) return
     try { await voidInvoice(i.id); toast('Bill cancelled.'); await reload() } catch (e) { toast(e.message, 'error') }
@@ -104,10 +109,12 @@ export default function AdminBilling() {
                   <td className="num text-right font-semibold">{rs(i.amount)}</td>
                   <td className={`num ${overdue(i) ? 'font-semibold text-danger' : ''}`}>{date(i.due_date)}</td>
                   <td>{i.status === 'paid' ? <><Badge tone="green">Paid</Badge><p className="mt-1 text-[12px] text-muted">{paymentLabel[i.payment_method]} · {date(i.paid_at)}</p></>
-                    : i.status === 'void' ? <Badge tone="grey">Cancelled</Badge> : <Badge tone={overdue(i) ? 'red' : 'amber'}>{overdue(i) ? 'Overdue' : 'Due'}</Badge>}</td>
+                    : i.status === 'void' ? <Badge tone="grey">Cancelled</Badge> : i.submitted_at ? <><Badge tone="blue">Payment sent</Badge><p className="mt-1 text-[12px] text-muted">{paymentLabel[i.payment_method]} · {i.payment_ref}</p></> : <Badge tone={overdue(i) ? 'red' : 'amber'}>{overdue(i) ? 'Overdue' : 'Due'}</Badge>}</td>
                   <td>{i.status === 'due' && (
-                    <div className="flex justify-end gap-2">
-                      <button className="btn-secondary btn-sm" onClick={() => cash(i)}>Record payment</button>
+                    <div className="flex flex-wrap items-center justify-end gap-2">
+                      {i.submitted_at
+                        ? <button className="btn-primary btn-sm" onClick={() => confirmPaid(i)} title={`${paymentLabel[i.payment_method]} ${i.payment_ref}`}>Confirm {paymentLabel[i.payment_method]}</button>
+                        : <button className="btn-secondary btn-sm" onClick={() => cash(i)}>Record cash</button>}
                       <button className="btn-ghost btn-sm text-danger" onClick={() => cancel(i)}>Cancel</button>
                     </div>
                   )}</td>

@@ -93,7 +93,12 @@ export default function Billing() {
               <p className="display num shrink-0 text-[26px]">{rs(i.amount)}</p>
             </div>
             <Breakdown i={i} />
-            <button className="btn-primary mt-4 w-full" onClick={() => setPaying(i)}><Icon name="wallet" size={17} />Pay {rs(i.amount)}</button>
+            {i.submitted_at ? (
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-haldi-soft px-4 py-3 text-[13px] text-amber">
+                <span><b>Payment sent</b> by {paymentLabel[i.payment_method]} ({i.payment_ref}). ApnaDairy is checking it.</span>
+                <button className="font-semibold underline" onClick={() => setPaying(i)}>Change</button>
+              </div>
+            ) : <button className="btn-primary mt-4 w-full" onClick={() => setPaying(i)}><Icon name="wallet" size={17} />Pay {rs(i.amount)}</button>}
           </article>
         ))}
       </div>
@@ -140,19 +145,19 @@ export function Breakdown({ i }) {
 
 function PaySheet({ invoice, onClose, onPaid }) {
   const { toast } = useUi()
-  const [method, setMethod] = useState('jazzcash')
-  const [ref, setRef] = useState('')
+  const [method, setMethod] = useState(invoice?.payment_method && invoice.payment_method !== 'cash' ? invoice.payment_method : 'jazzcash')
+  const [ref, setRef] = useState(invoice?.payment_ref ?? '')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
   const submit = async () => {
     if (!ref.trim()) return setErr('Enter the transaction ID from your payment.')
     setBusy(true); setErr('')
-    try { await payInvoice(invoice.id, method, ref); toast(`Payment of ${rs(invoice.amount)} received. Thank you.`); onPaid(); onClose() } catch (e) { setErr(e.message) }
+    try { await payInvoice(invoice.id, method, ref); toast('Payment sent. ApnaDairy confirms it once the money arrives.'); onPaid(); onClose() } catch (e) { setErr(e.message) }
     setBusy(false)
   }
   return (
     <Sheet open={!!invoice} onClose={onClose} title={`Pay ${invoice ? rs(invoice.amount) : ''}`} subtitle={invoice?.description}
-      footer={<><button className="btn-secondary" onClick={onClose}>Cancel</button><button className="btn-primary" onClick={submit} disabled={busy}>{busy ? 'Confirming…' : 'Confirm payment'}</button></>}>
+      footer={<><button className="btn-secondary" onClick={onClose}>Cancel</button><button className="btn-primary" onClick={submit} disabled={busy}>{busy ? 'Sending…' : 'Send payment details'}</button></>}>
       <Alert>{err}</Alert>
       <p className="text-[13px] font-semibold">How did you pay?</p>
       <div className="mt-2 grid gap-2">
@@ -165,7 +170,7 @@ function PaySheet({ invoice, onClose, onPaid }) {
         ))}
       </div>
       <div className="field mt-5"><label htmlFor="ref">Transaction ID</label><input id="ref" className="input" placeholder="e.g. 0123456789" value={ref} onChange={(e) => setRef(e.target.value)} /></div>
-      <p className="mt-4 rounded-2xl bg-cream px-4 py-3 text-[12.5px] text-muted">Demo payment: it is confirmed straight away. A JazzCash and EasyPaisa gateway will be connected before launch.</p>
+      <p className="mt-4 rounded-2xl bg-cream px-4 py-3 text-[12.5px] text-muted">Pay ApnaDairy by JazzCash, EasyPaisa or bank transfer, then enter the transaction ID here. ApnaDairy checks it and marks the bill paid. To pay cash, visit the ApnaDairy office.</p>
     </Sheet>
   )
 }
