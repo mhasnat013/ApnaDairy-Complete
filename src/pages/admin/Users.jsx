@@ -63,7 +63,7 @@ export default function Users() {
 
   return (
     <>
-      <PageHeader title="Users" description="Everyone with an ApnaDairy account. Admin rights and suspensions take effect immediately." />
+      <PageHeader title="Users" description="Everyone with an ApnaDairy account. Suspend or reactivate accounts here; new admins are created on the Admins page." />
 
 
       <div className="mb-4 flex flex-wrap items-center gap-3">
@@ -94,7 +94,7 @@ export default function Users() {
             {!loading && shown.map((u) => {
               const isMe = u.id === me.id
               const isAdmin = u.role === 'super_admin'
-              const canToggle = !isMe && ['active', 'suspended'].includes(u.status)
+              const canToggle = !isMe && !isAdmin && ['active', 'suspended'].includes(u.status)
               return (
                 <tr key={u.id}>
                   <td>
@@ -109,15 +109,7 @@ export default function Users() {
                   <td className="num text-muted">{date(u.created_at)}</td>
                   <td>
                     <div className={`flex justify-end gap-2 ${busy === u.id ? 'opacity-50 pointer-events-none' : ''}`}>
-                      {!isMe && u.status === 'active' && (
-                        isAdmin ? (
-                          <button onClick={() => run(u, 'set_admin', { p_make_admin: false }, { title: `Remove admin access from ${u.full_name}?`, body: 'They go back to their original account type.', confirmLabel: 'Remove admin', danger: true })}
-                            className="btn-secondary btn-sm">Remove admin</button>
-                        ) : (
-                          <button onClick={() => run(u, 'set_admin', { p_make_admin: true }, { title: `Make ${u.full_name} an admin?`, body: 'Admins can approve accounts, suspend users and see everything on the platform.', confirmLabel: 'Make admin' })}
-                            className="btn-secondary btn-sm">Make admin</button>
-                        )
-                      )}
+                      {isAdmin && !isMe && <Link to="/admin/admins" className="btn-ghost btn-sm">Manage on Admins</Link>}
                       {u.center && u.status === 'active' && (
                         <button className="btn-secondary btn-sm" onClick={async () => {
                           const demo = !u.center.is_demo

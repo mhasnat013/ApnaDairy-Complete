@@ -39,6 +39,7 @@ import MarketRates from './pages/admin/MarketRates'
 import Audit from './pages/admin/Audit'
 import IotDevices from './pages/admin/IotDevices'
 import Analytics from './pages/admin/Analytics'
+import Admins from './pages/admin/Admins'
 
 
 export default function App() {
@@ -68,6 +69,7 @@ export default function App() {
               <Route path="audit" element={<Audit />} />
               <Route path="iot-devices" element={<IotDevices />} />
               <Route path="analytics" element={<Analytics />} />
+              <Route path="admins" element={<Admins />} />
               <Route path="*" element={<ModuleSoon />} />
             </Route>
           </Route>

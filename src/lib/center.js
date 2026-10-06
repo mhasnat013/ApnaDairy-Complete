@@ -268,10 +268,13 @@ export const demoDeliveryCode = (kind, id) => rpc('demo_delivery_code', { p_kind
 export const myDevice = async () => must(await supabase.from('iot_devices').select('*').maybeSingle())
 export const deviceLog = async (limit = 12) => must(await supabase.from('device_readings').select('*').order('received_at', { ascending: false }).limit(limit))
 // a device test runs about a minute: start, a sample every few seconds, then the server averages them
-async function iot(body) {
-  const { data, error } = await supabase.functions.invoke('iot-reading', { body })
+async function iot(body) { return callFunction('iot-reading', body) }
+// edge functions return { error } in the body; show that message rather than a generic one
+async function callFunction(name, body) {
+  const { data, error } = await supabase.functions.invoke(name, { body })
   if (error) {
-    let msg = 'Could not reach the device service. Check your internet and try again.'
+    let msg = name === 'iot-reading' ? 'Could not reach the device service. Check your internet and try again.'
+      : error.context?.status === 404 ? `The ${name} function is not deployed on Supabase yet.` : 'Could not reach ApnaDairy. Check your internet and try again.'
     try { const b = await error.context?.json?.(); if (b?.error) msg = b.error } catch { /* keep the general message */ }
     throw new Error(msg)
   }
@@ -279,6 +282,10 @@ async function iot(body) {
   return data
 }
 export const startDeviceTest = () => iot({ action: 'start' })
+// ---------- super admins ----------
+export const allAdmins = async () => must(await supabase.from('profiles').select('id, full_name, email, phone, status, created_at').eq('role', 'super_admin').order('created_at'))
+export const createAdmin = (a) => callFunction('admin-users', { full_name: a.full_name, email: a.email, password: a.password }).then((d) => d.admin)
+export const removeAdmin = (id) => rpc('set_admin', { p_user: id, p_make_admin: false })
 export const takeDeviceSample = (session) => iot({ action: 'sample', session }).then((d) => d.sample)
 export const finishDeviceTest = (session) => iot({ action: 'finish', session }).then((d) => d.reading)
 // ---------- any date, listings, bulk capacity, admin ----------

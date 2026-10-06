@@ -4,6 +4,7 @@ export const navFor = {
     { to: '/admin', label: 'Overview', icon: 'grid', end: true, ready: true },
     { to: '/admin/approvals', label: 'Approvals', icon: 'check', ready: true },
     { to: '/admin/users', label: 'Users', icon: 'users', ready: true },
+    { to: '/admin/admins', label: 'Admins', icon: 'shield', ready: true },
     { to: '/admin/bulk-market', label: 'Bulk market', icon: 'gavel', ready: true },
     { to: '/admin/billing', label: 'Billing', icon: 'wallet', ready: true },
     { to: '/admin/market-rates', label: 'Market rates', icon: 'tag', ready: true },
