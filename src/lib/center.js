@@ -215,6 +215,10 @@ export const setCoverPhoto = async (photos, id) => {
 }
 export const myReviews = async () => must(await supabase.from('shop_reviews').select('*').order('created_at', { ascending: false }).limit(200))
 export const replyReview = (id, reply) => rpc('reply_review', { p_review: id, p_reply: reply })
+// ratings businesses gave after a bulk order was delivered
+export const myBulkReviews = async () => must(await supabase.from('bulk_reviews')
+  .select('*, business:business_profiles(business_name, business_type), order:bulk_orders(quantity_l, delivery_date, delivered_at, requirement:bulk_requirements(milk_type))')
+  .order('created_at', { ascending: false }).limit(100))
 export const milkListings = async () => must(await supabase.from('products').select('*').eq('category', 'milk'))
 export const createListing = async (type, price, litres, description) => must(await supabase.from('products').insert({
   name: `Fresh ${({ cow: 'cow', buffalo: 'buffalo', mixed: 'mixed' })[type]} milk`, category: 'milk', milk_type: type, unit: 'litre',
