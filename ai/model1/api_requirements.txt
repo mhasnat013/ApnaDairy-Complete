@@ -1,0 +1,7 @@
+# versions the models were trained and saved with; keep scikit-learn the same so the .joblib files load
+scikit-learn==1.9.1
+joblib==1.6.0
+numpy==2.5.3
+pandas==3.0.6
+fastapi==0.142.2
+uvicorn==0.52.4

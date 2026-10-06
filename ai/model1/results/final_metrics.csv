@@ -1,0 +1,5 @@
+Output,Model,Metric 1,Metric 1 Name,Metric 2,Metric 2 Name
+Quality,SVM,0.6666666666666666,Accuracy,0.6654787625032926,Macro F1
+Freshness Score,Random Forest,11.064909882139942,MAE,0.7739580793164523,R²
+Remaining Shelf Life,Random Forest,6.765724838980931,MAE (hours),0.8813331320255153,R²
+Spoilage Risk,Random Forest,10.961213214969826,MAE (%),0.7759653191694706,R²

@@ -77,7 +77,7 @@ export default function Farmers() {
                 <div className="mt-1.5 h-2 rounded-full bg-cream-2"><div className="h-2 rounded-full bg-forest-2" style={{ width: `${(Number(s.litres_30d) / top) * 100}%` }} /></div>
               </div>
               <div className="mt-3 flex items-center justify-between text-[12.5px] text-muted">
-                <span>{premium}% premium{Number(s.failed_30d) ? ` · ${s.failed_30d} failed` : ''}</span>
+                <span>{premium}% Good{Number(s.failed_30d) ? ` · ${s.failed_30d} failed` : ''}</span>
                 <span>{s.last_collected_at ? relative(s.last_collected_at) : 'No milk yet'}</span>
               </div>
             </Link>

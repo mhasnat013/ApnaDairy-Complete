@@ -2,7 +2,8 @@ import { supabase } from './supabase'
 
 // ---------- labels ----------
 export const milkLabel = { cow: 'Cow', buffalo: 'Buffalo', mixed: 'Mixed' }
-export const gradeLabel = { premium: 'Premium', fresh: 'Fresh', standard: 'Standard' }
+// grades from ai model 1. stored with the older names: premium = Good, fresh = Acceptable, standard = Poor (Spoiled is not bought)
+export const gradeLabel = { premium: 'Good', fresh: 'Acceptable', standard: 'Poor' }
 export const gradeTone = { premium: 'green', fresh: 'blue', standard: 'amber' }
 export const riskLabel = { low: 'Low', medium: 'Medium', high: 'High' }
 export const orderStatusLabel = {
@@ -30,10 +31,10 @@ export const PARAMS = [
 ]
 // which sensor feeds which model (matches the device firmware)
 export const MODELS = [
-  { key: 'freshness', name: 'Model 1 · Freshness', inputs: ['temperature_c', 'timestamp', 'ph', 'ec_ms'],
-    outputs: 'Shelf life, freshness score, spoilage and anomaly risk' },
-  { key: 'adulteration', name: 'Model 2 · Adulteration', inputs: ['temperature_c', 'ph', 'ec_ms', 'tds_ppm'],
-    outputs: 'Adulteration risk, probability and the likely additive' },
+  { key: 'freshness', name: 'Model 1 · Quality and freshness', inputs: ['temperature_c', 'ph', 'ec_ms'],
+    outputs: 'Quality (SVM), freshness score, shelf life and spoilage risk (random forests)' },
+  { key: 'adulteration', name: 'Adulteration check', inputs: ['temperature_c', 'ph', 'ec_ms', 'tds_ppm'],
+    outputs: 'Adulteration risk and the likely additive (rules until Model 2 is added)' },
 ]
 export const inRange = (p, v) => v >= p.low && v <= p.high
 
@@ -91,7 +92,7 @@ export const stockBatches = async () =>
     .eq('status', 'accepted').gte('collected_at', new Date(Date.now() - 4 * 864e5).toISOString()).order('collected_at', { ascending: false }))
 export const readingsSince = async (days = 14) =>
   must(await supabase.from('milk_collections')
-    .select('id, collected_at, reading_at, milk_type, quantity_l, ph, ec_ms, tds_ppm, temperature_c, test_source, device_serial, quality, freshness_hours, freshness_score, spoilage_risk, adulteration_risk, adulteration_score, suspected, ai_notes, status, reject_reason, farmer:farmers(full_name)')
+    .select('id, collected_at, reading_at, milk_type, quantity_l, ph, ec_ms, tds_ppm, temperature_c, test_source, device_serial, quality, model_quality, spoilage_pct, freshness_hours, freshness_score, spoilage_risk, adulteration_risk, adulteration_score, suspected, ai_notes, status, reject_reason, farmer:farmers(full_name)')
     .gte('collected_at', new Date(Date.now() - days * 864e5).toISOString()).order('collected_at', { ascending: false }).limit(1000))
 export const priceHistory = async (days = 30) =>
   must(await supabase.from('milk_collections').select('collected_at, milk_type, quality, ai_price_per_l, price_per_l, status, reject_reason')
@@ -292,6 +293,8 @@ export const startDeviceTest = () => iot({ action: 'start' })
 export const allAdmins = async () => must(await supabase.from('profiles').select('id, full_name, email, phone, status, created_at').eq('role', 'super_admin').order('created_at'))
 export const createAdmin = (a) => callFunction('admin-users', { full_name: a.full_name, email: a.email, password: a.password }).then((d) => d.admin)
 export const removeAdmin = (id) => rpc('set_admin', { p_user: id, p_make_admin: false })
+// ask ai model 1 directly (the try-it sliders); the answer is saved so assessMilk can use it
+export const predictModel1 = (temperature, ph, ec) => iot({ action: 'predict', temperature, ph, ec }).then((d) => d.prediction)
 export const takeDeviceSample = (session) => iot({ action: 'sample', session }).then((d) => d.sample)
 export const finishDeviceTest = (session) => iot({ action: 'finish', session }).then((d) => d.reading)
 // ---------- any date, listings, bulk capacity, admin ----------
@@ -304,6 +307,7 @@ export const deviceActivity = () => rpc('device_activity')
 export const allDevices = async () => must(await supabase.from('iot_devices').select('*, center:area_managers(id, center_name, city)').order('serial'))
 export const saveDevice = async (d) => must(await supabase.from('iot_devices').upsert({
   serial: d.serial.trim().toUpperCase(), db_url: d.db_url.trim().replace(/\/$/, ''), path: d.path.trim() || 'Result', label: d.label?.trim() || null, is_active: d.is_active ?? true,
+  tds_at_25c: !!d.tds_at_25c,
 }).select().single())
 export const assignDevice = (serial, centerId) => rpc('assign_device', { p_serial: serial, p_center: centerId })
 export const activeCenters = async () => must(await supabase.from('area_managers').select('id, center_name, city').eq('type', 'milk_center').eq('verification_status', 'active').order('center_name'))

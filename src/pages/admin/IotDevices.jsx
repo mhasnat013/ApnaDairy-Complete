@@ -153,6 +153,13 @@ function DeviceSheet({ device, devices, centers, onClose, onSaved }) {
             <span className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-all ${f.is_active ? 'left-[26px]' : 'left-0.5'}`} />
           </button>
         </div>
+        <div className="flex items-center justify-between gap-3 rounded-2xl bg-cream px-4 py-3">
+          <span><span className="block text-[14px] font-semibold">TDS sensor corrects to 25 °C</span><span className="text-[12.5px] text-muted">Turn on if the firmware passes the temperature to the TDS sensor. EC for AI Model 1 is then worked back to the milk’s own temperature. Off: EC = TDS ÷ 640.</span></span>
+          <button type="button" role="switch" aria-checked={!!f.tds_at_25c} aria-label="TDS sensor corrects to 25 °C" onClick={() => set('tds_at_25c')(!f.tds_at_25c)}
+            className={`relative h-7 w-[52px] shrink-0 rounded-full transition-colors ${f.tds_at_25c ? 'bg-forest' : 'bg-line'}`}>
+            <span className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-all ${f.tds_at_25c ? 'left-[26px]' : 'left-0.5'}`} />
+          </button>
+        </div>
       </form>
     </Sheet>
   )

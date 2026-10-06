@@ -16,7 +16,7 @@ function TrackRecord({ r }) {
   if (!r) return null
   const bits = [
     r.tests_30d > 0 && `${r.pass_pct ?? 0}% of ${r.tests_30d} milk tests passed`,
-    r.premium_pct != null && r.tests_30d > 0 && `${r.premium_pct}% premium`,
+    r.premium_pct != null && r.tests_30d > 0 && `${r.premium_pct}% rated Good`,
     Number(r.orders_delivered) > 0 ? `${r.orders_delivered} bulk ${Number(r.orders_delivered) === 1 ? 'order' : 'orders'}, ${r.on_time_pct ?? 0}% on time` : 'First bulk order',
     Number(r.cancelled_by_center) > 0 && `cancelled ${r.cancelled_by_center} ${Number(r.cancelled_by_center) === 1 ? 'order' : 'orders'}`,
   ].filter(Boolean)
