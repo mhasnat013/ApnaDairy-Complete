@@ -163,7 +163,6 @@ export default function PublicRequests() {
   const litres = all.filter(isMilk).reduce((n, r) => n + Number(r.quantity_l), 0)
   const productCount = all.filter((r) => !isMilk(r)).length
   const closingToday = all.filter((r) => hoursLeft(r) < 24).length
-  const count = (key, v) => all.filter((r) => r[key] === v).length
   const filtered = milk !== 'all' || quality !== 'all' || q
   const clear = () => { setMilk('all'); setQuality('all'); setQ('') }
 

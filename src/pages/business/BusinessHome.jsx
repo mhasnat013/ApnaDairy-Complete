@@ -27,7 +27,7 @@ export default function BusinessHome() {
 
   return (
     <>
-      <WelcomeBanner name={profile.full_name.split(' ')[0]} line={data?.biz ? `${data.biz.business_name}'s milk, sorted.` : ' '}>
+      <WelcomeBanner name={profile.full_name.split(' ')[0]} line={data?.biz ? `${data.biz.business_name}${/s$/i.test(data.biz.business_name) ? '’' : '’s'} dairy, sorted.` : ' '}>
         <Link to="/business/requirements/new" className="btn-haldi">Post a requirement</Link>
         <Link to="/business/orders" className="btn-on-dark">Track orders</Link>
       </WelcomeBanner>

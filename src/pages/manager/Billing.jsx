@@ -11,6 +11,7 @@ import Alert from '../../components/Alert'
 import Icon from '../../components/Icon'
 import Sheet from '../../components/Sheet'
 import EmptyState from '../../components/EmptyState'
+import { refError } from '../../lib/validate'
 
 const isOverdue = (i) => i.status === 'due' && i.due_date < todayKey()
 
@@ -143,9 +144,9 @@ function PaySheet({ invoice, onClose, onPaid }) {
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
   const submit = async () => {
-    if (!ref.trim()) return setErr('Enter the transaction ID from your payment.')
+    if (refError(ref)) return setErr(refError(ref))
     setBusy(true); setErr('')
-    try { await payInvoice(invoice.id, method, ref); toast('Payment sent. ApnaDairy confirms it once the money arrives.'); onPaid(); onClose() } catch (e) { setErr(e.message) }
+    try { await payInvoice(invoice.id, method, ref.trim()); toast('Payment sent. ApnaDairy confirms it once the money arrives.'); onPaid(); onClose() } catch (e) { setErr(e.message) }
     setBusy(false)
   }
   return (
@@ -162,7 +163,7 @@ function PaySheet({ invoice, onClose, onPaid }) {
           </button>
         ))}
       </div>
-      <div className="field mt-5"><label htmlFor="ref">Transaction ID</label><input id="ref" className="input" placeholder="e.g. 0123456789" value={ref} onChange={(e) => setRef(e.target.value)} /></div>
+      <div className="field mt-5"><label htmlFor="ref">Transaction ID</label><input id="ref" className="input num" maxLength={30} placeholder="e.g. 0123456789" value={ref} onChange={(e) => setRef(e.target.value)} /></div>
       <p className="mt-4 rounded-2xl bg-cream px-4 py-3 text-[12.5px] text-muted">Pay ApnaDairy by JazzCash, EasyPaisa or bank transfer, then enter the transaction ID here. ApnaDairy checks it and marks the bill paid. To pay cash, visit the ApnaDairy office.</p>
     </Sheet>
   )

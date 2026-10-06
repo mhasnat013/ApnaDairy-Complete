@@ -51,7 +51,6 @@ export default function RecordMilk() {
     .filter(([n], i, a) => a.findIndex(([m]) => m === n) === i).slice(0, 6)
 
   const device = data?.device
-  const demo = !!data?.center?.is_demo
   const badReading = reading?.status === 'check'
   // the real device: a test runs about a minute. the edge function reads the device every few seconds and
   // stores each sample; at the end the server averages them and only that final reading goes to the ai.
@@ -235,6 +234,7 @@ export default function RecordMilk() {
                 </button>
               ))}
             </div>
+            {quantity !== '' && !(qty > 0 && qty <= 2000) && <p role="alert" className="mt-2 text-[13px] font-semibold text-danger">Enter between 0.5 and 2,000 litres.</p>}
             <p className="mt-2 text-[12.5px] text-muted">Type any amount up to 2,000 litres.{usual?.length ? ` Gold amounts are what ${farmer?.full_name.split(' ')[0]} usually brings.` : ''}</p>
             <p className="mt-6 text-[13px] font-semibold">Shift</p>
             <div className="mt-2"><Segmented value={shift} onChange={setShift} options={[{ value: 'morning', label: 'Morning' }, { value: 'evening', label: 'Evening' }]} /></div>
@@ -393,7 +393,7 @@ export default function RecordMilk() {
                 <label className="mt-5 block text-[13px] font-semibold" htmlFor="price">Price you pay per litre</label>
                 <div className="mt-2 flex items-center gap-2">
                   <span className="text-[18px] font-semibold text-muted">Rs</span>
-                  <input id="price" className={`input num h-14 w-full text-[26px] font-bold ${Number(price) < ai.min_price ? 'border-danger' : ''}`} type="number" min={ai.min_price} value={price} onChange={(e) => setPrice(e.target.value)} />
+                  <input id="price" className={`input num h-14 w-full text-[26px] font-bold ${Number(price) < ai.min_price ? 'border-danger' : ''}`} type="number" inputMode="decimal" min={ai.min_price} value={price} onChange={(e) => setPrice(e.target.value)} />
                 </div>
                 <div className="mt-2 flex flex-wrap gap-2">
                   {[[Number(ai.farmer_min_pct), ai.min_price], [Number(ai.farmer_default_pct), ai.offer_price], [100, ai.market_price]].map(([pct, v]) => (

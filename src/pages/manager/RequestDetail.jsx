@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, useOutletContext } from 'react-router-dom'
 import { requirementForCenter, placeBid, withdrawBid, milkLabel, qualityLabel, qualityHint, myProductCapacity, isMilk, qtyText, perUnit, productLabel } from '../../lib/b2b'
 import { useLoad } from '../../lib/useLoad'
 import { bidCapacity, todayKey } from '../../lib/center'
@@ -11,6 +11,7 @@ import Alert from '../../components/Alert'
 import Loader from '../../components/Loader'
 import { MilkChurn } from '../../components/Farm'
 import OffersList from '../../components/OffersList'
+import { numberError, firstError } from '../../lib/validate'
 
 const freshPicks = [6, 12, 24, 48]
 
@@ -92,6 +93,16 @@ function BidForm({ req, onSaved }) {
 
   const submit = async (e) => {
     e.preventDefault()
+    const bad = firstError(
+      numberError(f.price, { min: 1, max: 100000, what: 'price' }),
+      numberError(f.quantity, { min: 1, max: Math.max(1, need), whole: req.unit === 'pack', what: 'quantity' }),
+      overCap ? `You can offer at most ${Q(capMax)}.` : '',
+      !f.delivery_date ? 'Pick the delivery date.' : f.delivery_date < today ? 'The delivery date is in the past.' : '',
+      milk && f.max_age !== '' ? numberError(f.max_age, { min: 1, max: 96, whole: true, what: 'milk age' }) : '',
+      makeBad ? 'What you will make cannot be more than the quantity, and needs at least a day.' : '',
+      f.notes.length > 300 ? 'The note is too long.' : '',
+    )
+    if (bad) return toast(bad, 'error')
     setBusy(true)
     try {
       await placeBid({
@@ -118,7 +129,7 @@ function BidForm({ req, onSaved }) {
         <label htmlFor="price">Your price per {milk ? 'litre' : perUnit(req.unit)}</label>
         <div className="relative">
           <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[18px] text-muted">Rs</span>
-          <input id="price" type="number" min="1" step="0.5" required className="input num h-14 w-full pl-12 text-[22px] font-bold" value={f.price} onChange={set('price')} placeholder={t || '190'} />
+          <input id="price" type="number" inputMode="decimal" min="1" step="0.5" required className="input num h-14 w-full pl-12 text-[22px] font-bold" value={f.price} onChange={set('price')} placeholder={t || '190'} />
         </div>
         {pricePicks.length > 0 && (
           <div className="flex flex-wrap gap-1.5">
@@ -140,7 +151,7 @@ function BidForm({ req, onSaved }) {
       <div className="grid grid-cols-2 gap-3">
         <div className="field">
           <label htmlFor="q">{milk ? 'Litres' : `Quantity (${perUnit(req.unit) === 'L' ? 'litres' : perUnit(req.unit) === 'pack' ? 'packs' : 'kg'})`}</label>
-          <input id="q" type="number" min="1" max={maxBid || undefined} step="1" required className={`input num ${overCap ? 'border-danger' : ''}`} value={f.quantity} onChange={set('quantity')} />
+          <input id="q" type="number" inputMode="decimal" min="1" max={maxBid || undefined} step="1" required className={`input num ${overCap ? 'border-danger' : ''}`} value={f.quantity} onChange={set('quantity')} />
         </div>
         <div className="field">
           <label htmlFor="d">Delivery date</label>
@@ -150,7 +161,7 @@ function BidForm({ req, onSaved }) {
       {!milk && (
         <div className="field">
           <label htmlFor="mk">Of this, how much will you make by the delivery date?</label>
-          <input id="mk" type="number" min="0" step="0.5" className={`input num w-40 ${makeBad ? 'border-danger' : ''}`} value={f.make} onChange={set('make')} />
+          <input id="mk" type="number" inputMode="decimal" min="0" step="0.5" className={`input num w-40 ${makeBad ? 'border-danger' : ''}`} value={f.make} onChange={set('make')} />
           <span className={`hint ${makeBad ? 'font-semibold text-danger' : ''}`}>{make > 0 && f.delivery_date <= today ? 'For delivery today, offer only what you have in stock.' : make > Number(f.quantity) ? 'This cannot be more than you offer.' : 'Leave 0 if everything is already in stock. The buyer sees how much is in stock and how much will be made.'}</span>
         </div>
       )}
@@ -173,7 +184,7 @@ function BidForm({ req, onSaved }) {
 
       <div className="field">
         <label htmlFor="n">Note to buyer <span className="font-normal text-muted">(optional)</span></label>
-        <textarea id="n" rows={2} className="input" value={f.notes} onChange={set('notes')} placeholder="Chilled tanker, morning delivery…" />
+        <textarea id="n" rows={2} maxLength={300} className="input" value={f.notes} onChange={set('notes')} placeholder="Chilled tanker, morning delivery…" />
       </div>
 
       {warnings.length > 0 && (
@@ -196,6 +207,7 @@ function BidForm({ req, onSaved }) {
 export default function RequestDetail() {
   const { id } = useParams()
   const { data: req, error, loading, reload } = useLoad(() => requirementForCenter(id), [id])
+  const { center } = useOutletContext() ?? {}
 
   if (loading && !req) return <Loader />
   if (error) return <Alert>{error}</Alert>
@@ -254,6 +266,8 @@ export default function RequestDetail() {
               <p className="text-[15.5px] text-forest">The buyer picked you at <strong className="num">{rs(mine.price_per_l)}/{perUnit(req.unit)}</strong>. It's in your bulk orders now.</p>
             ) : !open ? (
               <p className="text-muted">Bidding on this request has closed.</p>
+            ) : center && (center.type === 'byproduct') === isMilk(req) ? (
+              <p className="text-muted">{isMilk(req) ? 'This buyer needs fresh milk. Only milk collection centers can bid on it.' : `This buyer needs ${productLabel[req.product].toLowerCase()}. Only dairy product sellers can bid on it.`}</p>
             ) : (
               <BidForm key={`${mine?.id}-${mine?.updated_at}-${mine?.status}`} req={req} onSaved={reload} />
             )}

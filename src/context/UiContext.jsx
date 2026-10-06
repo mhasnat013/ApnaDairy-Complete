@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useRef, useState } from 'react'
+import { niceError } from '../lib/validate'
 
 // app-wide toasts and confirm dialogs (replaces window.alert / window.confirm)
 const UiContext = createContext(null)
@@ -10,7 +11,7 @@ export function UiProvider({ children }) {
 
   const toast = useCallback((text, type = 'success') => {
     const id = Math.random().toString(36).slice(2)
-    setToasts((t) => [...t, { id, text, type }])
+    setToasts((t) => [...t, { id, text: type === 'error' ? niceError(text) : text, type }])
     setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 4200)
   }, [])
 
@@ -47,7 +48,7 @@ export function UiProvider({ children }) {
             <h2 id="dlg-title" className="display text-[24px]">{dialog.title}</h2>
             {dialog.body && <p className="mt-2 text-muted">{dialog.body}</p>}
             {dialog.input && (
-              <textarea className="input mt-4 w-full" rows={3} placeholder={dialog.input} value={text} onChange={(e) => setText(e.target.value)} />
+              <textarea className="input mt-4 w-full" rows={3} maxLength={300} placeholder={dialog.input} value={text} onChange={(e) => setText(e.target.value)} />
             )}
             <div className="mt-6 flex justify-end gap-2">
               <button className="btn-secondary" onClick={() => close(false)} autoFocus>{dialog.cancelLabel ?? 'Go back'}</button>

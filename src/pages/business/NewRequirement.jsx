@@ -8,6 +8,7 @@ import PageHeader from '../../components/PageHeader'
 import ChoiceCards from '../../components/ChoiceCards'
 import Alert from '../../components/Alert'
 import { MilkChurn } from '../../components/Farm'
+import { numberError, cityError, firstError, tidyCity, CITIES } from '../../lib/validate'
 
 const iso = (d) => d.toLocaleDateString('en-CA', { timeZone: 'Asia/Karachi' })
 const plusDays = (n) => { const d = new Date(); d.setDate(d.getDate() + n); return d }
@@ -32,6 +33,17 @@ export default function NewRequirement() {
 
   const onSubmit = async (e) => {
     e.preventDefault()
+    const milkReq = f.product === 'milk'
+    const bad = firstError(
+      numberError(f.quantity_l, { min: milkReq ? 10 : 1, max: 50000, whole: f.unit === 'pack', what: 'quantity' }),
+      numberError(f.target_price, { min: 1, max: 100000, what: 'target price', required: false }),
+      !f.required_date ? 'Pick the delivery date.' : '',
+      !f.deadline_date || !f.deadline_time ? 'Pick when bidding closes.' : '',
+      cityError(f.delivery_city),
+      f.delivery_address.length > 200 ? 'The address is too long.' : '',
+      f.notes.length > 500 ? 'The note is too long.' : '',
+    )
+    if (bad) return setError(bad)
     if (f.required_date < today) return setError('The delivery date is in the past.')
     if (deadline.getTime() <= Date.now()) return setError('Bidding has to close in the future.')
     if (f.deadline_date > f.required_date) return setError('Bidding has to close on or before the delivery date.')
@@ -49,7 +61,7 @@ export default function NewRequirement() {
       quality: f.product === 'milk' ? f.quality : 'standard',
       target_price: f.target_price ? Number(f.target_price) : null,
       bid_deadline: deadline.toISOString(),
-      delivery_city: f.delivery_city.trim(),
+      delivery_city: tidyCity(f.delivery_city),
       delivery_address: f.delivery_address.trim() || null,
       notes: f.notes.trim() || null,
     }).select('id').single()
@@ -100,7 +112,7 @@ export default function NewRequirement() {
             <div className="field">
               <label htmlFor="qty">{f.product === 'milk' ? 'How many litres?' : 'How much?'}</label>
               <div className="flex gap-2">
-                <input id="qty" type="number" min="1" max="50000" step="1" className="input num min-w-0 flex-1" required value={f.quantity_l} onChange={set('quantity_l')} placeholder={f.product === 'milk' ? '500' : '20'} />
+                <input id="qty" type="number" inputMode="decimal" min="1" max="50000" step="1" className="input num min-w-0 flex-1" required value={f.quantity_l} onChange={set('quantity_l')} placeholder={f.product === 'milk' ? '500' : '20'} />
                 {f.product !== 'milk' && (
                   <select className="input w-[110px]" aria-label="Unit" value={f.unit} onChange={set('unit')}>
                     <option value="kg">kg</option><option value="litre">litres</option><option value="pack">packs</option>
@@ -127,7 +139,7 @@ export default function NewRequirement() {
               <label htmlFor="target">Your target price per {f.product === 'milk' ? 'litre' : perUnit(f.unit)} <span className="font-normal text-muted">(optional)</span></label>
               <div className="relative">
                 <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-muted">Rs</span>
-                <input id="target" type="number" min="1" step="0.5" className="input num w-full pl-11" value={f.target_price} onChange={set('target_price')} placeholder={f.product === 'milk' ? '190' : f.product === 'ghee' ? '2400' : '600'} />
+                <input id="target" type="number" inputMode="decimal" min="1" step="0.5" className="input num w-full pl-11" value={f.target_price} onChange={set('target_price')} placeholder={f.product === 'milk' ? '190' : f.product === 'ghee' ? '2400' : '600'} />
               </div>
               <p className="hint">A guide for sellers. You can still accept a higher bid.</p>
             </div>
@@ -143,17 +155,18 @@ export default function NewRequirement() {
           <div className="grid gap-5 sm:grid-cols-[1fr_1.6fr]">
             <div className="field">
               <label htmlFor="city">Delivery city</label>
-              <input id="city" className="input" required value={f.delivery_city} onChange={set('delivery_city')} placeholder="Islamabad" />
+              <input id="city" className="input" required maxLength={40} list="nr-cities" value={f.delivery_city} onChange={set('delivery_city')} placeholder="Islamabad" />
+              <datalist id="nr-cities">{CITIES.map((c) => <option key={c} value={c} />)}</datalist>
             </div>
             <div className="field">
               <label htmlFor="addr">Delivery address</label>
-              <input id="addr" className="input" value={f.delivery_address} onChange={set('delivery_address')} placeholder="Only shared with the center you choose" />
+              <input id="addr" className="input" maxLength={200} value={f.delivery_address} onChange={set('delivery_address')} placeholder="Only shared with the center you choose" />
             </div>
           </div>
 
           <div className="field">
             <label htmlFor="notes">Anything centers should know? <span className="font-normal text-muted">(optional)</span></label>
-            <textarea id="notes" rows={3} className="input" value={f.notes} onChange={set('notes')} placeholder="Morning delivery, two drops of 250 L, chilled transport…" />
+            <textarea id="notes" rows={3} maxLength={500} className="input" value={f.notes} onChange={set('notes')} placeholder="Morning delivery, two drops of 250 L, chilled transport…" />
           </div>
 
           <div className="flex justify-end gap-2 border-t border-line pt-6">

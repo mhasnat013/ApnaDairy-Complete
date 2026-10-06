@@ -18,6 +18,7 @@ import Sheet from '../../components/Sheet'
 import Receipt from '../../components/Receipt'
 import { TrendChart, C } from '../../components/charts'
 import { FarmerForm } from './Farmers'
+import { refError } from '../../lib/validate'
 
 export default function FarmerDetail() {
   const { id } = useParams()
@@ -159,9 +160,9 @@ function PaySheet({ farmer, amount, onClose, onSent }) {
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
   const submit = async () => {
-    if (method !== 'cash' && !ref.trim()) return setErr('Enter the transaction ID so the farmer can match it.')
+    if (method !== 'cash' && refError(ref)) return setErr(refError(ref))
     setBusy(true); setErr('')
-    try { await sendPayout(farmer.id, method, ref); toast(`${rs(Math.round(amount))} sent. ${farmer.full_name} confirms it in the app.`); onSent(); onClose() } catch (e) { setErr(e.message) }
+    try { await sendPayout(farmer.id, method, method === 'cash' ? '' : ref.trim()); toast(`${rs(Math.round(amount))} sent. ${farmer.full_name} confirms it in the app.`); onSent(); onClose() } catch (e) { setErr(e.message) }
     setBusy(false)
   }
   return (
@@ -176,7 +177,7 @@ function PaySheet({ farmer, amount, onClose, onSent }) {
         ))}
       </div>
       {method !== 'cash' && (
-        <div className="field mt-5"><label htmlFor="pref">Transaction ID</label><input id="pref" className="input" placeholder="e.g. 0123456789" value={ref} onChange={(e) => setRef(e.target.value)} /></div>
+        <div className="field mt-5"><label htmlFor="pref">Transaction ID</label><input id="pref" className="input num" maxLength={30} placeholder="e.g. 0123456789" value={ref} onChange={(e) => setRef(e.target.value)} /></div>
       )}
       <p className="mt-4 rounded-2xl bg-cream px-4 py-3 text-[12.5px] text-muted">
         {farmer.full_name.split(' ')[0]} gets a message in the ApnaDairy app to confirm the money arrived. The milk counts as paid only after they confirm, and a receipt is generated. If they say it did not arrive, it goes back to unpaid.

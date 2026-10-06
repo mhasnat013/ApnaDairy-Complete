@@ -46,7 +46,7 @@ export default function BulkOrders() {
 
   return (
     <>
-      <PageHeader title="Bulk orders" description="Bids you won. Milk is tested on your IoT device before it is dispatched; the buyer’s 4-digit code confirms delivery." />
+      <PageHeader title="Bulk orders" description={center?.type === 'byproduct' ? 'Bids you won. Dispatch each order when it leaves, and the buyer’s 4-digit code confirms delivery.' : 'Bids you won. Milk is tested on your IoT device before it is dispatched, and the buyer’s 4-digit code confirms delivery.'} />
       {testing && <DispatchTest order={testing} onClose={() => setTesting(null)} onDone={() => { toast('Tested and dispatched. The buyer can see the test result.'); reload() }} />}
       <DeliverySheet key={delivering?.id ?? 'closed'} order={delivering} kind="bulk" demo={center?.is_demo}
         title={delivering ? `Deliver to ${delivering.buyer?.business_name}` : ''} subtitle={delivering ? `${qtyText(delivering.quantity_l, delivering.requirement?.unit)} · ${rs(delivering.total_amount)}` : ''}

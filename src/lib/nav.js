@@ -25,7 +25,7 @@ export const navFor = {
     { to: '/manager/iot', label: 'IoT readings', icon: 'chip', ready: true },
     { to: '/manager/ai-pricing', label: 'AI price engine', icon: 'spark', ready: true },
     { to: '/manager/billing', label: 'Billing', icon: 'wallet', ready: true },
-    { to: '/manager/support', label: 'Support', icon: 'chat' },
+    { to: '/manager/help', label: 'Help', icon: 'chat', ready: true },
   ],
   // dairy products sellers: no milk collection and no iot device
   byproduct: [
@@ -36,12 +36,12 @@ export const navFor = {
     { to: '/manager/bulk-orders', label: 'Bulk orders', icon: 'truck', ready: true },
     { to: '/manager/shop', label: 'My shop', icon: 'store', ready: true },
     { to: '/manager/billing', label: 'Billing', icon: 'wallet', ready: true },
-    { to: '/manager/support', label: 'Support', icon: 'chat' },
+    { to: '/manager/help', label: 'Help', icon: 'chat', ready: true },
   ],
   business: [
     { to: '/business', label: 'Overview', icon: 'grid', end: true, ready: true },
     { to: '/business/requirements', label: 'My requirements', icon: 'box', ready: true },
     { to: '/business/orders', label: 'Bulk orders', icon: 'truck', ready: true },
-    { to: '/business/support', label: 'Support', icon: 'chat' },
+    { to: '/business/help', label: 'Help', icon: 'chat', ready: true },
   ],
 }

@@ -120,7 +120,9 @@ function ProductSheet({ product, onClose, onSaved }) {
     setErr('')
     if (f.name.trim().length < 3) return setErr('Give the product a name customers understand, like "Pure desi ghee".')
     if (!(Number(f.price) > 0)) return setErr('Enter the price.')
-    if (Number(f.discount_pct) < 0 || Number(f.discount_pct) > 90) return setErr('Discount can be 0 to 90%.')
+    if (Number(f.price) > 1000000) return setErr('The price looks too high. Check it.')
+    if (stock > 100000) return setErr('Stock can be at most 100,000.')
+    if (!Number.isInteger(Number(f.discount_pct || 0)) || Number(f.discount_pct) < 0 || Number(f.discount_pct) > 90) return setErr('Discount is a whole number from 0 to 90%.')
     if (!(stock >= 0) || Number.isNaN(stock)) return setErr('Enter how much you have in stock.')
     if (f.unit === 'pack' && stock !== Math.trunc(stock)) return setErr('Packs are counted in whole numbers.')
     if (f.made_on && f.made_on > todayKey()) return setErr('The date it was made cannot be in the future.')
@@ -160,16 +162,16 @@ function ProductSheet({ product, onClose, onSaved }) {
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="field"><label htmlFor="pp">Price per {perUnit(f.unit)}</label>
-            <div className="flex items-center gap-2"><span className="text-muted">Rs</span><input id="pp" className="input num w-full" type="number" min="1" value={f.price} onChange={set('price')} /></div></div>
+            <div className="flex items-center gap-2"><span className="text-muted">Rs</span><input id="pp" className="input num w-full" type="number" inputMode="decimal" min="1" value={f.price} onChange={set('price')} /></div></div>
           <div className="field"><label htmlFor="pd">Discount</label>
-            <div className="flex items-center gap-2"><input id="pd" className="input num w-full" type="number" min="0" max="90" value={f.discount_pct} onChange={set('discount_pct')} /><span className="text-muted">%</span></div></div>
+            <div className="flex items-center gap-2"><input id="pd" className="input num w-full" type="number" inputMode="decimal" min="0" max="90" value={f.discount_pct} onChange={set('discount_pct')} /><span className="text-muted">%</span></div></div>
         </div>
         {isNew ? (
           <div className="field"><label htmlFor="ps">How much do you have now?</label>
-            <div className="flex items-center gap-2"><input id="ps" className="input num w-40" type="number" min="0" step={f.unit === 'pack' ? 1 : 0.5} value={f.stock_qty} onChange={set('stock_qty')} /><span className="text-muted">{f.unit === 'pack' ? 'packs' : f.unit === 'kg' ? 'kg' : 'litres'}</span></div></div>
+            <div className="flex items-center gap-2"><input id="ps" className="input num w-40" type="number" inputMode="decimal" min="0" step={f.unit === 'pack' ? 1 : 0.5} value={f.stock_qty} onChange={set('stock_qty')} /><span className="text-muted">{f.unit === 'pack' ? 'packs' : f.unit === 'kg' ? 'kg' : 'litres'}</span></div></div>
         ) : (
           <div className="field"><label htmlFor="pa">Add new stock</label>
-            <div className="flex flex-wrap items-center gap-2"><input id="pa" className="input num w-32" type="number" step={f.unit === 'pack' ? 1 : 0.5} value={add} onChange={(e) => setAdd(e.target.value)} placeholder="0" />
+            <div className="flex flex-wrap items-center gap-2"><input id="pa" className="input num w-32" type="number" inputMode="decimal" step={f.unit === 'pack' ? 1 : 0.5} value={add} onChange={(e) => setAdd(e.target.value)} placeholder="0" />
               <span className="text-[13px] text-muted">In stock now {qtyText(f.stock_qty || 0, f.unit)}{Number(add) ? `, after saving ${qtyText(stock, f.unit)}` : ''}</span></div>
             <span className="hint">Use a minus number to remove stock that was spoiled or used.</span></div>
         )}

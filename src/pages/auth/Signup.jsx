@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../context/AuthContext'
 import AuthShell from '../../components/AuthShell'
 import Alert from '../../components/Alert'
+import { nameError, titleError, cityError, emailError, phoneError, passwordError, firstError, normPhone, tidyCity, CITIES } from '../../lib/validate'
 
 const roles = [
   { id: 'area_manager', label: 'Area Manager', hint: 'Run a collection center or sell dairy products' },
@@ -11,7 +12,7 @@ const roles = [
 ]
 
 const empty = {
-  full_name: '', email: '', phone: '', password: '',
+  full_name: '', email: '', phone: '', password: '', password2: '',
   manager_type: 'milk_center', center_name: '',
   business_name: '', business_type: 'restaurant',
   city: '', address: '',
@@ -32,16 +33,27 @@ export default function Signup() {
 
   const onSubmit = async (e) => {
     e.preventDefault()
+    const bad = firstError(
+      nameError(form.full_name, 'full name'),
+      emailError(form.email),
+      phoneError(form.phone, { required: true }),
+      role === 'area_manager' ? titleError(form.center_name, 'center or shop name') : titleError(form.business_name, 'business name'),
+      cityError(form.city),
+      form.address.length > 200 ? 'The address is too long.' : '',
+      passwordError(form.password),
+      form.password !== form.password2 ? 'The two passwords do not match.' : '',
+    )
+    if (bad) return setError(bad)
     setError('')
     setBusy(true)
 
     // everything in "data" lands in raw_user_meta_data → the db trigger builds the profile
-    const meta = { role, full_name: form.full_name, phone: form.phone, city: form.city, address: form.address }
-    if (role === 'area_manager') Object.assign(meta, { manager_type: form.manager_type, center_name: form.center_name })
-    else Object.assign(meta, { business_name: form.business_name, business_type: form.business_type })
+    const meta = { role, full_name: form.full_name.trim(), phone: normPhone(form.phone), city: tidyCity(form.city), address: form.address.trim() }
+    if (role === 'area_manager') Object.assign(meta, { manager_type: form.manager_type, center_name: form.center_name.trim() })
+    else Object.assign(meta, { business_name: form.business_name.trim(), business_type: form.business_type })
 
     const { data, error } = await supabase.auth.signUp({
-      email: form.email,
+      email: form.email.trim().toLowerCase(),
       password: form.password,
       options: { data: meta },
     })
@@ -75,47 +87,46 @@ export default function Signup() {
         ))}
       </div>
 
-      <form onSubmit={onSubmit} className="flex flex-col gap-4">
-        <Alert>{error}</Alert>
+      <form onSubmit={onSubmit} noValidate className="flex flex-col gap-4">
 
         <div className="field">
-          <label>Full name</label>
-          <input className="input" required value={form.full_name} onChange={set('full_name')} />
+          <label htmlFor="su-name">Full name</label>
+          <input id="su-name" className="input" required maxLength={80} autoComplete="name" value={form.full_name} onChange={set('full_name')} />
         </div>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid gap-3 sm:grid-cols-2">
           <div className="field">
-            <label>Email</label>
-            <input type="email" className="input" required value={form.email} onChange={set('email')} />
+            <label htmlFor="su-email">Email</label>
+            <input id="su-email" type="email" className="input" required maxLength={120} autoComplete="email" value={form.email} onChange={set('email')} />
           </div>
           <div className="field">
-            <label>Phone</label>
-            <input className="input" required placeholder="03xx xxxxxxx" value={form.phone} onChange={set('phone')} />
+            <label htmlFor="su-phone">Mobile number</label>
+            <input id="su-phone" type="tel" inputMode="tel" className="input num" required maxLength={16} autoComplete="tel" placeholder="0300 1234567" value={form.phone} onChange={set('phone')} />
           </div>
         </div>
 
         {role === 'area_manager' ? (
           <>
             <div className="field">
-              <label>What do you operate?</label>
-              <select className="input" value={form.manager_type} onChange={set('manager_type')}>
+              <label htmlFor="su-type">What do you operate?</label>
+              <select id="su-type" className="input" value={form.manager_type} onChange={set('manager_type')}>
                 <option value="milk_center">Milk collection center</option>
                 <option value="byproduct">Dairy byproducts (desi ghee, etc.)</option>
               </select>
             </div>
             <div className="field">
-              <label>Center / shop name</label>
-              <input className="input" required value={form.center_name} onChange={set('center_name')} />
+              <label htmlFor="su-center">Center or shop name</label>
+              <input id="su-center" className="input" required maxLength={80} value={form.center_name} onChange={set('center_name')} />
             </div>
           </>
         ) : (
-          <div className="grid grid-cols-[1.4fr_1fr] gap-3">
+          <div className="grid gap-3 sm:grid-cols-[1.4fr_1fr]">
             <div className="field">
-              <label>Business name</label>
-              <input className="input" required value={form.business_name} onChange={set('business_name')} />
+              <label htmlFor="su-biz">Business name</label>
+              <input id="su-biz" className="input" required maxLength={80} value={form.business_name} onChange={set('business_name')} />
             </div>
             <div className="field">
-              <label>Type</label>
-              <select className="input" value={form.business_type} onChange={set('business_type')}>
+              <label htmlFor="su-btype">Type</label>
+              <select id="su-btype" className="input" value={form.business_type} onChange={set('business_type')}>
                 <option value="restaurant">Restaurant</option>
                 <option value="bakery">Bakery</option>
                 <option value="hotel">Hotel</option>
@@ -127,22 +138,31 @@ export default function Signup() {
           </div>
         )}
 
-        <div className="grid grid-cols-[1fr_1.4fr] gap-3">
+        <div className="grid gap-3 sm:grid-cols-[1fr_1.4fr]">
           <div className="field">
-            <label>City</label>
-            <input className="input" required value={form.city} onChange={set('city')} />
+            <label htmlFor="su-city">City</label>
+            <input id="su-city" className="input" required maxLength={40} list="su-cities" autoComplete="address-level2" value={form.city} onChange={set('city')} />
+            <datalist id="su-cities">{CITIES.map((c) => <option key={c} value={c} />)}</datalist>
           </div>
           <div className="field">
-            <label>Address</label>
-            <input className="input" value={form.address} onChange={set('address')} />
+            <label htmlFor="su-addr">Address <span className="font-normal text-muted">(optional)</span></label>
+            <input id="su-addr" className="input" maxLength={200} autoComplete="street-address" value={form.address} onChange={set('address')} />
           </div>
         </div>
 
-        <div className="field">
-          <label>Password</label>
-          <input type="password" className="input" required minLength={6} value={form.password} onChange={set('password')} />
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="field">
+            <label htmlFor="su-pw">Password</label>
+            <input id="su-pw" type="password" className="input" required minLength={8} autoComplete="new-password" value={form.password} onChange={set('password')} />
+            <span className="hint">8 or more, letters and numbers</span>
+          </div>
+          <div className="field">
+            <label htmlFor="su-pw2">Type it again</label>
+            <input id="su-pw2" type="password" className="input" required autoComplete="new-password" value={form.password2} onChange={set('password2')} />
+          </div>
         </div>
 
+        <Alert>{error}</Alert>
         <button className="btn-primary mt-2" disabled={busy}>{busy ? 'Creating account…' : 'Create account'}</button>
       </form>
 

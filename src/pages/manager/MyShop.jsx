@@ -17,6 +17,7 @@ import EmptyState from '../../components/EmptyState'
 import Sheet from '../../components/Sheet'
 import { HillsStrip } from '../../components/Farm'
 import { qtyText, perUnit } from '../../lib/b2b'
+import { phoneError, numberError, firstError, prettyPhone } from '../../lib/validate'
 
 const TYPES = ['buffalo', 'cow', 'mixed']
 
@@ -55,7 +56,7 @@ export default function MyShop() {
     <>
       <PageHeader title="My shop" description={data?.byproduct ? "What customers see in the ApnaDairy app: your shop, your products and what customers and businesses say about you." : "What customers see in the ApnaDairy app: your milk on sale, your shop and what other customers say about it."} />
       <Alert>{error}</Alert>
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px] xl:gap-7">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_340px] xl:gap-7">
         <div className="min-w-0">
           <div className="mb-5">
             <Segmented value={view} onChange={setTab} options={[
@@ -91,7 +92,7 @@ function Listings({ data, guide, reload }) {
   const close = () => { setSheet(null); if (focus) setParams({}) }
   const editing = sheet && (sheet.listing ?? data.listings.find((x) => x.milk_type === sheet.type))
   return (
-    <div className="grid gap-4">
+    <div className="grid grid-cols-1 gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="display text-[22px] text-forest-deep">Your milk on the app</h2>
@@ -139,9 +140,9 @@ function GradeChip({ grade }) {
 function Stat({ label, value, hint }) {
   return (
     <div className="min-w-0 rounded-2xl bg-cream px-3 py-2.5">
-      <p className="truncate text-[12px] text-muted">{label}</p>
+      <p className="text-[12px] leading-tight text-muted">{label}</p>
       <p className="num mt-0.5 truncate text-[17px] font-bold text-forest-deep sm:text-[19px]">{value}</p>
-      <p className="truncate text-[11.5px] text-muted">{hint}</p>
+      <p className="text-[11.5px] leading-tight text-muted">{hint}</p>
     </div>
   )
 }
@@ -175,7 +176,7 @@ function ListingCard({ listing, pub, fresh, grade, reload, onEdit }) {
         </div>
       </div>
       <div className="mt-4 grid grid-cols-3 gap-2">
-        <Stat label="Available now" value={litres(onApp)} hint={`${litres(fresh)} fresh in stock`} />
+        <Stat label="On the app" value={litres(onApp)} hint={`${litres(fresh)} fresh in stock`} />
         <Stat label="Price" value={rs(price)} hint={Number(listing.discount_pct) ? `per litre, ${listing.discount_pct}% off` : 'per litre'} />
         <Stat label="Freshness" value={pub ? `${pub.freshness_score}/100` : '—'} hint={pub?.hours_left ? `about ${Math.round(pub.hours_left)} h left` : 'no fresh milk'} />
       </div>
@@ -211,7 +212,7 @@ function ListingSheet({ open, listing, startType, taken, fresh, grades, guide, p
     if (l > max) return setErr(`You have ${litres(max)} of fresh ${milkLabel[type].toLowerCase()} milk. List that much or less.`)
     if (!(Number(f.price) > 0)) return setErr('Enter your price per litre.')
     if (g && Number(f.price) > g.max) return setErr(`The most you can charge is ${rs(g.max)} a litre (${g.maxPct}% above what you pay farmers).`)
-    if (Number(f.discount) < 0 || Number(f.discount) > 90) return setErr('Discount can be 0 to 90%.')
+    if (!Number.isInteger(Number(f.discount || 0)) || Number(f.discount) < 0 || Number(f.discount) > 90) return setErr('Discount is a whole number from 0 to 90%.')
     setBusy(true)
     try {
       if (listing) {
@@ -270,7 +271,7 @@ function ListingSheet({ open, listing, startType, taken, fresh, grades, guide, p
                   {Number(f.price) !== g.suggest && <button type="button" className="ml-1 font-semibold text-forest underline" onClick={() => setF({ ...f, price: String(g.suggest) })}>Use {rs(g.suggest)}</button>}</span>}
               </div>
               <div className="field"><label htmlFor="ld">Discount</label>
-                <div className="flex items-center gap-2"><input id="ld" className="input num w-full" type="number" min="0" max="90" value={f.discount} onChange={set('discount')} /><span className="text-muted">%</span></div></div>
+                <div className="flex items-center gap-2"><input id="ld" className="input num w-full" type="number" inputMode="decimal" min="0" max="90" value={f.discount} onChange={set('discount')} /><span className="text-muted">%</span></div></div>
             </div>
 
             <div className="field"><label htmlFor="lx">Description <span className="font-normal text-muted">(optional)</span></label>
@@ -299,12 +300,19 @@ function Profile({ data, reload }) {
   const set = (k) => (e) => setP({ ...p, [k]: e.target.value })
 
   const save = async () => {
+    const bad = firstError(
+      phoneError(p.phone), p.whatsapp ? phoneError(p.whatsapp).replace('Phone', 'WhatsApp') : '',
+      (p.opening_hours ?? '').length > 80 ? 'Opening hours are too long.' : '',
+      numberError(p.delivery_radius_km, { min: 0, max: 50, what: 'delivery area', required: false }),
+    )
+    if (bad) return toast(bad, 'error')
     setBusy(true)
-    try { await saveShopProfile(data.center.id, p); toast('Shop profile saved.'); await reload() } catch (e) { toast(e.message, 'error') }
+    try { await saveShopProfile(data.center.id, { ...p, phone: p.phone?.trim() ? prettyPhone(p.phone) : null, whatsapp: p.whatsapp?.trim() ? prettyPhone(p.whatsapp) : null, opening_hours: p.opening_hours?.trim() || null }); toast('Shop profile saved.'); await reload() } catch (e) { toast(e.message, 'error') }
     setBusy(false)
   }
   const upload = async (files) => {
-    const list = [...files].filter((f) => f.type.startsWith('image/'))
+    const list = [...files].filter((f) => ['image/jpeg', 'image/png', 'image/webp'].includes(f.type))
+    if (list.length < files.length) toast('Only JPG, PNG or WebP photos can be added.', 'error')
     const big = list.find((f) => f.size > 5 * 1024 * 1024)
     if (big) return toast(`${big.name} is larger than 5 MB.`, 'error')
     if (photos.length + list.length > 8) return toast('A shop can have up to 8 photos.', 'error')
@@ -350,11 +358,11 @@ function Profile({ data, reload }) {
           <div className="field sm:col-span-2"><label htmlFor="tg">Tagline</label><input id="tg" className="input" maxLength={90} placeholder="e.g. Khalis doodh, tested every morning" value={p.tagline ?? ''} onChange={set('tagline')} /></div>
           <div className="field sm:col-span-2"><label htmlFor="ds">Description</label><textarea id="ds" className="input" rows={4} maxLength={600} placeholder="Where your milk comes from and why customers trust you" value={p.description ?? ''} onChange={set('description')} />
             <span className="hint">{(p.description ?? '').length}/600</span></div>
-          <div className="field"><label htmlFor="ph">Phone</label><input id="ph" className="input" inputMode="tel" value={p.phone ?? ''} onChange={set('phone')} /></div>
-          <div className="field"><label htmlFor="wa">WhatsApp</label><input id="wa" className="input" inputMode="tel" value={p.whatsapp ?? ''} onChange={set('whatsapp')} /></div>
-          <div className="field"><label htmlFor="oh">Opening hours</label><input id="oh" className="input" placeholder="e.g. Every day, 6 am to 10 pm" value={p.opening_hours ?? ''} onChange={set('opening_hours')} /></div>
+          <div className="field"><label htmlFor="ph">Phone</label><input id="ph" className="input num" type="tel" inputMode="tel" maxLength={16} placeholder="0300 1234567" value={p.phone ?? ''} onChange={set('phone')} /></div>
+          <div className="field"><label htmlFor="wa">WhatsApp</label><input id="wa" className="input num" type="tel" inputMode="tel" maxLength={16} placeholder="0300 1234567" value={p.whatsapp ?? ''} onChange={set('whatsapp')} /></div>
+          <div className="field"><label htmlFor="oh">Opening hours</label><input id="oh" className="input" maxLength={80} placeholder="e.g. Every day, 6 am to 10 pm" value={p.opening_hours ?? ''} onChange={set('opening_hours')} /></div>
           <div className="field"><label htmlFor="dr">Delivery area</label>
-            <div className="flex items-center gap-2"><input id="dr" className="input num w-24" type="number" min="0" max="50" step="0.5" value={p.delivery_radius_km ?? ''} onChange={set('delivery_radius_km')} /><span className="text-[13px] text-muted">km around the shop</span></div></div>
+            <div className="flex items-center gap-2"><input id="dr" className="input num w-24" type="number" inputMode="decimal" min="0" max="50" step="0.5" value={p.delivery_radius_km ?? ''} onChange={set('delivery_radius_km')} /><span className="text-[13px] text-muted">km around the shop</span></div></div>
         </div>
         <p className="mt-4 text-[12.5px] text-muted">Your shop name, city and address come from registration. Contact support to change them.</p>
         <button className="btn-primary mt-4" onClick={save} disabled={busy}>{busy ? 'Saving…' : 'Save profile'}</button>
@@ -473,8 +481,9 @@ function ReviewItem({ r, reload }) {
   const [text, setText] = useState(r.reply ?? '')
   const [busy, setBusy] = useState(false)
   const send = async () => {
+    if (text.trim().length < 2) return toast('Write a reply first.', 'error')
     setBusy(true)
-    try { await replyReview(r.id, text); toast('Reply posted.'); setOpen(false); await reload() } catch (e) { toast(e.message, 'error') }
+    try { await replyReview(r.id, text.trim()); toast('Reply posted.'); setOpen(false); await reload() } catch (e) { toast(e.message, 'error') }
     setBusy(false)
   }
   return (

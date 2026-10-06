@@ -3,7 +3,7 @@ import { useLoad } from '../../lib/useLoad'
 import { useUi } from '../../context/UiContext'
 import {
   adminInvoices, platformSettings, savePlatformSettings, generateInvoices, voidInvoice, payInvoice,
-  paymentLabel, monthLabel, rsShort, todayKey,
+  paymentLabel, monthLabel, todayKey,
 } from '../../lib/center'
 import { rs, date } from '../../lib/format'
 import PageHeader from '../../components/PageHeader'
@@ -13,6 +13,7 @@ import Badge from '../../components/Badge'
 import Alert from '../../components/Alert'
 import Icon from '../../components/Icon'
 import EmptyState from '../../components/EmptyState'
+import { numberError } from '../../lib/validate'
 
 const overdue = (i) => i.status === 'due' && i.due_date < todayKey()
 
@@ -44,6 +45,12 @@ export default function AdminBilling() {
   const list = inv.filter((i) => view === 'all' || (view === 'overdue' ? overdue(i) : i.status === view))
 
   const saveSettings = async () => {
+    for (const [, fields] of GROUPS) for (const [k, label, unit] of fields) {
+      const max = unit === '%' ? 300 : unit === 'days' ? 60 : unit === 'L' ? 1000 : 100000000
+      const bad = numberError(s[k], { min: unit === 'Rs' && k !== 'discount_min_sales' ? 0 : unit === '%' ? 0 : 1, max, whole: unit === 'days', what: label.toLowerCase() })
+      if (bad) return toast(bad, 'error')
+    }
+    if (Number(s.farmer_min_pct) > 100 || Number(s.farmer_default_pct) > 100) return toast('The farmer share cannot be more than 100%.', 'error')
     if (!(Number(s.discount_pct) >= 0 && Number(s.discount_pct) <= 90)) return toast('The discount can be 0 to 90%.', 'error')
     if (Number(s.order_min_l) <= 0 || Number(s.order_max_l) < Number(s.order_min_l)) return toast('The largest order must be at least the smallest order, and both above 0.', 'error')
     if (Number(s.farmer_min_pct) > Number(s.farmer_default_pct)) return toast('The suggested farmer share cannot be below the minimum.', 'error')
@@ -133,7 +140,7 @@ export default function AdminBilling() {
                       <span className="text-[13.5px]">{label}</span>
                       <span className="flex items-center gap-1.5">
                         {unit === 'Rs' && <span className="text-[13px] text-muted">Rs</span>}
-                        <input className={`input num h-10 text-right font-semibold ${unit === 'Rs' ? 'w-32' : 'w-24'}`} type="number" min="0" step="any" value={s[k] ?? ''}
+                        <input className={`input num h-10 text-right font-semibold ${unit === 'Rs' ? 'w-32' : 'w-24'}`} type="number" inputMode="decimal" min="0" step="any" value={s[k] ?? ''}
                           onChange={(e) => setForm({ ...s, [k]: e.target.value })} aria-label={label} />
                         {unit !== 'Rs' && <span className="w-8 text-[12px] text-muted">{unit}</span>}
                       </span>

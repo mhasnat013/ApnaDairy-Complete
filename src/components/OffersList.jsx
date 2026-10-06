@@ -34,7 +34,7 @@ export default function OffersList({ requirementId, target, highlight, dark = fa
               </p>
             </div>
             <div className="shrink-0 text-right">
-              <p className="num text-[18px] font-bold">{rs(b.price_per_l)}<span className={`text-[12px] font-medium ${muted}`}> /L</span></p>
+              <p className="num text-[18px] font-bold">{rs(b.price_per_l)}<span className={`text-[12px] font-medium ${muted}`}> /{unit === 'litre' ? 'L' : unit}</span></p>
               {diff != null && <p className={`num text-[12px] font-medium ${diff <= 0 ? 'text-forest' : 'text-amber'}`}>{diff === 0 ? 'at target' : `${rs(Math.abs(diff))} ${diff < 0 ? 'under' : 'over'}`}</p>}
             </div>
           </li>

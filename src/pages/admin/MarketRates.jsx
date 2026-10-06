@@ -7,6 +7,7 @@ import PageHeader from '../../components/PageHeader'
 import Card from '../../components/Card'
 import Alert from '../../components/Alert'
 import Icon from '../../components/Icon'
+import { cityError } from '../../lib/validate'
 
 const TYPES = ['buffalo', 'cow', 'mixed']
 
@@ -30,7 +31,7 @@ export default function MarketRates() {
   const dirty = Object.keys(edits).length > 0
 
   const save = async () => {
-    for (const [k, v] of Object.entries(edits)) if (!(Number(v) > 0)) return toast('Every rate must be more than zero.', 'error')
+    for (const v of Object.values(edits)) if (!(Number(v) > 0) || Number(v) > 2000) return toast('Every rate must be between Rs 1 and Rs 2,000 a litre.', 'error')
     setBusy(true)
     try {
       for (const [k, v] of Object.entries(edits)) { const [city, t] = k.split('|'); await saveMarketRate(city, t, v) }
@@ -41,6 +42,7 @@ export default function MarketRates() {
   const addCity = async (name) => {
     const city = (name ?? newCity).trim().toLowerCase()
     if (!city || city === '*') return
+    if (cityError(city)) return toast(cityError(city), 'error')
     if (rows[city]) return toast(`${cityLabel(city)} already has rates.`, 'error')
     setBusy(true)
     try {
@@ -72,7 +74,7 @@ export default function MarketRates() {
                   <td><p className="font-semibold">{cityLabel(city)}</p>{city === '*' && <p className="text-[12.5px] text-muted">used where no city rate is set</p>}</td>
                   {TYPES.map((t) => (
                     <td key={t} className="text-right">
-                      <input className={`input num h-10 w-24 text-right font-semibold ${edits[`${city}|${t}`] != null ? 'border-forest' : ''}`} type="number" min="1"
+                      <input className={`input num h-10 w-24 text-right font-semibold ${edits[`${city}|${t}`] != null ? 'border-forest' : ''}`} type="number" inputMode="decimal" min="1"
                         value={val(city, t)} onChange={(e) => setEdits({ ...edits, [`${city}|${t}`]: e.target.value })} aria-label={`${cityLabel(city)} ${t}`} />
                     </td>
                   ))}
@@ -88,7 +90,7 @@ export default function MarketRates() {
       <div className="mt-5 grid gap-4 lg:grid-cols-2">
         <Card title="Add a city" subtitle="Give a city its own rates when milk prices there differ from the national rate.">
           <div className="flex gap-2">
-            <input className="input flex-1" placeholder="e.g. Karachi" value={newCity} onChange={(e) => setNewCity(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addCity()} />
+            <input className="input flex-1" maxLength={40} placeholder="e.g. Karachi" value={newCity} onChange={(e) => setNewCity(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addCity()} />
             <button className="btn-secondary" onClick={() => addCity()} disabled={busy || !newCity.trim()}><Icon name="plus" size={16} />Add</button>
           </div>
           {uncovered.length > 0 && (

@@ -29,7 +29,7 @@ export default function Requirements() {
 
   return (
     <>
-      <PageHeader title="My requirements" description="Post how much milk you need and when. Verified collection centers send you their price, and you pick one.">
+      <PageHeader title="My requirements" description="Post what you need and when. Verified sellers send you their price, and you pick one or more.">
         <Link to="/business/requirements/new" className="btn-primary">Post a requirement</Link>
       </PageHeader>
 

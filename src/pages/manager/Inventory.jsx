@@ -210,10 +210,10 @@ function UsageForm({ value, stock, onClose, onSaved }) {
         <div className="field"><span className="label">Milk</span>
           <Segmented value={u.milk_type} onChange={(v) => setU({ ...u, milk_type: v })} options={TYPES.map((t) => ({ value: t, label: milkLabel[t] }))} />
           <span className="hint">{Math.round(max)} L in stock</span></div>
-        <div className="field"><label htmlFor="ul">Litres</label><input id="ul" className="input w-40" type="number" min="0.5" step="0.5" value={u.litres} onChange={(e) => setU({ ...u, litres: e.target.value })} /></div>
+        <div className="field"><label htmlFor="ul">Litres</label><input id="ul" className="input w-40" type="number" inputMode="decimal" min="0.5" step="0.5" value={u.litres} onChange={(e) => setU({ ...u, litres: e.target.value })} /></div>
         <div className="field"><span className="label">Reason</span>
           <Segmented value={u.reason} onChange={(v) => setU({ ...u, reason: v })} options={[{ value: 'spoiled', label: 'Spoiled' }, { value: 'own_use', label: 'Own use' }]} /></div>
-        <div className="field"><label htmlFor="un">Note</label><input id="un" className="input" placeholder="e.g. turned sour overnight" value={u.note} onChange={(e) => setU({ ...u, note: e.target.value })} /></div>
+        <div className="field"><label htmlFor="un">Note</label><input id="un" className="input" maxLength={200} placeholder="e.g. turned sour overnight" value={u.note} onChange={(e) => setU({ ...u, note: e.target.value })} /></div>
       </form>
     </Sheet>
   )

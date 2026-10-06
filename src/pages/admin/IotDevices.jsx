@@ -127,7 +127,7 @@ function DeviceSheet({ device, devices, centers, onClose, onSaved }) {
         <div className="field"><label htmlFor="ds">Serial</label>
           <input id="ds" className="input num uppercase" placeholder="AD-IOT-0002" value={f.serial} onChange={set('serial')} disabled={!isNew} required /></div>
         <div className="field"><label htmlFor="dl">Name <span className="font-normal text-muted">(optional)</span></label>
-          <input id="dl" className="input" placeholder="ESP32 tester: temperature, pH, TDS" value={f.label ?? ''} onChange={set('label')} /></div>
+          <input id="dl" className="input" maxLength={60} placeholder="ESP32 tester: temperature, pH, TDS" value={f.label ?? ''} onChange={set('label')} /></div>
         <div className="field"><label htmlFor="du">Firebase database link</label>
           <input id="du" className="input text-[14px]" value={f.db_url} onChange={set('db_url')} required />
           <span className="hint">The secret key stays on the server, never here.</span></div>

@@ -84,8 +84,9 @@ function RateSheet({ order, onClose, onSaved }) {
   const [busy, setBusy] = useState(false)
   const words = ['', 'Poor', 'Below what was promised', 'Okay', 'Good', 'Excellent']
   const save = async () => {
+    if (!stars) return toast('Pick 1 to 5 stars.', 'error')
     setBusy(true)
-    try { await rateOrder(order.id, stars, comment); toast('Thank you. Your rating helps other businesses choose.'); onSaved(); onClose() } catch (e) { toast(e.message, 'error') }
+    try { await rateOrder(order.id, stars, comment.trim()); toast('Thank you. Your rating helps other businesses choose.'); onSaved(); onClose() } catch (e) { toast(e.message, 'error') }
     setBusy(false)
   }
   return (

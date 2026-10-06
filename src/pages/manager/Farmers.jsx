@@ -10,6 +10,7 @@ import EmptyState from '../../components/EmptyState'
 import Alert from '../../components/Alert'
 import Icon from '../../components/Icon'
 import Sheet from '../../components/Sheet'
+import { nameError, phoneError, numberError, firstError, prettyPhone } from '../../lib/validate'
 
 export default function Farmers() {
   const [params, setParams] = useSearchParams()
@@ -108,27 +109,33 @@ export function FarmerForm({ farmer, onClose, onSaved }) {
   const set = (k) => (e) => setF({ ...f, [k]: e.target.type === 'checkbox' ? e.target.checked : e.target.value })
   const submit = async (e) => {
     e.preventDefault()
-    if (!f.full_name?.trim()) return setErr('Enter the farmer’s name.')
+    const bad = firstError(
+      nameError(f.full_name, 'farmer’s name'),
+      phoneError(f.phone),
+      (f.village ?? '').trim().length > 60 ? 'The village name is too long.' : '',
+      numberError(f.cattle_count, { min: 0, max: 500, whole: true, what: 'number of animals' }),
+    )
+    if (bad) return setErr(bad)
     setBusy(true); setErr('')
-    try { await saveFarmer(f); toast(f.id ? 'Farmer updated.' : `${f.full_name} added.`); onSaved?.(); onClose() } catch (ex) { setErr(ex.message) }
+    try { await saveFarmer({ ...f, full_name: f.full_name.trim(), phone: f.phone?.trim() ? prettyPhone(f.phone) : null, village: f.village?.trim() || null, cattle_count: Number(f.cattle_count) }); toast(f.id ? 'Farmer updated.' : `${f.full_name} added.`); onSaved?.(); onClose() } catch (ex) { setErr(ex.message) }
     setBusy(false)
   }
 
   return (
     <Sheet open={farmer !== null} onClose={onClose} title={farmer?.id ? 'Edit farmer' : 'Add a farmer'} subtitle="They can link the ApnaDairy app later with the same phone number."
       footer={<><button className="btn-secondary" onClick={onClose}>Cancel</button><button className="btn-primary" form="farmer-form" disabled={busy}>{busy ? 'Saving…' : 'Save farmer'}</button></>}>
-      <form id="farmer-form" onSubmit={submit} className="grid gap-4">
+      <form id="farmer-form" onSubmit={submit} noValidate className="grid gap-4">
         <Alert>{err}</Alert>
-        <div className="field"><label htmlFor="fn">Full name</label><input id="fn" className="input" value={f.full_name ?? ''} onChange={set('full_name')} autoFocus /></div>
+        <div className="field"><label htmlFor="fn">Full name</label><input id="fn" className="input" maxLength={80} value={f.full_name ?? ''} onChange={set('full_name')} autoFocus /></div>
         <div className="grid gap-4 sm:grid-cols-2">
-          <div className="field"><label htmlFor="fp">Phone</label><input id="fp" className="input" inputMode="tel" placeholder="03xx xxxxxxx" value={f.phone ?? ''} onChange={set('phone')} /></div>
-          <div className="field"><label htmlFor="fv">Village</label><input id="fv" className="input" value={f.village ?? ''} onChange={set('village')} /></div>
+          <div className="field"><label htmlFor="fp">Phone</label><input id="fp" className="input num" type="tel" inputMode="tel" maxLength={16} placeholder="0300 1234567" value={f.phone ?? ''} onChange={set('phone')} /></div>
+          <div className="field"><label htmlFor="fv">Village</label><input id="fv" className="input" maxLength={60} value={f.village ?? ''} onChange={set('village')} /></div>
         </div>
         <div className="field">
           <span className="label">Milk they bring</span>
           <Segmented value={f.milk_type} onChange={(v) => setF({ ...f, milk_type: v })} options={[{ value: 'buffalo', label: 'Buffalo' }, { value: 'cow', label: 'Cow' }, { value: 'mixed', label: 'Mixed' }]} />
         </div>
-        <div className="field"><label htmlFor="fc">Number of animals</label><input id="fc" className="input w-32" type="number" min="0" value={f.cattle_count ?? ''} onChange={set('cattle_count')} /></div>
+        <div className="field"><label htmlFor="fc">Number of animals</label><input id="fc" className="input w-32" type="number" min="0" max="500" step="1" inputMode="numeric" value={f.cattle_count ?? ''} onChange={set('cattle_count')} /></div>
         {f.id && (
           <label className="flex items-center gap-3 rounded-2xl bg-cream px-4 py-3 text-[14px]">
             <input type="checkbox" className="h-5 w-5 accent-[#1f4d36]" checked={!!f.is_active} onChange={set('is_active')} />

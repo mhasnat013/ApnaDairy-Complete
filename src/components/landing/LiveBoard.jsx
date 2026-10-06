@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import Reveal from './Reveal'
-import { milkLabel, qualityLabel } from '../../lib/b2b'
+import { milkLabel, qualityLabel, isMilk, productLabel, qtyText, perUnit } from '../../lib/b2b'
 import { rs, date, relative } from '../../lib/format'
 import { MilkChurn } from '../Farm'
 
@@ -32,11 +32,11 @@ export default function LiveBoard({ requests }) {
               <Reveal key={r.id} delay={i * 0.08}>
                 <article className="group relative h-full overflow-hidden rounded-[24px] bg-cream p-6 text-ink transition-transform duration-300 hover:-translate-y-1">
                   <MilkChurn size={70} className="absolute -right-3 -top-3 opacity-15 transition-transform duration-500 group-hover:rotate-12" />
-                  <p className="display num text-[48px] leading-none text-forest">{Number(r.quantity_l).toLocaleString('en-PK')} L</p>
-                  <p className="mt-2 font-semibold">{milkLabel[r.milk_type]}, {qualityLabel[r.quality].toLowerCase()}</p>
+                  <p className="display num text-[48px] leading-none text-forest">{qtyText(r.quantity_l, r.unit ?? 'litre')}</p>
+                  <p className="mt-2 font-semibold">{isMilk(r) ? `${milkLabel[r.milk_type]}, ${qualityLabel[r.quality].toLowerCase()}` : productLabel[r.product]}</p>
                   <p className="mt-3 text-[15px] text-muted">
                     For a {r.business_type === 'other' ? 'business' : r.business_type} in {r.delivery_city} by <span className="num">{date(r.required_date)}</span>
-                    {r.target_price ? <>, around <span className="num">{rs(r.target_price)}</span>/L</> : ''}.
+                    {r.target_price ? <>, around <span className="num">{rs(r.target_price)}</span>/{perUnit(r.unit ?? 'litre')}</> : ''}.
                   </p>
                   <p className="mt-5 flex items-center justify-between border-t border-line pt-4 text-[14px]">
                     <span className="font-semibold">Closes {relative(r.bid_deadline)}</span>

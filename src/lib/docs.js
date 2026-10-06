@@ -47,7 +47,9 @@ export async function listDocs(userId) {
 }
 
 export async function uploadDoc(userId, docType, file) {
-  if (file.size > 5 * 1024 * 1024) throw new Error('file must be under 5 mb')
+  if (!['image/jpeg', 'image/png', 'image/webp', 'application/pdf'].includes(file.type)) throw new Error('Upload a photo (JPG, PNG) or a PDF.')
+  if (file.size > 5 * 1024 * 1024) throw new Error('The file must be under 5 MB.')
+  if (file.size < 1024) throw new Error('This file looks empty. Pick another one.')
   const ext = file.name.split('.').pop().toLowerCase()
   const path = `${userId}/${docType}-${Date.now()}.${ext}`
 
