@@ -27,6 +27,17 @@ export const navFor = {
     { to: '/manager/billing', label: 'Billing', icon: 'wallet', ready: true },
     { to: '/manager/support', label: 'Support', icon: 'chat' },
   ],
+  // dairy products sellers: no milk collection and no iot device
+  byproduct: [
+    { to: '/manager', label: 'Overview', icon: 'grid', end: true, ready: true },
+    { to: '/manager/products', label: 'Products', icon: 'box', ready: true },
+    { to: '/manager/orders', label: 'Shop orders', icon: 'cart', ready: true },
+    { to: '/manager/bulk-requests', label: 'Bulk requests', icon: 'gavel', ready: true },
+    { to: '/manager/bulk-orders', label: 'Bulk orders', icon: 'truck', ready: true },
+    { to: '/manager/shop', label: 'My shop', icon: 'store', ready: true },
+    { to: '/manager/billing', label: 'Billing', icon: 'wallet', ready: true },
+    { to: '/manager/support', label: 'Support', icon: 'chat' },
+  ],
   business: [
     { to: '/business', label: 'Overview', icon: 'grid', end: true, ready: true },
     { to: '/business/requirements', label: 'My requirements', icon: 'box', ready: true },

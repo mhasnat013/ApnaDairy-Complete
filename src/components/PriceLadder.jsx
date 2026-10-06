@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
-import { rs, litres } from '../lib/format'
+import { rs } from '../lib/format'
+import { qtyText } from '../lib/b2b'
 
 // every bid as a dot on one shared price scale; the buyer's target is the haldi line.
 // dots glide in from the target on first render; hovering a row shows the full offer.
-export default function PriceLadder({ rows, target, acceptedId, onPick }) {
+export default function PriceLadder({ rows, target, acceptedId, onPick, unit = 'litre' }) {
   const [settled, setSettled] = useState(false)
   const [hover, setHover] = useState(null)
   useEffect(() => { const t = requestAnimationFrame(() => setSettled(true)); return () => cancelAnimationFrame(t) }, [])
@@ -18,7 +19,7 @@ export default function PriceLadder({ rows, target, acceptedId, onPick }) {
   const start = target ? x(target) : 50
 
   return (
-    <figure className="panel animate-rise p-5 sm:p-7" aria-label="Bids compared by price per litre">
+    <figure className="panel animate-rise p-5 sm:p-7" aria-label="Bids compared by price">
       <figcaption className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <span className="display text-[20px]">Who's offering what</span>
         <span className="flex flex-wrap items-center gap-4 text-[13px] text-muted">
@@ -63,7 +64,7 @@ export default function PriceLadder({ rows, target, acceptedId, onPick }) {
                   {isHover && (
                     <span className="num absolute -top-1 z-20 -translate-x-1/2 -translate-y-full whitespace-nowrap rounded-xl bg-forest-deep px-3 py-1.5 text-[12.5px] text-cream shadow-lg"
                       style={{ left: `${x(r.price)}%` }}>
-                      {litres(r.quantity)} for {rs(r.price * r.quantity)}
+                      {qtyText(r.quantity, unit)} for {rs(r.price * r.quantity)}
                     </span>
                   )}
                 </div>

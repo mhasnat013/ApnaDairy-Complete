@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { myRequirements, milkLabel, qualityLabel, coveredL, isExpired } from '../../lib/b2b'
+import { myRequirements, qualityLabel, coveredL, isExpired, reqTitle, qtyText, isMilk, productLabel } from '../../lib/b2b'
 import { useLoad } from '../../lib/useLoad'
-import { rs, litres, date, relative } from '../../lib/format'
+import { rs, date, relative } from '../../lib/format'
 import PageHeader from '../../components/PageHeader'
 import Segmented from '../../components/Segmented'
 import Badge from '../../components/Badge'
@@ -57,9 +57,9 @@ export default function Requirements() {
               <tr key={r.id} className="clickable" onClick={() => nav(`/business/requirements/${r.id}`)}>
                 <td>
                   <Link to={`/business/requirements/${r.id}`} className="font-semibold text-ink hover:underline" onClick={(e) => e.stopPropagation()}>
-                    {litres(r.quantity_l)} {milkLabel[r.milk_type].toLowerCase()}
+                    {reqTitle(r)}
                   </Link>
-                  <p className="text-[13px] text-muted">{qualityLabel[r.quality]}{coveredL(r) > 0 ? ` · ${litres(coveredL(r))} ordered` : ''}</p>
+                  <p className="text-[13px] text-muted">{isMilk(r) ? qualityLabel[r.quality] : `${productLabel[r.product]}, ${qualityLabel[r.quality].toLowerCase()}`}{coveredL(r) > 0 ? ` · ${qtyText(coveredL(r), r.unit)} ordered` : ''}</p>
                 </td>
                 <td className="num">{date(r.required_date)}<p className="text-[13px] text-muted">{r.delivery_city}</p></td>
                 <td className="num text-right">{r.target_price ? rs(r.target_price) : <span className="text-muted">Open</span>}</td>

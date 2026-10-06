@@ -2,8 +2,8 @@ import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useUi } from '../../context/UiContext'
-import { milkLabel, qualityLabel, qualityHint } from '../../lib/b2b'
-import { rs, litres, date } from '../../lib/format'
+import { milkLabel, qualityLabel, qualityHint, productQualityHint, productLabel, PRODUCTS, defaultUnit, qtyText, perUnit } from '../../lib/b2b'
+import { rs, date } from '../../lib/format'
 import PageHeader from '../../components/PageHeader'
 import ChoiceCards from '../../components/ChoiceCards'
 import Alert from '../../components/Alert'
@@ -12,14 +12,15 @@ import { MilkChurn } from '../../components/Farm'
 const iso = (d) => d.toLocaleDateString('en-CA', { timeZone: 'Asia/Karachi' })
 const plusDays = (n) => { const d = new Date(); d.setDate(d.getDate() + n); return d }
 const milkHint = { cow: 'Lighter, everyday milk', buffalo: 'Thicker, more cream', mixed: 'Either is fine' }
-const quickQty = [100, 250, 500, 1000]
+const quickQty = { milk: [100, 250, 500, 1000], product: [5, 10, 25, 50] }
+const productHint = { ghee: 'Pure desi ghee', butter: 'White or yellow butter', yogurt: 'Fresh dahi', cheese: 'Paneer or cheese', cream: 'Fresh malai', lassi: 'Sweet or salted', other: 'Khoya and more' }
 
 export default function NewRequirement() {
   const nav = useNavigate()
   const { toast } = useUi()
   const [today] = useState(() => iso(new Date()))
   const [f, setF] = useState(() => ({
-    milk_type: 'cow', quantity_l: '', required_date: iso(plusDays(7)), quality: 'fresh',
+    product: 'milk', unit: 'litre', milk_type: 'cow', quantity_l: '', required_date: iso(plusDays(7)), quality: 'fresh',
     target_price: '', deadline_date: iso(plusDays(5)), deadline_time: '18:00',
     delivery_city: '', delivery_address: '', notes: '',
   }))
@@ -40,6 +41,8 @@ export default function NewRequirement() {
 
     const { data, error } = await supabase.from('bulk_requirements').insert({
       business_id: businessId,
+      product: f.product,
+      unit: f.product === 'milk' ? 'litre' : f.unit,
       milk_type: f.milk_type,
       quantity_l: Number(f.quantity_l),
       required_date: f.required_date,
@@ -58,15 +61,28 @@ export default function NewRequirement() {
 
   return (
     <>
-      <PageHeader title="What milk do you need?" back={{ to: '/business/requirements', label: 'My requirements' }}
-        description="Verified collection centers see this and send their best price. You choose who supplies you, and can split a large order between centers." />
+      <PageHeader title="What do you need?" back={{ to: '/business/requirements', label: 'My requirements' }}
+        description="Verified milk centers and dairy product sellers see this and send their best price. You choose who supplies you, and can split a large order between sellers." />
 
       <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_340px]">
         <form onSubmit={onSubmit} className="panel space-y-7 p-6 sm:p-8">
           <Alert>{error}</Alert>
 
           <div className="field">
-            <span className="label">Milk</span>
+            <span className="label">What do you need?</span>
+            <div className="flex flex-wrap gap-1.5">
+              {['milk', ...PRODUCTS].map((v) => (
+                <button key={v} type="button" onClick={() => setF((p) => ({ ...p, product: v, unit: v === 'milk' ? 'litre' : defaultUnit[v], quality: v === 'milk' ? p.quality : p.quality === 'fresh' ? 'standard' : p.quality, quantity_l: '' }))}
+                  className={`rounded-full border-[1.5px] px-3.5 py-1.5 text-[14px] font-medium transition-all ${f.product === v ? 'border-forest bg-mint-soft text-forest' : 'border-line bg-white hover:border-[#cdbd98]'}`}>
+                  {productLabel[v]}
+                </button>
+              ))}
+            </div>
+            <p className="hint">{f.product === 'milk' ? 'Fresh milk comes from milk collection centers, tested by their IoT device.' : `${productHint[f.product]}. Dairy products come from approved byproduct sellers.`}</p>
+          </div>
+
+          <div className="field">
+            <span className="label">{f.product === 'milk' ? 'Milk' : 'Made from'}</span>
             <ChoiceCards name="Milk" value={f.milk_type} onChange={set('milk_type')}
               options={Object.keys(milkLabel).map((v) => ({ value: v, label: milkLabel[v], hint: milkHint[v] }))} />
           </div>
@@ -74,18 +90,25 @@ export default function NewRequirement() {
           <div className="field">
             <span className="label">Quality</span>
             <ChoiceCards name="Quality" value={f.quality} onChange={set('quality')}
-              options={['fresh', 'standard', 'premium'].map((v) => ({ value: v, label: qualityLabel[v], hint: qualityHint[v] }))} />
+              options={(f.product === 'milk' ? ['fresh', 'standard', 'premium'] : ['standard', 'premium']).map((v) => ({ value: v, label: qualityLabel[v], hint: f.product === 'milk' ? qualityHint[v] : productQualityHint[v] }))} />
           </div>
 
           <div className="grid gap-5 sm:grid-cols-2">
             <div className="field">
-              <label htmlFor="qty">How many litres?</label>
-              <input id="qty" type="number" min="1" max="50000" step="1" className="input num" required value={f.quantity_l} onChange={set('quantity_l')} placeholder="500" />
+              <label htmlFor="qty">{f.product === 'milk' ? 'How many litres?' : 'How much?'}</label>
+              <div className="flex gap-2">
+                <input id="qty" type="number" min="1" max="50000" step="1" className="input num min-w-0 flex-1" required value={f.quantity_l} onChange={set('quantity_l')} placeholder={f.product === 'milk' ? '500' : '20'} />
+                {f.product !== 'milk' && (
+                  <select className="input w-[110px]" aria-label="Unit" value={f.unit} onChange={set('unit')}>
+                    <option value="kg">kg</option><option value="litre">litres</option><option value="pack">packs</option>
+                  </select>
+                )}
+              </div>
               <div className="flex flex-wrap gap-1.5">
-                {quickQty.map((q) => (
+                {quickQty[f.product === 'milk' ? 'milk' : 'product'].map((q) => (
                   <button key={q} type="button" onClick={() => set('quantity_l')(String(q))}
                     className={`num rounded-full px-3 py-1 text-[13px] font-medium transition-colors ${Number(f.quantity_l) === q ? 'bg-forest text-cream' : 'bg-cream-2 text-ink hover:bg-mint-soft'}`}>
-                    {q} L
+                    {qtyText(q, f.unit)}
                   </button>
                 ))}
               </div>
@@ -98,12 +121,12 @@ export default function NewRequirement() {
 
           <div className="grid gap-5 sm:grid-cols-2">
             <div className="field">
-              <label htmlFor="target">Your target price per litre <span className="font-normal text-muted">(optional)</span></label>
+              <label htmlFor="target">Your target price per {f.product === 'milk' ? 'litre' : perUnit(f.unit)} <span className="font-normal text-muted">(optional)</span></label>
               <div className="relative">
                 <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-muted">Rs</span>
-                <input id="target" type="number" min="1" step="0.5" className="input num w-full pl-11" value={f.target_price} onChange={set('target_price')} placeholder="190" />
+                <input id="target" type="number" min="1" step="0.5" className="input num w-full pl-11" value={f.target_price} onChange={set('target_price')} placeholder={f.product === 'milk' ? '190' : f.product === 'ghee' ? '2400' : '600'} />
               </div>
-              <p className="hint">A guide for centers. You can still accept a higher bid.</p>
+              <p className="hint">A guide for sellers. You can still accept a higher bid.</p>
             </div>
             <div className="field">
               <span className="label">Bidding closes</span>
@@ -142,8 +165,8 @@ export default function NewRequirement() {
           <div className="furrows overflow-hidden rounded-[24px] bg-forest-deep text-cream">
             <div className="flex items-start justify-between p-6 pb-4">
               <div>
-                <p className="display num text-[42px] leading-none">{f.quantity_l ? litres(f.quantity_l) : '— L'}</p>
-                <p className="mt-2 font-semibold">{milkLabel[f.milk_type]}</p>
+                <p className="display num text-[42px] leading-none">{f.quantity_l ? qtyText(f.quantity_l, f.unit) : qtyText(0, f.unit).replace('0', '—')}</p>
+                <p className="mt-2 font-semibold">{f.product === 'milk' ? milkLabel[f.milk_type] : `${productLabel[f.product]}, from ${milkLabel[f.milk_type].toLowerCase()}`}</p>
               </div>
               <MilkChurn size={52} stroke="#fffcf4" />
             </div>
@@ -151,7 +174,7 @@ export default function NewRequirement() {
             <dl className="space-y-2.5 bg-cream/5 px-6 py-5 text-[14px]">
               <div className="flex justify-between gap-4"><dt className="text-cream/65">Needed on</dt><dd className="num">{date(f.required_date)}</dd></div>
               <div className="flex justify-between gap-4"><dt className="text-cream/65">Deliver to</dt><dd>{f.delivery_city || '—'}</dd></div>
-              <div className="flex justify-between gap-4"><dt className="text-cream/65">Target</dt><dd className="num">{f.target_price ? `${rs(f.target_price)} / L` : 'Best offer'}</dd></div>
+              <div className="flex justify-between gap-4"><dt className="text-cream/65">Target</dt><dd className="num">{f.target_price ? `${rs(f.target_price)} / ${perUnit(f.unit)}` : 'Best offer'}</dd></div>
               <div className="flex justify-between gap-4"><dt className="text-cream/65">Bids close</dt><dd className="num">{date(f.deadline_date)}, {f.deadline_time}</dd></div>
             </dl>
             {f.quantity_l && f.target_price && (

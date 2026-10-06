@@ -1,9 +1,9 @@
 import { useState } from 'react'
-import { businessOrders, updateBulkOrder, myDeliveryCodes, rateOrder, milkLabel } from '../../lib/b2b'
+import { businessOrders, updateBulkOrder, myDeliveryCodes, rateOrder, milkLabel, qtyText, perUnit, isMilk, productLabel } from '../../lib/b2b'
 import { useLoad } from '../../lib/useLoad'
 import { useUi } from '../../context/UiContext'
 import { SkeletonRows } from '../../components/Skeleton'
-import { rs, litres, date } from '../../lib/format'
+import { rs, date } from '../../lib/format'
 import PageHeader from '../../components/PageHeader'
 import OrderProgress from '../../components/OrderProgress'
 import Alert from '../../components/Alert'
@@ -20,12 +20,12 @@ export default function BusinessOrders() {
   const [rating, setRating] = useState(null)
 
   const cancel = async (o) => {
-    const ok = await confirm({ title: 'Cancel this order?', body: `${litres(o.quantity_l)} from ${o.center?.center_name}. They haven't dispatched it yet.`, confirmLabel: 'Cancel order', danger: true, cancelLabel: 'Keep order' })
+    const ok = await confirm({ title: 'Cancel this order?', body: `${qtyText(o.quantity_l, o.requirement?.unit)} from ${o.center?.center_name}. They haven't dispatched it yet.`, confirmLabel: 'Cancel order', danger: true, cancelLabel: 'Keep order' })
     if (!ok) return
     try { await updateBulkOrder(o.id, 'cancelled'); await reload(); toast('Order cancelled.') } catch (e) { toast(e.message, 'error') }
   }
   const received = async (o) => {
-    const ok = await confirm({ title: 'Did the milk arrive?', body: `${litres(o.quantity_l)} from ${o.center?.center_name}. Confirm only once you have it.`, confirmLabel: 'Yes, received' })
+    const ok = await confirm({ title: 'Did the order arrive?', body: `${qtyText(o.quantity_l, o.requirement?.unit)} from ${o.center?.center_name}. Confirm only once you have it.`, confirmLabel: 'Yes, received' })
     if (!ok) return
     try { await updateBulkOrder(o.id, 'delivered'); await reload(); toast('Marked as received. Thank you.') } catch (e) { toast(e.message, 'error') }
   }
@@ -37,7 +37,7 @@ export default function BusinessOrders() {
       <div className="panel overflow-x-auto">
         <table className="table min-w-[980px]">
           <thead>
-            <tr><th>Supplier</th><th>Milk</th><th className="text-right">Price / L</th><th className="text-right">Total</th><th>Delivery</th><th>Progress</th><th>Delivery code</th><th></th></tr>
+            <tr><th>Supplier</th><th>Order</th><th className="text-right">Price</th><th className="text-right">Total</th><th>Delivery</th><th>Progress</th><th>Delivery code</th><th></th></tr>
           </thead>
           <tbody>
             {loading && <SkeletonRows cols={8} />}
@@ -47,8 +47,8 @@ export default function BusinessOrders() {
             {data?.map((o) => (
               <tr key={o.id}>
                 <td><p className="font-semibold">{o.center?.center_name}</p><p className="text-[13px] text-muted">{o.center?.city}</p></td>
-                <td className="num">{litres(o.quantity_l)}<p className="text-[13px] text-muted">{milkLabel[o.requirement?.milk_type]}</p></td>
-                <td className="num text-right">{rs(o.price_per_l)}</td>
+                <td className="num">{qtyText(o.quantity_l, o.requirement?.unit)}<p className="text-[13px] text-muted">{isMilk(o.requirement) ? milkLabel[o.requirement?.milk_type] : productLabel[o.requirement?.product]}</p></td>
+                <td className="num text-right">{rs(o.price_per_l)}<span className="text-[12px] text-muted"> / {perUnit(o.requirement?.unit)}</span></td>
                 <td className="num text-right font-semibold">{rs(o.total_amount)}</td>
                 <td className="num">{date(o.delivery_date)}<p className="text-[13px] text-muted">{o.delivery_city}</p></td>
                 <td><OrderProgress order={o} /></td>
@@ -86,7 +86,7 @@ function RateSheet({ order, onClose, onSaved }) {
   }
   return (
     <Sheet open={!!order} onClose={onClose} title={`Rate ${order?.center?.center_name ?? 'the center'}`}
-      subtitle={order ? `${litres(order.quantity_l)} delivered for ${rs(order.total_amount)}. Was the milk as promised and on time?` : ''}
+      subtitle={order ? `${qtyText(order.quantity_l, order.requirement?.unit)} delivered for ${rs(order.total_amount)}. Was it as promised and on time?` : ''}
       footer={<><button className="btn-secondary" onClick={onClose}>Cancel</button><button className="btn-primary" disabled={!stars || busy} onClick={save}>{busy ? 'Saving…' : 'Save rating'}</button></>}>
       <div className="flex gap-1" role="radiogroup" aria-label="Stars">
         {[1, 2, 3, 4, 5].map((n) => (

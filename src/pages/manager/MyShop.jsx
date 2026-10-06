@@ -5,7 +5,7 @@ import { useUi } from '../../context/UiContext'
 import { useLoad } from '../../lib/useLoad'
 import {
   myCenter, milkListings, myPublicListings, myPublicShop, shopProfile, saveShopProfile, shopPhotos, uploadShopPhoto, deleteShopPhoto,
-  setCoverPhoto, photoUrl, myReviews, myBulkReviews, replyReview, createListing, saveListing, myMilkShelf, stockGrade, milkCost, platformSettings, milkLabel, gradeLabel,
+  setCoverPhoto, photoUrl, myReviews, myBulkReviews, myPublicProducts, replyReview, createListing, saveListing, myMilkShelf, stockGrade, milkCost, platformSettings, milkLabel, gradeLabel,
 } from '../../lib/center'
 import { rs, litres, date, relative } from '../../lib/format'
 import PageHeader from '../../components/PageHeader'
@@ -16,6 +16,7 @@ import Icon from '../../components/Icon'
 import EmptyState from '../../components/EmptyState'
 import Sheet from '../../components/Sheet'
 import { HillsStrip } from '../../components/Farm'
+import { qtyText, perUnit } from '../../lib/b2b'
 
 const TYPES = ['buffalo', 'cow', 'mixed']
 
@@ -24,12 +25,21 @@ export default function MyShop() {
   const [tab, setTab] = useState('listings')
   const { data, error, reload } = useLoad(async () => {
     const center = await myCenter(profile.id)
+    // dairy products sellers: products live on the Products page, here only the shop and its reviews
+    if (center.type === 'byproduct') {
+      const [shop, prof, photos, reviews, bizReviews, pub] = await Promise.all([
+        myPublicShop(center.id), shopProfile(), shopPhotos(), myReviews(), myBulkReviews().catch(() => []), myPublicProducts(center.id),
+      ])
+      return { center, shop, prof, photos, reviews, bizReviews, pub, byproduct: true }
+    }
     const [listings, pub, shop, prof, photos, reviews, bizReviews, shelf, cost, platform, ...g] = await Promise.all([
       milkListings(), myPublicListings(center.id), myPublicShop(center.id), shopProfile(), shopPhotos(), myReviews(), myBulkReviews().catch(() => []),
       myMilkShelf(), milkCost(), platformSettings(), ...TYPES.map((t) => stockGrade(center.id, t).catch(() => null)),
     ])
     return { center, listings, pub, shop, prof, photos, reviews, bizReviews, shelf, cost, platform, grades: Object.fromEntries(TYPES.map((t, i) => [t, g[i]])) }
   }, [profile.id])
+
+  const view = data?.byproduct && tab === 'listings' ? 'profile' : tab
 
   // fair price: what this center paid farmers, plus the suggested and maximum markup
   const guide = (type) => {
@@ -43,20 +53,20 @@ export default function MyShop() {
 
   return (
     <>
-      <PageHeader title="My shop" description="What customers see in the ApnaDairy app: your milk on sale, your shop and what other customers say about it." />
+      <PageHeader title="My shop" description={data?.byproduct ? "What customers see in the ApnaDairy app: your shop, your products and what customers and businesses say about you." : "What customers see in the ApnaDairy app: your milk on sale, your shop and what other customers say about it."} />
       <Alert>{error}</Alert>
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px] xl:gap-7">
         <div className="min-w-0">
           <div className="mb-5">
-            <Segmented value={tab} onChange={setTab} options={[
-              { value: 'listings', label: 'Milk on the app' },
+            <Segmented value={view} onChange={setTab} options={[
+              ...(data?.byproduct ? [] : [{ value: 'listings', label: 'Milk on the app' }]),
               { value: 'profile', label: 'Shop profile' },
               { value: 'reviews', label: 'Reviews', count: data ? data.reviews.length + data.bizReviews.length : undefined },
             ]} />
           </div>
-          {tab === 'listings' && <Listings data={data} guide={guide} reload={reload} />}
-          {tab === 'profile' && <Profile key={data?.prof?.updated_at ?? 'p'} data={data} reload={reload} />}
-          {tab === 'reviews' && <Reviews data={data} reload={reload} />}
+          {view === 'listings' && <Listings data={data} guide={guide} reload={reload} />}
+          {view === 'profile' && <Profile key={data?.prof?.updated_at ?? 'p'} data={data} reload={reload} />}
+          {view === 'reviews' && <Reviews data={data} reload={reload} />}
         </div>
         <aside className="lg:sticky lg:top-6 lg:self-start">
           <p className="mb-3 flex items-center gap-2 text-[13px] font-semibold text-muted"><Icon name="chip" size={15} />In the customer app</p>
@@ -499,7 +509,7 @@ function ReviewItem({ r, reload }) {
 function PhonePreview({ data }) {
   const shop = data?.shop
   const cover = data?.photos?.[0]
-  const listings = (data?.pub ?? []).slice().sort((a, b) => TYPES.indexOf(a.milk_type) - TYPES.indexOf(b.milk_type))
+  const listings = data?.byproduct ? (data?.pub ?? []) : (data?.pub ?? []).slice().sort((a, b) => TYPES.indexOf(a.milk_type) - TYPES.indexOf(b.milk_type))
   const top = (data?.reviews ?? []).filter((r) => r.rating >= 4 && r.comment).slice(0, 2)
   return (
     <div className="mx-auto w-full max-w-[340px] rounded-[44px] border-[10px] border-forest-deep bg-forest-deep shadow-[0_30px_60px_-30px_rgb(23_58_40/.7)]">
@@ -517,10 +527,22 @@ function PhonePreview({ data }) {
           </div>
           {shop?.tagline && <p className="mt-2 text-[12.5px] italic text-ink/80">“{shop.tagline}”</p>}
 
-          <p className="mt-4 text-[12px] font-semibold uppercase tracking-wide text-muted">Milk today</p>
+          <p className="mt-4 text-[12px] font-semibold uppercase tracking-wide text-muted">{data?.byproduct ? 'Products' : 'Milk today'}</p>
           <ul className="mt-2 grid gap-2">
-            {listings.length === 0 && <li className="rounded-2xl bg-surface px-3 py-3 text-[12.5px] text-muted">No milk listed yet</li>}
-            {listings.map((l) => (
+            {listings.length === 0 && <li className="rounded-2xl bg-surface px-3 py-3 text-[12.5px] text-muted">{data?.byproduct ? 'No products on sale yet' : 'No milk listed yet'}</li>}
+            {data?.byproduct && listings.map((l) => (
+              <li key={l.id} className="flex items-start justify-between gap-2 rounded-2xl border border-line bg-surface px-3 py-2.5">
+                <div className="min-w-0">
+                  <p className="truncate text-[13.5px] font-semibold">{l.name}</p>
+                  <p className="text-[11.5px] text-muted">{qtyText(l.available_qty, l.unit)} available{l.expires_on ? ` · best before ${date(l.expires_on)}` : ''}</p>
+                </div>
+                <div className="text-right">
+                  <p className="num text-[14px] font-bold">{rs(l.price)}<span className="text-[11px] font-medium text-muted">/{perUnit(l.unit)}</span></p>
+                  {l.discount_pct > 0 && <p className="num text-[11px] text-muted line-through">{rs(l.list_price)}</p>}
+                </div>
+              </li>
+            ))}
+            {!data?.byproduct && listings.map((l) => (
               <li key={l.id} className="rounded-2xl border border-line bg-surface px-3 py-2.5">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">

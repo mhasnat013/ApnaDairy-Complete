@@ -9,6 +9,7 @@ import {
   shortDay, weekday, rsShort, todayKey, orderStatusLabel, orderTone, timeOf, milkLabel,
 } from '../../lib/center'
 import { rs, litres, relative } from '../../lib/format'
+import SellerHome from '../seller/SellerHome'
 import WelcomeBanner from '../../components/WelcomeBanner'
 import Card, { Kpi } from '../../components/Card'
 import Badge from '../../components/Badge'
@@ -32,14 +33,7 @@ export default function ManagerHome() {
   }, [profile.id])
 
   const c = data?.center
-  if (c && (c.type !== 'milk_center' || c.verification_status !== 'active')) {
-    return (
-      <>
-        <WelcomeBanner name={profile.full_name.split(' ')[0]} line={c.center_name} />
-        <div className="panel"><EmptyState title="Product listings are coming next">Byproduct sellers will list desi ghee and other dairy products here.</EmptyState></div>
-      </>
-    )
-  }
+  if (c?.type === 'byproduct') return <SellerHome center={c} />
 
   const empty = data?.daily && data.farmers.length === 0 && sum(data.daily, 'sales') === 0
 
@@ -56,7 +50,7 @@ export default function ManagerHome() {
 }
 
 // a gentle reminder for due bills, red once a bill is overdue
-function BillReminder({ invoices }) {
+export function BillReminder({ invoices, milk = true }) {
   const due = (invoices ?? []).filter((i) => i.status === 'due').sort((a, b) => a.due_date.localeCompare(b.due_date))
   if (!due.length) return null
   const late = due.filter((i) => i.due_date < todayKey())
@@ -64,8 +58,8 @@ function BillReminder({ invoices }) {
   return (
     <div className={`mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl px-4 py-3 text-[14px] ${late.length ? 'bg-[#f8e2dc] text-danger' : 'bg-haldi-soft text-forest-deep'}`}>
       <span className="flex items-center gap-2"><Icon name={late.length ? 'alert' : 'wallet'} size={16} />
-        {late.length ? <b>Your ApnaDairy bill is overdue. Bidding and milk testing are paused until it is paid.</b>
-          : <span><b>{rs(Math.round(total))}</b> due by {new Date(`${due[0].due_date}T12:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} for {due.length === 1 ? due[0].description.toLowerCase() : `${due.length} bills`}.</span>}
+        {late.length ? <b>{milk ? 'Your ApnaDairy bill is overdue. Bidding and milk testing are paused until it is paid.' : 'Your ApnaDairy bill is overdue. Bidding is paused until it is paid.'}</b>
+          : <span><b>{rs(Math.round(total))}</b> due by {new Date(`${due[0].due_date}T12:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} for {due.length === 1 ? due[0].description : `${due.length} bills`}.</span>}
       </span>
       <Link to="/manager/billing" className={late.length ? 'btn-danger btn-sm' : 'btn-secondary btn-sm'}>{late.length ? 'Pay now' : 'View bill'}</Link>
     </div>

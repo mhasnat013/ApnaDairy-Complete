@@ -1,9 +1,9 @@
 import { Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../context/AuthContext'
-import { myRequirements, businessOrders, milkLabel, isExpired } from '../../lib/b2b'
+import { myRequirements, businessOrders, isExpired, reqTitle, qtyText, isMilk, productLabel } from '../../lib/b2b'
 import { useLoad } from '../../lib/useLoad'
-import { rs, litres, date, relative } from '../../lib/format'
+import { rs, date, relative } from '../../lib/format'
 import WelcomeBanner from '../../components/WelcomeBanner'
 import StatCard, { StatRow } from '../../components/StatCard'
 import Badge from '../../components/Badge'
@@ -35,8 +35,8 @@ export default function BusinessHome() {
         <StatCard label="Taking bids" value={data ? open.length : null} note="open requirements" />
         <StatCard label="Bids received" value={data ? open.reduce((n, r) => n + r.bid_count, 0) : null} note="waiting for your pick" tone="haldi" />
         <StatCard label="Orders on the way" value={data ? active.length : null} note="confirmed or dispatched" />
-        <StatCard label="Milk received" value={data ? delivered.reduce((n, o) => n + Number(o.quantity_l), 0) : null} format={(n) => `${Math.round(n).toLocaleString('en-PK')} L`}
-          note={data ? `${rs(delivered.reduce((n, o) => n + Number(o.total_amount), 0))} spent` : null} tone="green" />
+        <StatCard label="Milk received" value={data ? delivered.filter((o) => isMilk(o.requirement)).reduce((n, o) => n + Number(o.quantity_l), 0) : null} format={(n) => `${Math.round(n).toLocaleString('en-PK')} L`}
+          note={data ? `${rs(delivered.reduce((n, o) => n + Number(o.total_amount), 0))} spent on all orders` : null} tone="green" />
       </StatRow>
 
       <section className="mt-10">
@@ -55,7 +55,7 @@ export default function BusinessHome() {
               <tbody>
                 {open.slice(0, 5).map((r) => (
                   <tr key={r.id}>
-                    <td className="font-semibold">{litres(r.quantity_l)} {milkLabel[r.milk_type].toLowerCase()}</td>
+                    <td className="font-semibold">{reqTitle(r)}</td>
                     <td className="num">{date(r.required_date)}</td>
                     <td className="num text-right font-semibold">{r.bid_count}</td>
                     <td className="text-muted">{relative(r.bid_deadline)}</td>
@@ -74,7 +74,7 @@ export default function BusinessHome() {
           <div className="panel divide-y divide-line overflow-hidden">
             {active.map((o) => (
               <div key={o.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
-                <p><span className="font-semibold">{litres(o.quantity_l)}</span> from {o.center?.center_name}, due {date(o.delivery_date)}</p>
+                <p><span className="font-semibold">{qtyText(o.quantity_l, o.requirement?.unit)} {o.requirement ? (isMilk(o.requirement) ? 'milk' : productLabel[o.requirement.product].toLowerCase()) : ''}</span> from {o.center?.center_name}, due {date(o.delivery_date)}</p>
                 <Badge status={o.status}>{o.status === 'dispatched' ? 'On the way' : undefined}</Badge>
               </div>
             ))}

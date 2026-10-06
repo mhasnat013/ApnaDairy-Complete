@@ -14,7 +14,7 @@ export const nextOrderStep = {
   preparing: ['out_for_delivery', 'Send for delivery'],
   out_for_delivery: ['delivered', 'Mark delivered'],
 }
-export const categoryLabel = { milk: 'Milk', yogurt: 'Dahi', butter: 'Butter', ghee: 'Ghee', cream: 'Cream', lassi: 'Lassi', other: 'Other' }
+export const categoryLabel = { milk: 'Milk', ghee: 'Desi ghee', butter: 'Butter', yogurt: 'Yogurt (dahi)', cheese: 'Cheese', cream: 'Cream', lassi: 'Lassi', other: 'Other dairy' }
 export const usageLabel = { products: 'Made into products', spoiled: 'Spoiled', own_use: 'Own use' }
 
 // normal ranges for the four iot parameters (shared by the device panel, readings page and charts)
@@ -99,7 +99,9 @@ export const priceHistory = async (days = 30) =>
 export const usageLog = async () =>
   must(await supabase.from('milk_usage').select('*').order('created_at', { ascending: false }).limit(30))
 
-export const products = async () => must(await supabase.from('products').select('*').order('category').order('name'))
+// shop data is public (customers browse it), so the seller's own rows are picked by id
+const mySellerId = async () => must(await supabase.rpc('my_seller_id'))
+export const products = async () => must(await supabase.from('products').select('*').eq('area_manager_id', await mySellerId()).order('category').order('name'))
 
 const ORDER_FIELDS = '*, items:shop_order_items(id, name, quantity, unit, unit_price, line_total, category)'
 export const activeOrders = async () =>
@@ -135,10 +137,10 @@ export const saveFarmer = async (f) => {
 export const saveProduct = async (p) => {
   const row = {
     name: p.name, category: p.category, unit: p.category === 'milk' ? 'litre' : p.unit, price: Number(p.price),
-    milk_type: p.category === 'milk' ? p.milk_type : null,
+    milk_type: p.milk_type || null,
     stock_qty: p.category === 'milk' ? null : Number(p.stock_qty) || 0,
     discount_pct: Number(p.discount_pct) || 0, made_on: p.made_on || null, expires_on: p.expires_on || null,
-    is_available: p.is_available ?? true,
+    is_available: p.is_available ?? true, description: p.description?.trim() || null,
   }
   return must(p.id
     ? await supabase.from('products').update(row).eq('id', p.id).select().single()
@@ -187,15 +189,16 @@ export const monthLabel = (d) => (d ? new Date(`${d.slice(0, 10)}T12:00:00`).toL
 
 // ---------- milk shop on the app: listings, profile, photos, reviews ----------
 export const myPublicListings = async (centerId) => must(await supabase.from('public_listings').select('*').eq('shop_id', centerId))
+export const myPublicProducts = async (centerId) => must(await supabase.from('public_products').select('*').eq('shop_id', centerId))
 export const myPublicShop = async (centerId) => must(await supabase.from('public_shops').select('*').eq('id', centerId).maybeSingle())
-export const shopProfile = async () => must(await supabase.from('shop_profiles').select('*').maybeSingle())
+export const shopProfile = async () => must(await supabase.from('shop_profiles').select('*').eq('area_manager_id', await mySellerId()).maybeSingle())
 export const saveShopProfile = async (centerId, p) => must(await supabase.from('shop_profiles').upsert({
   area_manager_id: centerId, tagline: p.tagline || null, description: p.description || null, phone: p.phone || null,
   whatsapp: p.whatsapp || null, opening_hours: p.opening_hours || null,
   delivery_radius_km: p.delivery_radius_km === '' || p.delivery_radius_km == null ? null : Number(p.delivery_radius_km),
   updated_at: new Date().toISOString(),
 }))
-export const shopPhotos = async () => must(await supabase.from('shop_photos').select('*').order('sort').order('created_at'))
+export const shopPhotos = async () => must(await supabase.from('shop_photos').select('*').eq('area_manager_id', await mySellerId()).order('sort').order('created_at'))
 export const photoUrl = (path) => supabase.storage.from('shop-photos').getPublicUrl(path).data.publicUrl
 export async function uploadShopPhoto(centerId, file, sort = 0) {
   const ext = (file.name.split('.').pop() || 'jpg').toLowerCase()
@@ -213,13 +216,13 @@ export const setCoverPhoto = async (photos, id) => {
   const ordered = [photos.find((p) => p.id === id), ...photos.filter((p) => p.id !== id)]
   for (let i = 0; i < ordered.length; i++) await supabase.from('shop_photos').update({ sort: i }).eq('id', ordered[i].id)
 }
-export const myReviews = async () => must(await supabase.from('shop_reviews').select('*').order('created_at', { ascending: false }).limit(200))
+export const myReviews = async () => must(await supabase.from('shop_reviews').select('*').eq('area_manager_id', await mySellerId()).order('created_at', { ascending: false }).limit(200))
 export const replyReview = (id, reply) => rpc('reply_review', { p_review: id, p_reply: reply })
 // ratings businesses gave after a bulk order was delivered
 export const myBulkReviews = async () => must(await supabase.from('bulk_reviews')
   .select('*, business:business_profiles(business_name, business_type), order:bulk_orders(quantity_l, delivery_date, delivered_at, requirement:bulk_requirements(milk_type))')
   .order('created_at', { ascending: false }).limit(100))
-export const milkListings = async () => must(await supabase.from('products').select('*').eq('category', 'milk'))
+export const milkListings = async () => must(await supabase.from('products').select('*').eq('area_manager_id', await mySellerId()).eq('category', 'milk'))
 export const createListing = async (type, price, litres, description) => must(await supabase.from('products').insert({
   name: `Fresh ${({ cow: 'cow', buffalo: 'buffalo', mixed: 'mixed' })[type]} milk`, category: 'milk', milk_type: type, unit: 'litre',
   price: Number(price), listed_l: Number(litres), description: description || null, is_available: true,

@@ -7,7 +7,21 @@ export const qualityHint = {
   standard: 'Regular raw milk',
   premium: 'Best grade, rich and creamy',
 }
+export const productQualityHint = { standard: 'Good everyday quality', premium: 'Best grade, pure and rich' }
 export const orderSteps = ['confirmed', 'dispatched', 'delivered']
+
+// what a business can ask for: fresh milk from milk centers, dairy products from byproduct sellers
+export const productLabel = { milk: 'Milk', ghee: 'Desi ghee', butter: 'Butter', yogurt: 'Yogurt (dahi)', cheese: 'Cheese', cream: 'Cream', lassi: 'Lassi', other: 'Other dairy' }
+export const PRODUCTS = ['ghee', 'butter', 'yogurt', 'cheese', 'cream', 'lassi', 'other']
+export const defaultUnit = { ghee: 'kg', butter: 'kg', yogurt: 'kg', cheese: 'kg', cream: 'kg', lassi: 'litre', other: 'kg' }
+const fmtN = (n) => Number(n).toLocaleString('en-PK', { maximumFractionDigits: 2 })
+// "40 L", "12 kg", "6 packs"
+export const qtyText = (n, unit = 'litre') => (n == null ? '—' : unit === 'kg' ? `${fmtN(n)} kg` : unit === 'pack' ? `${fmtN(n)} ${Number(n) === 1 ? 'pack' : 'packs'}` : `${fmtN(n)} L`)
+export const perUnit = (unit = 'litre') => (unit === 'kg' ? 'kg' : unit === 'pack' ? 'pack' : 'L')
+export const isMilk = (r) => !r?.product || r.product === 'milk'
+// "400 L mixed milk", "50 kg desi ghee"
+export const whatText = (r) => (isMilk(r) ? `${milkLabel[r.milk_type]?.toLowerCase() ?? 'milk'}` : productLabel[r.product]?.toLowerCase())
+export const reqTitle = (r) => `${qtyText(r.quantity_l, r.unit)} ${whatText(r)}`
 
 // litres already ordered on a requirement (several bids can cover one requirement)
 export const coveredL = (req) => (req.orders ?? []).filter((o) => o.status !== 'cancelled').reduce((n, o) => n + Number(o.quantity_l), 0)
@@ -20,9 +34,9 @@ const one = (x) => (Array.isArray(x) ? x[0] ?? null : x ?? null)
 export function bidIssues(bid, req) {
   const issues = []
   const need = req.orders ? stillNeeded(req) || Number(req.quantity_l) : Number(req.quantity_l)
-  if (Number(bid.quantity_l) < need) issues.push(`Covers ${Number(bid.quantity_l)} of ${need} L`)
+  if (Number(bid.quantity_l) < need) issues.push(`Covers ${qtyText(bid.quantity_l, req.unit)} of ${qtyText(need, req.unit)}`)
   if (bid.delivery_date > req.required_date) issues.push('Arrives after your date')
-  if (req.quality === 'fresh' && (!bid.max_age_hours || bid.max_age_hours > 24)) issues.push('Not same-day milk')
+  if (isMilk(req) && req.quality === 'fresh' && (!bid.max_age_hours || bid.max_age_hours > 24)) issues.push('Not same-day milk')
   return issues
 }
 
@@ -39,7 +53,7 @@ export function rankBids(bids, req) {
   return { top, others }
 }
 
-const BID_FIELDS = 'id, price_per_l, quantity_l, delivery_date, max_age_hours, notes, status, created_at, updated_at, area_manager_id'
+const BID_FIELDS = 'id, price_per_l, quantity_l, make_qty, delivery_date, max_age_hours, notes, status, created_at, updated_at, area_manager_id'
 
 // ---------- business ----------
 export async function myRequirements() {
@@ -73,7 +87,7 @@ export async function trackRecord(ids) {
 export async function businessOrders() {
   const { data, error } = await supabase
     .from('bulk_orders')
-    .select('*, center:area_managers(center_name, city), requirement:bulk_requirements(milk_type, quality), review:bulk_reviews(rating, comment)')
+    .select('*, center:area_managers(center_name, city), requirement:bulk_requirements(milk_type, quality, product, unit), review:bulk_reviews(rating, comment)')
     .order('created_at', { ascending: false })
   if (error) throw error
   return data.map((o) => ({ ...o, review: one(o.review) }))
@@ -89,7 +103,7 @@ export async function requestBoard() {
 export async function myBids() {
   const { data, error } = await supabase
     .from('bids')
-    .select(`${BID_FIELDS}, requirement:bulk_requirements(id, milk_type, quantity_l, required_date, delivery_city, target_price, status, bid_deadline)`)
+    .select(`${BID_FIELDS}, requirement:bulk_requirements(id, milk_type, product, unit, quantity_l, required_date, delivery_city, target_price, status, bid_deadline)`)
     .order('updated_at', { ascending: false })
   if (error) throw error
   return data
@@ -112,7 +126,7 @@ export async function requirementForCenter(id) {
 export async function centerOrders() {
   const { data, error } = await supabase
     .from('bulk_orders')
-    .select('*, buyer:business_profiles(business_name, business_type), requirement:bulk_requirements(milk_type, quality), review:bulk_reviews(rating, comment)')
+    .select('*, buyer:business_profiles(business_name, business_type), requirement:bulk_requirements(milk_type, quality, product, unit), review:bulk_reviews(rating, comment)')
     .order('created_at', { ascending: false })
   if (error) throw error
   return data.map((o) => ({ ...o, review: one(o.review) }))
@@ -136,6 +150,7 @@ const rpc = async (fn, args) => {
   return data
 }
 export const placeBid = (a) => rpc('place_bid', a)
+export const myProductCapacity = (product, requirementId) => rpc('my_product_capacity', { p_product: product, p_requirement: requirementId ?? null })
 export const withdrawBid = (id) => rpc('withdraw_bid', { p_bid: id })
 export const acceptBid = (id) => rpc('accept_bid', { p_bid: id })
 export const cancelRequirement = (id) => rpc('cancel_requirement', { p_requirement: id })

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, Navigate } from 'react-router-dom'
+import { Link, Navigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../context/AuthContext'
 import AuthShell from '../../components/AuthShell'
@@ -19,7 +19,8 @@ const empty = {
 
 export default function Signup() {
   const { session } = useAuth()
-  const [role, setRole] = useState('area_manager')
+  const [params] = useSearchParams()
+  const [role, setRole] = useState(params.get('role') === 'business' ? 'business' : 'area_manager')
   const [form, setForm] = useState(empty)
   const [error, setError] = useState('')
   const [done, setDone] = useState(false)

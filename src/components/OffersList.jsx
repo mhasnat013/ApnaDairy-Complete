@@ -1,16 +1,17 @@
 import { publicBids } from '../lib/b2b'
 import { useLoad } from '../lib/useLoad'
-import { rs, litres, date } from '../lib/format'
+import { rs, date } from '../lib/format'
+import { qtyText } from '../lib/b2b'
 
 // every live offer on a request, cheapest first — visible to everyone
-export default function OffersList({ requirementId, target, highlight, dark = false }) {
+export default function OffersList({ requirementId, target, highlight, dark = false, unit = 'litre' }) {
   const { data, loading, error } = useLoad(() => publicBids(requirementId), [requirementId])
   const muted = dark ? 'text-cream/65' : 'text-muted'
 
   if (loading) return <div className="space-y-2">{[0, 1].map((i) => <div key={i} className="skeleton h-16 rounded-2xl" />)}</div>
   // a missing view (05_open_bids.sql not run) or any other failure should show, not look like "no offers"
   if (error) return <p className="rounded-2xl bg-[#f8e2dc] px-4 py-3 text-[14px] text-danger">Offers could not load: {error}</p>
-  if (!data?.length) return <p className={`text-[14.5px] ${muted}`}>No offers yet. The first center to bid sets the pace.</p>
+  if (!data?.length) return <p className={`text-[14.5px] ${muted}`}>No offers yet. The first seller to bid sets the pace.</p>
 
   return (
     <ul className="space-y-2">
@@ -29,7 +30,7 @@ export default function OffersList({ requirementId, target, highlight, dark = fa
                 {mine && <span className="text-[12px] font-medium text-forest">(you)</span>}
               </p>
               <p className={`num text-[13px] ${muted}`}>
-                {b.center_city}, {litres(b.quantity_l)} by {date(b.delivery_date)}{b.max_age_hours ? `, under ${b.max_age_hours} h old` : ''}
+                {b.center_city}, {qtyText(b.quantity_l, unit)} by {date(b.delivery_date)}{b.max_age_hours ? `, under ${b.max_age_hours} h old` : ''}
               </p>
             </div>
             <div className="shrink-0 text-right">

@@ -40,6 +40,8 @@ import Audit from './pages/admin/Audit'
 import IotDevices from './pages/admin/IotDevices'
 import Analytics from './pages/admin/Analytics'
 import Admins from './pages/admin/Admins'
+import Products from './pages/seller/Products'
+import MilkOnly from './components/MilkOnly'
 
 
 export default function App() {
@@ -80,16 +82,17 @@ export default function App() {
               <Route path="bulk-requests" element={<BulkRequests />} />
               <Route path="bulk-requests/:id" element={<RequestDetail />} />
               <Route path="bulk-orders" element={<BulkOrders />} />
-              <Route path="collection" element={<Collection />} />
-              <Route path="collection/new" element={<RecordMilk />} />
-              <Route path="farmers" element={<Farmers />} />
-              <Route path="farmers/:id" element={<FarmerDetail />} />
-              <Route path="inventory" element={<Inventory />} />
+              <Route path="collection" element={<MilkOnly><Collection /></MilkOnly>} />
+              <Route path="collection/new" element={<MilkOnly><RecordMilk /></MilkOnly>} />
+              <Route path="farmers" element={<MilkOnly><Farmers /></MilkOnly>} />
+              <Route path="farmers/:id" element={<MilkOnly><FarmerDetail /></MilkOnly>} />
+              <Route path="inventory" element={<MilkOnly><Inventory /></MilkOnly>} />
               <Route path="orders" element={<ShopOrders />} />
-              <Route path="iot" element={<IotReadings />} />
-              <Route path="ai-pricing" element={<AiPricing />} />
+              <Route path="iot" element={<MilkOnly><IotReadings /></MilkOnly>} />
+              <Route path="ai-pricing" element={<MilkOnly><AiPricing /></MilkOnly>} />
               <Route path="billing" element={<Billing />} />
               <Route path="shop" element={<MyShop />} />
+              <Route path="products" element={<MilkOnly products><Products /></MilkOnly>} />
               <Route path="*" element={<ModuleSoon />} />
             </Route>
           </Route>

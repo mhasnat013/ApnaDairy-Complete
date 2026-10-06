@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useOutletContext } from 'react-router-dom'
 import { useLoad } from '../../lib/useLoad'
 import { useUi } from '../../context/UiContext'
 import { billingOverview, myInvoices, billingTiers, payInvoice, paymentLabel, monthLabel, rsShort, todayKey } from '../../lib/center'
@@ -14,6 +15,8 @@ import EmptyState from '../../components/EmptyState'
 const isOverdue = (i) => i.status === 'due' && i.due_date < todayKey()
 
 export default function Billing() {
+  const { center } = useOutletContext() ?? {}
+  const seller = center?.type === 'byproduct'
   const { data, error, reload } = useLoad(async () => {
     const [o, invoices, tiers] = await Promise.all([billingOverview(), myInvoices(), billingTiers()])
     return { o, invoices, tiers }
@@ -28,30 +31,30 @@ export default function Billing() {
 
   return (
     <>
-      <PageHeader title="Billing" description="Your ApnaDairy plan: the IoT milk tester and the monthly platform fee. Every rupee from your milk sales is yours." />
+      <PageHeader title="Billing" description={seller ? "Your ApnaDairy plan: the monthly platform fee only. Every rupee from your sales is yours." : "Your ApnaDairy plan: the IoT milk tester and the monthly platform fee. Every rupee from your milk sales is yours."} />
       <Alert>{error}</Alert>
 
       <div className="grid gap-4 sm:gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]">
         <section className="furrows relative overflow-hidden rounded-[24px] bg-forest-deep p-6 text-cream">
           <p className="text-[13px] text-cream/70">Your plan</p>
-          <p className="display mt-1 text-[28px]">ApnaDairy Center</p>
+          <p className="display mt-1 text-[28px]">{seller ? 'ApnaDairy Seller' : 'ApnaDairy Center'}</p>
           <dl className="mt-5 grid gap-3">
-            <div className="flex items-center justify-between rounded-2xl bg-cream/10 px-4 py-3">
+            {!seller && <div className="flex items-center justify-between rounded-2xl bg-cream/10 px-4 py-3">
               <dt className="flex items-center gap-2 text-[14px]"><Icon name="chip" size={16} />IoT milk tester</dt>
               <dd>{o ? (o.device_active
                 ? <span className="rounded-full bg-[#7fd39b]/20 px-2.5 py-1 text-[12.5px] font-semibold text-[#a9e6bd]">Active</span>
                 : <span className="rounded-full bg-haldi/20 px-2.5 py-1 text-[12.5px] font-semibold text-haldi">Awaiting payment</span>) : '—'}</dd>
-            </div>
+            </div>}
             <div className="flex items-center justify-between rounded-2xl bg-cream/10 px-4 py-3">
               <dt className="flex items-center gap-2 text-[14px]"><Icon name="clock" size={16} />Monthly platform fee</dt>
               <dd className="num font-semibold">{o ? rs(o.monthly_fee) : '—'}</dd>
             </div>
             <div className="flex items-center justify-between rounded-2xl bg-cream/10 px-4 py-3">
-              <dt className="flex items-center gap-2 text-[14px]"><Icon name="cart" size={16} />Your milk sales</dt>
+              <dt className="flex items-center gap-2 text-[14px]"><Icon name="cart" size={16} />{seller ? 'Your sales' : 'Your milk sales'}</dt>
               <dd><span className="rounded-full bg-[#7fd39b]/20 px-2.5 py-1 text-[12.5px] font-semibold text-[#a9e6bd]">100% yours</span></dd>
             </div>
           </dl>
-          <p className="mt-4 text-[12.5px] leading-relaxed text-cream/65">ApnaDairy takes no cut from milk you sell. The monthly fee gets smaller when you sell more through the app and bulk orders, see the tiers below.</p>
+          <p className="mt-4 text-[12.5px] leading-relaxed text-cream/65">ApnaDairy takes no cut from what you sell. The monthly fee gets smaller when you sell more through the app and bulk orders, see the tiers below.</p>
         </section>
 
         <Card title="This month" subtitle="Delivered app and bulk orders so far decide next month’s discount">
@@ -88,7 +91,7 @@ export default function Billing() {
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="font-semibold">{i.description}</p>
-                <p className={`mt-0.5 text-[13px] ${isOverdue(i) ? 'font-semibold text-danger' : 'text-muted'}`}>{isOverdue(i) ? `Overdue since ${date(i.due_date)}. Bidding and testing are paused.` : `Due ${date(i.due_date)}`}</p>
+                <p className={`mt-0.5 text-[13px] ${isOverdue(i) ? 'font-semibold text-danger' : 'text-muted'}`}>{isOverdue(i) ? `Overdue since ${date(i.due_date)}. ${seller ? 'Bidding is paused.' : 'Bidding and testing are paused.'}` : `Due ${date(i.due_date)}`}</p>
               </div>
               <p className="display num shrink-0 text-[26px]">{rs(i.amount)}</p>
             </div>

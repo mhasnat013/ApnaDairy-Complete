@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { navFor } from '../lib/nav'
+import { useLoad } from '../lib/useLoad'
+import { myCenter } from '../lib/center'
 import { roleLabel } from '../lib/roles'
 import Logo from '../components/Logo'
 import Icon from '../components/Icon'
@@ -9,8 +11,12 @@ import Icon from '../components/Icon'
 export default function DashboardLayout() {
   const { profile, signOut } = useAuth()
   const [open, setOpen] = useState(false)
-  const items = (navFor[profile.role] ?? []).filter((i) => i.ready)
-  const later = (navFor[profile.role] ?? []).filter((i) => !i.ready)
+  // area managers are milk centers or byproduct sellers; each gets its own menu
+  const { data: center } = useLoad(() => (profile.role === 'area_manager' ? myCenter(profile.id).catch(() => null) : Promise.resolve(null)), [profile.id, profile.role])
+  const key = profile.role === 'area_manager' && center?.type === 'byproduct' ? 'byproduct' : profile.role
+  const nav = profile.role === 'area_manager' && !center ? [] : navFor[key] ?? []
+  const items = nav.filter((i) => i.ready)
+  const later = nav.filter((i) => !i.ready)
   const initials = profile.full_name.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase()
 
   const sidebar = (
@@ -47,7 +53,7 @@ export default function DashboardLayout() {
         <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-haldi text-[14px] font-bold text-forest-deep">{initials}</span>
         <div className="min-w-0 flex-1">
           <p className="truncate text-[14px] font-semibold">{profile.full_name}</p>
-          <p className="truncate text-[12.5px] text-cream/60">{roleLabel[profile.role]}</p>
+          <p className="truncate text-[12.5px] text-cream/60">{key === 'byproduct' ? 'Dairy seller' : roleLabel[profile.role]}</p>
         </div>
         <button onClick={signOut} className="rounded-full p-2 text-cream/60 transition-colors hover:bg-cream/10 hover:text-cream" aria-label="Sign out" title="Sign out">
           <Icon name="logout" size={17} />
@@ -72,7 +78,7 @@ export default function DashboardLayout() {
           <button onClick={() => setOpen(true)} aria-label="Open menu" className="btn-ghost h-10 w-10 p-0"><Icon name="menu" /></button>
           <Logo />
         </header>
-        <main className="mx-auto max-w-[1180px] px-4 py-8 sm:px-8 lg:py-10"><Outlet /></main>
+        <main className="mx-auto max-w-[1180px] px-4 py-8 sm:px-8 lg:py-10"><Outlet context={{ center }} /></main>
       </div>
     </div>
   )

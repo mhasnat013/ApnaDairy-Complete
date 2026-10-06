@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase'
 import { useLoad } from '../lib/useLoad'
 import { useAuth } from '../context/AuthContext'
 import { homeFor } from '../lib/roles'
-import { milkLabel, qualityLabel, qualityHint } from '../lib/b2b'
+import { milkLabel, qualityLabel, qualityHint, productQualityHint, qtyText, perUnit, isMilk, productLabel } from '../lib/b2b'
 import { rs, date, dateTime, relative } from '../lib/format'
 import PublicHeader from '../components/landing/PublicHeader'
 import Footer from '../components/landing/Footer'
@@ -15,7 +15,7 @@ import OffersList from '../components/OffersList'
 
 const sorts = {
   closing: { label: 'Closing soon', fn: (a, b) => new Date(a.bid_deadline) - new Date(b.bid_deadline) },
-  litres: { label: 'Most litres', fn: (a, b) => b.quantity_l - a.quantity_l },
+  litres: { label: 'Largest', fn: (a, b) => b.quantity_l - a.quantity_l },
   newest: { label: 'Newest first', fn: (a, b) => new Date(b.created_at) - new Date(a.created_at) },
   price: { label: 'Highest target price', fn: (a, b) => (b.target_price ?? 0) - (a.target_price ?? 0) },
 }
@@ -59,8 +59,8 @@ function RequestCard({ r, onOpen, i }) {
         <span className={`rounded-full px-2.5 py-1 text-[12.5px] font-semibold ${qualityTone[r.quality]}`}>{qualityLabel[r.quality]}</span>
         <span className="num rounded-full bg-cream-2 px-2.5 py-1 text-[12.5px] font-medium text-muted">{r.bid_count} {r.bid_count === 1 ? 'offer' : 'offers'}</span>
       </div>
-      <p className="display num mt-4 text-[38px] leading-none text-forest-deep">{Number(r.quantity_l).toLocaleString('en-PK')} L</p>
-      <p className="mt-1.5 text-[15.5px] font-semibold">{milkLabel[r.milk_type]}</p>
+      <p className="display num mt-4 text-[38px] leading-none text-forest-deep">{qtyText(r.quantity_l, r.unit)}</p>
+      <p className="mt-1.5 text-[15.5px] font-semibold">{isMilk(r) ? milkLabel[r.milk_type] : productLabel[r.product]}</p>
       <p className="mt-1 text-[14.5px] text-muted">{who(r.business_type)} in {r.delivery_city}</p>
 
       <dl className="mt-4 grid grid-cols-3 gap-3 rounded-2xl bg-cream px-4 py-3 text-[14px]">
@@ -91,10 +91,10 @@ function DetailPanel({ r, onClose }) {
         <div className="furrows relative bg-forest-deep p-6 text-cream">
           <button onClick={onClose} className="absolute right-4 top-4 rounded-full bg-cream/10 px-3 py-1 text-[13px] font-medium hover:bg-cream/20">Close</button>
           <MilkChurn size={56} stroke="#fffcf4" className="mb-3" />
-          <p className="display num text-[44px] leading-none">{Number(r.quantity_l).toLocaleString('en-PK')} L</p>
-          <p className="mt-2 text-[17px] font-semibold">{milkLabel[r.milk_type]}</p>
+          <p className="display num text-[44px] leading-none">{qtyText(r.quantity_l, r.unit)}</p>
+          <p className="mt-2 text-[17px] font-semibold">{isMilk(r) ? milkLabel[r.milk_type] : `${productLabel[r.product]}, from ${milkLabel[r.milk_type].toLowerCase()}`}</p>
           <span className="mt-3 inline-flex rounded-full bg-haldi px-3 py-1 text-[13px] font-bold text-forest-deep">{qualityLabel[r.quality]}</span>
-          <p className="mt-1.5 text-[13.5px] text-cream/70">{qualityHint[r.quality]}</p>
+          <p className="mt-1.5 text-[13.5px] text-cream/70">{isMilk(r) ? qualityHint[r.quality] : productQualityHint[r.quality]}</p>
         </div>
 
         <dl className="divide-y divide-line px-6">
@@ -102,7 +102,7 @@ function DetailPanel({ r, onClose }) {
             ['Buyer', `${who(r.business_type)} (verified)`],
             ['Deliver to', r.delivery_city],
             ['Needed by', date(r.required_date)],
-            ['Target price', r.target_price ? `${rs(r.target_price)} per litre` : 'No target, best offer'],
+            ['Target price', r.target_price ? `${rs(r.target_price)} per ${isMilk(r) ? 'litre' : perUnit(r.unit)}` : 'No target, best offer'],
             ['Order value at target', total ? rs(total) : '—'],
             ['Offers so far', `${r.bid_count}`],
             ['Bidding closes', dateTime(r.bid_deadline)],
@@ -115,7 +115,7 @@ function DetailPanel({ r, onClose }) {
 
         <section className="px-6 pb-5">
           <p className="mb-3 font-semibold">Offers so far</p>
-          <OffersList requirementId={r.id} target={r.target_price} />
+          <OffersList requirementId={r.id} target={r.target_price} unit={r.unit} />
         </section>
 
         <div className="mx-6 rounded-2xl bg-cream px-5 py-4 text-[14.5px]">
@@ -155,12 +155,13 @@ export default function PublicRequests() {
 
   const all = data ?? []
   const shown = useMemo(() => all
-    .filter((r) => milk === 'all' || r.milk_type === milk)
+    .filter((r) => milk === 'all' || (milk === 'milk' ? isMilk(r) : !isMilk(r)))
     .filter((r) => quality === 'all' || r.quality === quality)
     .filter((r) => !q.trim() || r.delivery_city.toLowerCase().includes(q.trim().toLowerCase()) || r.business_type.includes(q.trim().toLowerCase()))
     .sort(sorts[sort].fn), [all, milk, quality, q, sort])
 
-  const litres = all.reduce((n, r) => n + Number(r.quantity_l), 0)
+  const litres = all.filter(isMilk).reduce((n, r) => n + Number(r.quantity_l), 0)
+  const productCount = all.filter((r) => !isMilk(r)).length
   const closingToday = all.filter((r) => hoursLeft(r) < 24).length
   const count = (key, v) => all.filter((r) => r[key] === v).length
   const filtered = milk !== 'all' || quality !== 'all' || q
@@ -173,11 +174,11 @@ export default function PublicRequests() {
         {/* title + who-specific action */}
         <div className="flex flex-wrap items-end justify-between gap-5 animate-rise">
           <div>
-            <h1 className="display text-[40px] text-forest-deep sm:text-[48px]">Bulk milk requests</h1>
-            <p className="mt-2 max-w-[600px] text-[16.5px] text-muted">Businesses post how much milk they need. Verified collection centers send a price, and the buyer picks one.</p>
+            <h1 className="display text-[40px] text-forest-deep sm:text-[48px]">Bulk dairy requests</h1>
+            <p className="mt-2 max-w-[600px] text-[16.5px] text-muted">Businesses post how much milk, desi ghee, butter or other dairy they need. Verified sellers send a price, and the buyer chooses, or splits a big order between sellers.</p>
           </div>
           <div className="flex flex-wrap gap-2">
-            {!profile && <Link to="/signup" className="btn-secondary">Post a requirement</Link>}
+            {!profile && <Link to="/signup?role=business" className="btn-secondary">Post a requirement</Link>}
             <Link to={top.to} className="btn-primary">{top.label}</Link>
           </div>
         </div>
@@ -186,7 +187,8 @@ export default function PublicRequests() {
         <div className="mt-6 flex flex-wrap gap-2">
           {[
             [`${all.length}`, all.length === 1 ? 'open request' : 'open requests'],
-            [`${litres.toLocaleString('en-PK')} L`, 'wanted in total'],
+            [`${litres.toLocaleString('en-PK')} L`, 'of milk wanted'],
+            [`${productCount}`, productCount === 1 ? 'dairy product request' : 'dairy product requests'],
             [`${closingToday}`, 'closing within 24 hours'],
           ].map(([n, l]) => (
             <span key={l} className="num inline-flex items-baseline gap-1.5 rounded-full bg-surface px-4 py-2 text-[14px] ring-1 ring-line">
@@ -203,8 +205,9 @@ export default function PublicRequests() {
               <svg className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-muted" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
             </div>
             <Segmented size="sm" value={milk} onChange={setMilk} options={[
-              { value: 'all', label: 'All milk' },
-              ...['cow', 'buffalo', 'mixed'].map((v) => ({ value: v, label: milkLabel[v].replace(' milk', ''), count: count('milk_type', v) })),
+              { value: 'all', label: 'Everything' },
+              { value: 'milk', label: 'Milk', count: all.filter(isMilk).length },
+              { value: 'products', label: 'Dairy products', count: all.filter((r) => !isMilk(r)).length },
             ]} />
             <Segmented size="sm" value={quality} onChange={setQuality} options={[
               { value: 'all', label: 'Any quality' },
@@ -247,9 +250,9 @@ export default function PublicRequests() {
               <p className="display text-[20px]">How bulk bidding works</p>
               <ol className="mt-4 space-y-4">
                 {[
-                  ['A business posts a need', 'Litres, milk type, quality, date and a target price.'],
-                  ['Centers post offers', 'Every offer is visible here, so prices stay fair.'],
-                  ['The buyer picks one', 'The chosen center delivers and tracks the order.'],
+                  ['A business posts a need', 'Milk or a dairy product, how much, quality, date and a target price.'],
+                  ['Sellers post offers', 'Every offer is visible here, so prices stay fair.'],
+                  ['The buyer chooses', 'One seller, or a big order split between sellers. Each delivers and tracks its part.'],
                 ].map(([t, d], i) => (
                   <li key={t} className="flex gap-3">
                     <span className="num grid h-7 w-7 shrink-0 place-items-center rounded-full bg-forest text-[13px] font-bold text-cream">{i + 1}</span>
@@ -260,9 +263,9 @@ export default function PublicRequests() {
             </div>
             {!profile && (
               <div className="rounded-[20px] bg-haldi p-5">
-                <p className="display text-[20px] text-forest-deep">Run a milk center?</p>
-                <p className="mt-1 text-[14px] text-forest-deep/80">Register, get verified, and bid on every request here.</p>
-                <Link to="/signup" className="btn-primary btn-sm mt-4">Register your center</Link>
+                <p className="display text-[20px] text-forest-deep">Run a milk center or make dairy products?</p>
+                <p className="mt-1 text-[14px] text-forest-deep/80">Register, get verified, and bid on the requests here.</p>
+                <Link to="/signup?role=area_manager" className="btn-primary btn-sm mt-4">Register as a seller</Link>
               </div>
             )}
           </aside>

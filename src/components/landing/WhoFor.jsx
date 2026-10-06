@@ -3,7 +3,7 @@ import Reveal from './Reveal'
 
 const doors = [
   { title: 'Collection centers', who: 'Area managers', text: 'Register your center, test and buy milk from farmers, and bid on bulk orders from businesses.', cta: 'Register your center', to: '/signup', img: '/media/farmer-hero.webp' },
-  { title: 'Businesses', who: 'Restaurants, hotels, shops', text: 'Post how much milk you need and compare open offers from verified centers and pick one.', cta: 'Create a business account', to: '/signup', img: '/media/cold-chain-delivery.webp' },
+  { title: 'Businesses', who: 'Restaurants, hotels, shops', text: 'Post how much milk, desi ghee or other dairy you need, compare open offers from verified sellers, and split big orders.', cta: 'Create a business account', to: '/signup?role=business', img: '/media/cold-chain-delivery.webp' },
   { title: 'Farmers', who: 'Dairy farmers', text: 'Sell at your nearest center and see every test, price and payment in the ApnaDairy app.', cta: 'Coming to the app', img: '/media/farm-collection.webp' },
   { title: 'Homes', who: 'Customers', text: 'Order fresh milk from centers near you and track it to your door in the ApnaDairy app.', cta: 'Coming to the app', img: '/media/dairy-facility.webp' },
 ]
