@@ -47,7 +47,7 @@ export default function ManagerHome() {
     <>
       <WelcomeBanner name={profile.full_name.split(' ')[0]} line={c ? c.center_name : ' '}>
         <Link to="/manager/collection/new" className="btn-haldi"><Icon name="drop" size={17} />Record milk</Link>
-        <Link to="/manager/orders?sale=1" className="btn-on-dark"><Icon name="cart" size={17} />New sale</Link>
+        <Link to="/manager/orders" className="btn-on-dark"><Icon name="cart" size={17} />Shop orders</Link>
       </WelcomeBanner>
       <BillReminder invoices={data?.invoices} />
       {empty ? <Onboarding demo={c?.is_demo} onDone={reload} /> : <Dashboard data={data} />}
@@ -94,7 +94,7 @@ function Onboarding({ demo, onDone }) {
         </div>
       </div>
       <ol className="grid gap-3">
-        {[['users', 'Add farmers', 'Name, village and the milk they bring'], ['chip', 'Test and buy milk', 'The IoT device reads it, the AI suggests a fair price'], ['cart', 'Sell and deliver', 'App orders, walk-in sales and bulk orders'], ['chart', 'Watch the numbers', 'Sales, profit, stock and quality at a glance']].map(([ic, t, d], i) => (
+        {[['users', 'Add farmers', 'Name, village and the milk they bring'], ['chip', 'Test and buy milk', 'The IoT device reads it, the AI suggests a fair price'], ['cart', 'List and sell', 'List tested milk on the app and bid on bulk orders'], ['chart', 'Watch the numbers', 'Sales, profit, stock and quality at a glance']].map(([ic, t, d], i) => (
           <li key={t} className="flex items-center gap-3 rounded-2xl bg-cream px-4 py-3">
             <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-forest text-cream"><Icon name={ic} size={16} /></span>
             <div><p className="font-semibold">{i + 1}. {t}</p><p className="text-[13px] text-muted">{d}</p></div>

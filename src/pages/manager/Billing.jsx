@@ -28,7 +28,7 @@ export default function Billing() {
 
   return (
     <>
-      <PageHeader title="Billing" description="Your ApnaDairy plan: the IoT milk tester, the monthly platform fee and the small commission on online orders." />
+      <PageHeader title="Billing" description="Your ApnaDairy plan: the IoT milk tester and the monthly platform fee. Every rupee from your milk sales is yours." />
       <Alert>{error}</Alert>
 
       <div className="grid gap-4 sm:gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]">
@@ -47,23 +47,23 @@ export default function Billing() {
               <dd className="num font-semibold">{o ? rs(o.monthly_fee) : '—'}</dd>
             </div>
             <div className="flex items-center justify-between rounded-2xl bg-cream/10 px-4 py-3">
-              <dt className="flex items-center gap-2 text-[14px]"><Icon name="cart" size={16} />Commission</dt>
-              <dd className="text-right text-[13.5px]"><b className="num">{o ? `${Number(o.commission_pct)}%` : '—'}</b> <span className="text-cream/70">of app and bulk orders</span></dd>
+              <dt className="flex items-center gap-2 text-[14px]"><Icon name="cart" size={16} />Your milk sales</dt>
+              <dd><span className="rounded-full bg-[#7fd39b]/20 px-2.5 py-1 text-[12.5px] font-semibold text-[#a9e6bd]">100% yours</span></dd>
             </div>
           </dl>
-          <p className="mt-4 text-[12.5px] leading-relaxed text-cream/65">Counter sales are free. The monthly fee drops when your online orders are high, see the tiers below.</p>
+          <p className="mt-4 text-[12.5px] leading-relaxed text-cream/65">ApnaDairy takes no cut from milk you sell. The monthly fee gets smaller when you sell more through the app and bulk orders, see the tiers below.</p>
         </section>
 
-        <Card title="This month" subtitle="Online orders (app and bulk) so far decide next month’s discount">
+        <Card title="This month" subtitle="Delivered app and bulk orders so far decide next month’s discount">
           <div className="grid grid-cols-3 gap-3">
-            <div className="rounded-2xl bg-cream px-3 py-3"><p className="text-[12px] text-muted">All sales</p><p className="display num mt-0.5 text-[20px] sm:text-[24px]">{o ? rsShort(o.this_month_sales) : '—'}</p></div>
-            <div className="rounded-2xl bg-cream px-3 py-3"><p className="text-[12px] text-muted">Online orders</p><p className="display num mt-0.5 text-[20px] sm:text-[24px]">{o ? rsShort(o.this_month_online) : '—'}</p></div>
-            <div className="rounded-2xl bg-cream px-3 py-3"><p className="text-[12px] text-muted">Commission so far</p><p className="display num mt-0.5 text-[20px] sm:text-[24px]">{o ? rs(Math.round(o.commission_so_far)) : '—'}</p></div>
+            <div className="rounded-2xl bg-cream px-3 py-3"><p className="text-[12px] text-muted">Sales so far</p><p className="display num mt-0.5 text-[20px] sm:text-[24px]">{o ? rsShort(o.this_month_online) : '—'}</p></div>
+            <div className="rounded-2xl bg-cream px-3 py-3"><p className="text-[12px] text-muted">Next month’s fee</p><p className="display num mt-0.5 text-[20px] sm:text-[24px]">{o ? rs(Math.round(Number(o.monthly_fee) * (100 - Number(o.tier_now_discount || 0)) / 100)) : '—'}</p></div>
+            <div className="rounded-2xl bg-cream px-3 py-3"><p className="text-[12px] text-muted">Cut from sales</p><p className="display num mt-0.5 text-[20px] text-forest sm:text-[24px]">Rs 0</p></div>
           </div>
           <div className="mt-5">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
               <p className="text-[14px]"><b>{o?.tier_now ?? '—'}</b>{o?.tier_now_discount ? ` · ${o.tier_now_discount}% off` : ''}</p>
-              {o?.next_tier ? <p className="text-[13px] text-muted">{rs(Math.max(0, Math.round(nextAt - o.this_month_online)))} more online orders to reach <b className="text-ink">{o.next_tier}</b> ({o.next_tier_discount}% off)</p>
+              {o?.next_tier ? <p className="text-[13px] text-muted">{rs(Math.max(0, Math.round(nextAt - o.this_month_online)))} more sales to reach <b className="text-ink">{o.next_tier}</b> ({o.next_tier_discount}% off)</p>
                 : <p className="text-[13px] font-semibold text-forest">Top tier reached</p>}
             </div>
             <div className="mt-2 h-3 rounded-full bg-cream-2"><div className="h-3 rounded-full bg-haldi transition-all" style={{ width: `${progress}%` }} /></div>
@@ -72,7 +72,7 @@ export default function Billing() {
             {tiers.map((t) => (
               <li key={t.name} className={`rounded-2xl border px-3 py-2.5 ${o?.tier_now === t.name ? 'border-forest bg-mint-soft' : 'border-line'}`}>
                 <p className="text-[13px] font-semibold">{t.name}</p>
-                <p className="text-[12px] text-muted">{Number(t.min_monthly_sales) ? `from ${rsShort(t.min_monthly_sales)} online a month` : 'any sales'}</p>
+                <p className="text-[12px] text-muted">{Number(t.min_monthly_sales) ? `from ${rsShort(t.min_monthly_sales)} a month` : 'any sales'}</p>
                 <p className="num mt-1 text-[15px] font-bold text-forest">{t.discount_pct}% off</p>
               </li>
             ))}
@@ -127,8 +127,9 @@ export function Breakdown({ i }) {
   if (Number(i.device_fee)) rows.push(['IoT milk tester', rs(i.device_fee)])
   if (Number(i.subscription_fee)) {
     rows.push(['Platform fee', rs(i.subscription_fee)])
-    if (i.discount_pct) rows.push([`${i.tier} discount (${i.discount_pct}%), on ${rsShort(i.sales_basis)} online orders last month`, `−${rs(Math.round(i.subscription_fee * i.discount_pct) / 100)}`])
+    if (i.discount_pct) rows.push([`${i.tier} discount (${i.discount_pct}%), on ${rsShort(i.sales_basis)} sales last month`, `−${rs(Math.round(i.subscription_fee * i.discount_pct) / 100)}`])
   }
+  // bills from before the subscription-only plan may still show a commission line
   if (Number(i.commission)) rows.push([`Commission ${Number(i.commission_pct)}% of ${rs(i.online_sales)} online orders`, rs(i.commission)])
   return (
     <dl className="mt-4 grid gap-1.5 rounded-2xl bg-cream px-4 py-3 text-[13.5px]">

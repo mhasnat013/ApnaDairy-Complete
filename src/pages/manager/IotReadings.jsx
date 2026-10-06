@@ -47,11 +47,11 @@ export default function IotReadings() {
       <div className="grid gap-4 sm:gap-5 lg:grid-cols-[320px_minmax(0,1fr)]">
         <section className="furrows relative overflow-hidden rounded-[24px] bg-forest-deep p-6 text-cream">
           <p className="text-[13px] text-cream/70">Milk tester</p>
-          <p className="display mt-1 text-[26px]">{data?.device?.serial ?? data?.settings?.device_serial ?? 'No device yet'}</p>
+          <p className="display mt-1 text-[26px]">{data?.device?.serial ?? 'No device yet'}</p>
           <span className="mt-3 inline-flex items-center gap-2 rounded-full bg-cream/10 px-3 py-1 text-[12.5px] font-semibold">
             {data?.device
               ? <><span className="relative flex h-2.5 w-2.5"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#7fd39b] opacity-60" /><span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-[#7fd39b]" /></span>Connected · live readings</>
-              : <><span className="h-2.5 w-2.5 rounded-full bg-cream/40" />Not linked · simulated readings</>}
+              : <><span className="h-2.5 w-2.5 rounded-full bg-cream/40" />No device linked</>}
           </span>
           <dl className="mt-6 grid grid-cols-2 gap-3">
             <div className="rounded-2xl bg-cream/10 p-3"><dt className="text-[12px] text-cream/65">Tests today</dt><dd className="display num text-[26px]">{data ? today.length : '—'}</dd></div>
@@ -63,7 +63,7 @@ export default function IotReadings() {
           </ul>
           <p className="mt-3 rounded-2xl bg-cream/5 p-3 text-[12.5px] leading-relaxed text-cream/70">{data?.device
             ? 'The ESP32 tester sends temperature, pH and TDS to the cloud. EC is worked out from TDS (TDS ÷ 640), then both AI models score the sample.'
-            : 'ApnaDairy links your tester once it is paid for. Until then readings are simulated or typed by hand.'}</p>
+            : 'ApnaDairy links your tester once it is paid for. Milk can only be tested and bought with the device, so readings cannot be typed in or changed.'}</p>
         </section>
 
         <Card title="Latest sample" subtitle={latest ? `${latest.farmer?.full_name}, ${litres(latest.quantity_l)} ${milkLabel[latest.milk_type].toLowerCase()} milk at ${timeOf(latest.collected_at)}` : 'No samples yet'}>

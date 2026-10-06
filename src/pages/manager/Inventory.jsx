@@ -4,8 +4,9 @@ import { useUi } from '../../context/UiContext'
 import { Link } from 'react-router-dom'
 import {
   milkStock, myMilkShelf, stockBatches, usageLog, recordUsage, undoUsage, shelfBatches, stockLeft, milkLabel, usageLabel, timeOf,
+  dayBook, myFirstDay, todayKey,
 } from '../../lib/center'
-import { litres, date, relative } from '../../lib/format'
+import { litres, date, relative, rs } from '../../lib/format'
 import PageHeader from '../../components/PageHeader'
 import Segmented from '../../components/Segmented'
 import Card from '../../components/Card'
@@ -13,6 +14,7 @@ import Alert from '../../components/Alert'
 import Icon from '../../components/Icon'
 import Sheet from '../../components/Sheet'
 import EmptyState from '../../components/EmptyState'
+import DayPicker from '../../components/DayPicker'
 
 const TYPES = ['buffalo', 'cow', 'mixed']
 
@@ -25,12 +27,13 @@ export default function Inventory() {
 
   return (
     <>
-      <PageHeader title="Inventory" description="Milk on your shelf, which milk to sell first, and milk that left stock without a sale.">
+      <PageHeader title="Inventory" description="Milk on your shelf, which milk to sell first, and a day book of what came in and went out on any day.">
         <Link to="/manager/shop" className="btn-secondary"><Icon name="store" size={17} />Listings on the app</Link>
         <button className="btn-primary" onClick={() => setUsage({})}><Icon name="minus" size={17} />Take milk out</button>
       </PageHeader>
       <Alert>{error}</Alert>
       <MilkStock data={data} onUse={setUsage} onChanged={reload} />
+      <DayBook stamp={data} />
       <UsageForm key={usage ? 'usage-' + (usage.milk_type ?? '') : 'usage-closed'} value={usage} stock={data?.stock} onClose={() => setUsage(null)} onSaved={reload} />
     </>
   )
@@ -53,7 +56,7 @@ function MilkStock({ data, onUse, onChanged }) {
           const left = s ? stockLeft(s) : 0
           const mine = shelf.filter((b) => b.milk_type === t)
           const soon = mine.filter((b) => b.hoursLeft > 0 && b.hoursLeft < 12).reduce((n, b) => n + b.remaining, 0)
-          // from the database: milk past its shelf life cannot be sold on the app, at the counter or in bulk
+          // from the database: milk past its shelf life cannot be sold on the app or in bulk
           const sh = data?.shelf?.find((x) => x.milk_type === t)
           const expired = Math.round(Number(sh?.expired_l ?? 0) * 10) / 10
           return (
@@ -127,6 +130,59 @@ function MilkStock({ data, onUse, onChanged }) {
         </Card>
       </div>
     </div>
+  )
+}
+
+// one day of the center: milk bought from farmers against milk sold, sent in bulk or lost
+function DayBook({ stamp }) {
+  const [day, setDay] = useState(todayKey)
+  const first = useLoad(myFirstDay)
+  const book = useLoad(() => dayBook(day), [day, stamp])
+  const rows = (book.data ?? []).slice().sort((a, b) => TYPES.indexOf(a.milk_type) - TYPES.indexOf(b.milk_type))
+  const sum = (k) => rows.reduce((n, r) => n + Number(r[k] ?? 0), 0)
+  const r1 = (n) => Math.round(Number(n) * 10) / 10
+  const bought = sum('bought_l'), paid = sum('paid_farmers'), app = sum('sold_l'), bulk = sum('bulk_l'), lost = sum('spoiled_l') + sum('used_l')
+  const quiet = book.data && bought + app + bulk + lost === 0
+  return (
+    <Card className="mt-4 sm:mt-5" title="Day book" subtitle="Pick any day since your center opened. Sales count when the milk is delivered."
+      action={<DayPicker value={day} onChange={setDay} min={first.data ?? undefined} />}>
+      <Alert>{book.error}</Alert>
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {[
+          ['Bought from farmers', litres(r1(bought)), `${rs(Math.round(paid))} paid`],
+          ['App orders delivered', litres(r1(app)), `${rs(Math.round(sum('sales')))} earned`],
+          ['Bulk orders delivered', litres(r1(bulk)), `${rs(Math.round(sum('bulk_sales')))} earned`],
+          ['Spoiled or used', litres(r1(lost)), lost > 0 ? `${litres(r1(sum('spoiled_l')))} spoiled` : 'nothing lost'],
+        ].map(([k, v, n]) => (
+          <div key={k} className="rounded-[18px] bg-cream px-4 py-3">
+            <p className="text-[12.5px] text-muted">{k}</p>
+            <p className="display num mt-0.5 truncate text-[20px] text-forest-deep sm:text-[24px]">{book.data ? v : '—'}</p>
+            <p className="truncate text-[12px] text-muted">{book.data ? n : ''}</p>
+          </div>
+        ))}
+      </div>
+      {quiet ? <p className="mt-5 rounded-2xl border border-dashed border-line px-4 py-6 text-center text-[13.5px] text-muted">No milk came in or went out on this day.</p> : (
+        <div className="mt-5 overflow-x-auto">
+          <table className="table min-w-[620px] [&_td]:whitespace-nowrap">
+            <thead><tr><th>Milk</th><th className="text-right">Bought</th><th className="text-right">Paid</th><th className="text-right">App orders</th><th className="text-right">Bulk orders</th><th className="text-right">Sales</th><th className="text-right">Spoiled / used</th></tr></thead>
+            <tbody>
+              {!book.data && <tr><td colSpan={7}><div className="skeleton h-24" /></td></tr>}
+              {rows.map((r) => (
+                <tr key={r.milk_type}>
+                  <td className="font-semibold">{milkLabel[r.milk_type]}</td>
+                  <td className="num text-right">{litres(r1(r.bought_l))}</td>
+                  <td className="num text-right text-muted">{rs(Math.round(r.paid_farmers))}</td>
+                  <td className="num text-right">{litres(r1(r.sold_l))}</td>
+                  <td className="num text-right">{litres(r1(r.bulk_l))}</td>
+                  <td className="num text-right font-semibold">{rs(Math.round(Number(r.sales) + Number(r.bulk_sales)))}</td>
+                  <td className={`num text-right ${Number(r.spoiled_l) > 0 ? 'text-danger' : 'text-muted'}`}>{litres(r1(Number(r.spoiled_l) + Number(r.used_l)))}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </Card>
   )
 }
 

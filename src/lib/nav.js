@@ -7,10 +7,10 @@ export const navFor = {
     { to: '/admin/bulk-market', label: 'Bulk market', icon: 'gavel', ready: true },
     { to: '/admin/billing', label: 'Billing', icon: 'wallet', ready: true },
     { to: '/admin/market-rates', label: 'Market rates', icon: 'tag', ready: true },
+    { to: '/admin/iot-devices', label: 'IoT devices', icon: 'chip', ready: true },
+    { to: '/admin/analytics', label: 'Analytics', icon: 'chart', ready: true },
     { to: '/admin/audit', label: 'Audit log', icon: 'file', ready: true },
-    { to: '/admin/iot-devices', label: 'IoT devices', icon: 'chip' },
     { to: '/admin/complaints', label: 'Complaints & support', icon: 'chat' },
-    { to: '/admin/analytics', label: 'Analytics', icon: 'chart' },
   ],
   area_manager: [
     { to: '/manager', label: 'Overview', icon: 'grid', end: true, ready: true },

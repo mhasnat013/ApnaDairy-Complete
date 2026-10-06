@@ -35,7 +35,7 @@ export default function AdminHome() {
       <WelcomeBanner name={profile.full_name.split(' ')[0]}
         line={s ? (s.pending ? `${s.pending} ${s.pending === 1 ? 'account is' : 'accounts are'} waiting for you.` : 'Everyone is approved. All clear.') : ' '}>
         <Link to="/admin/approvals" className="btn-haldi">Review approvals</Link>
-        <Link to="/admin/bulk-market" className="btn-on-dark">Bulk market</Link>
+        <Link to="/admin/analytics" className="btn-on-dark">Analytics</Link>
       </WelcomeBanner>
       <StatRow>
         <StatCard label="Waiting for approval" value={s?.pending} note="centers and businesses" tone="haldi" />

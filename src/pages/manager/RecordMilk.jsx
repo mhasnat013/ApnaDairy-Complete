@@ -4,7 +4,7 @@ import { useLoad } from '../../lib/useLoad'
 import { useAuth } from '../../context/AuthContext'
 import { useUi } from '../../context/UiContext'
 import {
-  farmersWithStats, settings, assessMilk, recordCollection, demoFarmerAnswer, collectionById, myCenter, myDevice, startDeviceTest, takeDeviceSample, finishDeviceTest, OFFER_HOURS, simulateReading, currentShift, billingOverview, milkListings, createListing,
+  farmersWithStats, settings, assessMilk, recordCollection, demoFarmerAnswer, collectionById, myCenter, myDevice, startDeviceTest, takeDeviceSample, finishDeviceTest, farmerUsual, OFFER_HOURS, currentShift, billingOverview, milkListings,
   milkLabel, gradeLabel, riskLabel, PARAMS, inRange,
 } from '../../lib/center'
 import { rs, litres } from '../../lib/format'
@@ -32,10 +32,7 @@ export default function RecordMilk() {
   const [quantity, setQuantity] = useState('')
   const [shift, setShift] = useState(currentShift())
   const [reading, setReading] = useState(null)
-  const [source, setSource] = useState('simulated')
-  const [scanning, setScanning] = useState(false)
-  const [manual, setManual] = useState(false)
-  const [manualReason, setManualReason] = useState('')
+  const scanning = false
   const [receipt, setReceipt] = useState(null)
   const [ai, setAi] = useState(null)
   const [price, setPrice] = useState('')
@@ -45,11 +42,13 @@ export default function RecordMilk() {
 
   const farmer = data?.farmers.find((f) => f.id === farmerId)
   const deviceOff = data?.billing && !data.billing.device_active
-  // with a working device, typed readings need a reason so a shop cannot quietly bypass the tester
-  const needReason = manual && !deviceOff && !manualReason.trim()
   const overdue = data?.billing && !data.billing.billing_ok
   const list = useMemo(() => (data?.farmers ?? []).filter((f) => `${f.full_name} ${f.village ?? ''}`.toLowerCase().includes(q.toLowerCase())), [data, q])
   const qty = Number(quantity)
+  // the farmer's usual drop-offs first, then common amounts
+  const { data: usual } = useLoad(() => (farmerId ? farmerUsual(farmerId).catch(() => []) : Promise.resolve([])), [farmerId])
+  const picks = [...(usual ?? []).map((n) => [Number(n), true]), ...[10, 20, 40, 60, 100].map((n) => [n, false])]
+    .filter(([n], i, a) => a.findIndex(([m]) => m === n) === i).slice(0, 6)
 
   const device = data?.device
   const demo = !!data?.center?.is_demo
@@ -67,7 +66,7 @@ export default function RecordMilk() {
   }, [test])
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
   const scan = async () => {
-    setAi(null); setManual(false); setErr(''); setReading(null)
+    setAi(null); setErr(''); setReading(null)
     cancelTest.current = false
     let t
     try { t = await startDeviceTest() } catch (e) { return setErr(e.message) }
@@ -89,7 +88,6 @@ export default function RecordMilk() {
       const r = await finishDeviceTest(t.session)
       setReading({ id: r.id, temperature_c: r.temperature_c, ph: r.ph, ec_ms: r.ec_ms, tds_ppm: r.tds_ppm, reading_at: r.reading_at,
         status: r.status, problems: r.problems ?? [], notes: r.notes ?? [], used: r.samples_used, total: r.samples_total, seconds: t.seconds })
-      setSource('device')
     } catch (e) { setErr(e.message) }
     setTest(null)
   }
@@ -97,11 +95,6 @@ export default function RecordMilk() {
   const left = test ? Math.max(0, Math.ceil((test.started + test.seconds * 1000 - Date.now()) / 1000)) : 0
   const lastGood = test ? [...test.samples].reverse().find((x) => x.valid) : null
   const live = lastGood ? { temperature_c: Number(lastGood.temperature_c), ph: Number(lastGood.ph), tds_ppm: Number(lastGood.tds_ppm), ec_ms: Number(lastGood.tds_ppm) / 640 } : null
-  // demo accounts can also simulate a reading when the device is not at hand
-  const simulate = () => {
-    setScanning(true); setAi(null); setManual(false); setErr('')
-    setTimeout(() => { setReading(simulateReading(farmer?.milk_type)); setSource('simulated'); setScanning(false) }, 1800)
-  }
 
   useEffect(() => {
     if (!reading || !farmer || reading.status === 'check') return
@@ -113,7 +106,7 @@ export default function RecordMilk() {
   const save = async () => {
     setSaving(true); setErr('')
     try {
-      const id = await recordCollection({ farmer: farmerId, quantity: qty, shift, reading, source, price: ai?.accept ? Number(price) : null, manualReason: source === 'manual' ? manualReason.trim() : null, readingId: source === 'device' ? reading.id : null })
+      const id = await recordCollection({ farmer: farmerId, quantity: qty, shift, reading, source: 'device', price: ai?.accept ? Number(price) : null, readingId: reading.id })
       setDone({ id, accepted: ai?.accept, until: Date.now() + OFFER_HOURS * 36e5 })
     } catch (e) { setErr(e.message) }
     setSaving(false)
@@ -130,17 +123,7 @@ export default function RecordMilk() {
       setReceipt(row)
     } catch (e) { toast(e.message, 'error') }
   }
-  const listNow = async () => {
-    try {
-      if (listing) { nav('/manager/shop'); return }
-      // start at the suggested markup over what was just paid
-      const listPrice = Math.round(Number(price) * 1.2) || ({ cow: 205, buffalo: 240, mixed: 210 })[farmer.milk_type]
-      await createListing(farmer.milk_type, listPrice)
-      toast(`${milkLabel[farmer.milk_type]} milk is on the app at ${rs(listPrice)} a litre.`)
-      nav('/manager/shop')
-    } catch (e) { toast(e.message, 'error') }
-  }
-  const again = () => { setStep(0); setFarmerId(''); setQuantity(''); setReading(null); setAi(null); setPrice(''); setDone(null); setQ(''); setManual(false); setManualReason(''); setSource('simulated') }
+  const again = () => { setStep(0); setFarmerId(''); setQuantity(''); setReading(null); setAi(null); setPrice(''); setDone(null); setQ('') }
 
   if (done) {
     return (
@@ -173,16 +156,13 @@ export default function RecordMilk() {
           {done.answered && done.row?.receipt_no && (
             <button className="mt-3 text-[13.5px] font-semibold text-forest hover:underline" onClick={() => setReceipt(done.row)}>View receipt {done.row.receipt_no}</button>
           )}
-          {done.answered && (
+          {done.accepted && (
             <div className="mt-6 rounded-2xl bg-mint-soft px-4 py-4 text-left text-[14px] text-forest">
-              {listing?.is_available ? (
-                <p><b>{litres(qty)} is now in stock</b> and shows in your {milkLabel[farmer.milk_type].toLowerCase()} milk listing on the customer app.</p>
-              ) : (
-                <>
-                  <p><b>{litres(qty)} is now in stock.</b> {listing ? `Your ${milkLabel[farmer.milk_type].toLowerCase()} milk listing is hidden from the app.` : `List ${milkLabel[farmer.milk_type].toLowerCase()} milk so customers can order it in the app.`}</p>
-                  <button className="btn-primary btn-sm mt-3" onClick={listNow}><Icon name="store" size={15} />{listing ? 'Open my shop' : 'List it on the app'}</button>
-                </>
-              )}
+              <p><b>{done.answered ? `${litres(qty)} is now in your stock.` : `Once ${farmer.full_name.split(' ')[0]} accepts, ${litres(qty)} joins your stock.`}</b> Sell it to homes on the app or to a business in bulk.</p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Link to={`/manager/shop?list=${farmer.milk_type}`} className="btn-primary btn-sm"><Icon name="store" size={15} />{listing ? 'Add litres to the app listing' : 'List it on the app'}</Link>
+                <Link to="/manager/bulk-requests" className="btn-secondary btn-sm"><Icon name="gavel" size={15} />Offer to bulk buyers</Link>
+              </div>
             </div>
           )}
           <div className="mt-4 flex flex-wrap justify-center gap-2">
@@ -246,13 +226,19 @@ export default function RecordMilk() {
           <section className="panel flex flex-col p-5 sm:p-6">
             <h2 className="display text-[19px] text-forest-deep">How much milk?</h2>
             <div className="mt-4 flex items-end gap-2">
-              <input className="input num h-16 w-full text-[30px] font-bold" type="number" min="0.5" step="0.5" inputMode="decimal" placeholder="0"
+              <input className="input num h-16 w-full text-[30px] font-bold" type="number" min="0.5" max="2000" step="0.5" inputMode="decimal" placeholder="0"
                 value={quantity} onChange={(e) => setQuantity(e.target.value)} aria-label="Litres" />
               <span className="pb-4 text-[18px] font-semibold text-muted">litres</span>
             </div>
             <div className="mt-3 flex flex-wrap gap-2">
-              {[5, 10, 15, 20].map((n) => <button key={n} type="button" className="btn-secondary btn-sm" onClick={() => setQuantity(String(n))}>{n} L</button>)}
+              {picks.map(([n, usual]) => (
+                <button key={n} type="button" onClick={() => setQuantity(String(n))}
+                  className={`rounded-full px-3.5 py-2 text-[13.5px] font-semibold transition-colors ${Number(quantity) === n ? 'bg-forest text-cream' : usual ? 'bg-haldi-soft text-forest-deep hover:bg-haldi/40' : 'bg-cream-2 text-ink hover:bg-mint-soft'}`}>
+                  {n} L{usual && <span className="ml-1 text-[11px] font-medium opacity-75">usual</span>}
+                </button>
+              ))}
             </div>
+            <p className="mt-2 text-[12.5px] text-muted">Type any amount up to 2,000 litres.{usual?.length ? ` Gold amounts are what ${farmer?.full_name.split(' ')[0]} usually brings.` : ''}</p>
             <p className="mt-6 text-[13px] font-semibold">Shift</p>
             <div className="mt-2"><Segmented value={shift} onChange={setShift} options={[{ value: 'morning', label: 'Morning' }, { value: 'evening', label: 'Evening' }]} /></div>
             <div className="mt-auto pt-6">
@@ -289,20 +275,18 @@ export default function RecordMilk() {
               <span className={`grid h-24 w-24 place-items-center rounded-full bg-cream/10 ${badReading && !scanning ? 'text-[#f3a08c]' : 'text-haldi'}`}><Icon name={reading && !scanning ? (badReading ? 'alert' : 'check') : 'chip'} size={40} /></span>
             </div>
             )}
-            <p className="mt-6 text-center text-[14px] text-cream/80">{testing ? (test.finishing ? 'Averaging the readings…' : `Keep the probes in the milk · ${test.samples.length} readings so far`) : scanning ? 'Reading the sample…' : reading ? `${source === 'device' ? 'From the device' : source === 'simulated' ? 'Simulated' : 'Typed by hand'}, ${new Date(reading.reading_at ?? Date.now()).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}` : 'Dip the probes in the sample, then take a reading.'}</p>
+            <p className="mt-6 text-center text-[14px] text-cream/80">{testing ? (test.finishing ? 'Averaging the readings…' : `Keep the probes in the milk · ${test.samples.length} readings so far`) : scanning ? 'Reading the sample…' : reading ? `Tested on the device, ${new Date(reading.reading_at ?? Date.now()).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}` : 'Dip the probes in the sample, then take a reading.'}</p>
             <div className="mt-5 flex flex-wrap justify-center gap-2">
               {device && (testing
                 ? <button className="btn-on-dark" onClick={() => { cancelTest.current = true }} disabled={test.finishing}>Cancel test</button>
                 : <button className="btn-haldi" onClick={scan} disabled={scanning || deviceOff}>{reading ? 'Test again' : 'Take reading'}</button>)}
-              {demo && !testing && <button className={device ? 'btn-on-dark' : 'btn-haldi'} onClick={simulate} disabled={scanning || deviceOff}>{device ? 'Simulate (demo)' : reading ? 'Read again' : 'Simulate a reading'}</button>}
-              {!testing && <button className="btn-on-dark" onClick={() => { setManual(true); setSource('manual'); setAi(null); setReading(reading && !badReading ? { ...reading, id: undefined, status: undefined, problems: undefined } : { temperature_c: 34, ph: 6.7, ec_ms: 4.5, tds_ppm: 2880, reading_at: new Date().toISOString() }) }}>Enter by hand</button>}
             </div>
-            {!device && !demo && !deviceOff && (
-              <p className="mt-4 rounded-2xl bg-cream/10 px-4 py-3 text-center text-[13px] text-cream/80">No IoT device is linked to your center yet. ApnaDairy assigns it once the device is paid. You can enter readings by hand meanwhile.</p>
+            {!device && !deviceOff && (
+              <p className="mt-4 rounded-2xl bg-cream/10 px-4 py-3 text-center text-[13px] text-cream/80">No IoT device is linked to your center yet. ApnaDairy links it once its bill is paid, then milk can be tested here.</p>
             )}
             {deviceOff && (
               <p className="mt-4 rounded-2xl bg-cream/10 px-4 py-3 text-center text-[13px] text-cream/80">
-                Your device activates once its invoice is paid. <Link to="/manager/billing" className="font-semibold text-haldi underline">Go to billing</Link>. You can enter readings by hand meanwhile.
+                Your IoT device works once its bill is paid. <Link to="/manager/billing" className="font-semibold text-haldi underline">Go to billing</Link>
               </p>
             )}
             <ul className="mt-5 flex flex-wrap justify-center gap-1.5 text-[11.5px] text-cream/60">
@@ -312,7 +296,7 @@ export default function RecordMilk() {
 
           <section className="panel p-5 sm:p-6">
             <h2 className="display text-[19px] text-forest-deep">Readings</h2>
-            {!reading && !scanning && !testing && <p className="mt-3 text-muted">{device ? 'Press Take reading. The device is read every few seconds for a minute and the values are averaged, so one bad reading cannot decide the price.' : 'The four sensor values appear here with their normal range.'}</p>}
+            {!reading && !scanning && !testing && <p className="mt-3 text-muted">Press Take reading. The device is read every few seconds for a minute and the values are averaged, so one bad reading cannot decide the price.</p>}
             {testing && (
               <div className="mt-4">
                 <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-cream px-4 py-2.5 text-[13px]">
@@ -361,28 +345,16 @@ export default function RecordMilk() {
                   <div key={p.key}>
                     <div className="flex items-baseline justify-between gap-3">
                       <span className="text-[14px] font-semibold">{p.label}</span>
-                      {manual ? (
-                        <input className="input num h-9 w-28 text-right" type="number" step={{ ph: 0.01, ec_ms: 0.05, tds_ppm: 10, temperature_c: 0.1 }[p.key]} value={reading[p.key]}
-                          onChange={(e) => setReading({ ...reading, [p.key]: Number(e.target.value) })} aria-label={p.label} />
-                      ) : (
-                        <span className={`num text-[18px] font-bold ${reading[p.key] != null && inRange(p, reading[p.key]) ? 'text-ink' : 'text-danger'}`}>{reading[p.key] == null ? '—' : Number(reading[p.key]).toFixed(p.digits)} <span className="text-[12px] font-medium text-muted">{p.unit}</span></span>
-                      )}
+                      <span className={`num text-[18px] font-bold ${reading[p.key] != null && inRange(p, reading[p.key]) ? 'text-ink' : 'text-danger'}`}>{reading[p.key] == null ? '—' : Number(reading[p.key]).toFixed(p.digits)} <span className="text-[12px] font-medium text-muted">{p.unit}</span></span>
                     </div>
                     <RangeBar param={p} value={Number(reading[p.key])} />
                   </div>
                 ))}
               </div>
             )}
-            {manual && (
-              <div className="field mt-5">
-                <label htmlFor="mreason">Why typed by hand?{deviceOff ? ' (optional)' : ''}</label>
-                <input id="mreason" className="input" placeholder={deviceOff ? 'Device not active yet' : 'e.g. probe being cleaned, battery low'} value={manualReason} onChange={(e) => setManualReason(e.target.value)} />
-                <p className="mt-1 text-[12px] text-muted">The farmer and ApnaDairy see that these readings were typed, with your reason.</p>
-              </div>
-            )}
             <div className="mt-6 flex justify-between gap-2">
               <button className="btn-ghost" onClick={() => setStep(0)} disabled={testing}>Back</button>
-              <button className="btn-primary" disabled={!reading || scanning || testing || !ai || needReason || badReading} onClick={() => setStep(2)}>See AI result <Icon name="arrow" size={17} /></button>
+              <button className="btn-primary" disabled={!reading || scanning || testing || !ai || badReading} onClick={() => setStep(2)}>See AI result <Icon name="arrow" size={17} /></button>
             </div>
           </section>
         </div>

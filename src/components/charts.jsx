@@ -25,7 +25,8 @@ const niceMax = (v) => {
   if (v <= 0) return 1
   const p = 10 ** Math.floor(Math.log10(v))
   const n = v / p
-  return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 2.5 ? 2.5 : n <= 5 ? 5 : 10) * p
+  // steps that split into four round ticks (0, ¼, ½, ¾, max)
+  return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 4 ? 4 : n <= 6 ? 6 : n <= 8 ? 8 : 10) * p
 }
 
 // time series: bars and/or lines on one shared axis, with a hover crosshair and tooltip

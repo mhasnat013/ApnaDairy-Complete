@@ -20,7 +20,7 @@ const GROUPS = [
   ['Subscription', [['device_price', 'IoT device', 'Rs'], ['monthly_fee', 'Monthly fee', 'Rs'], ['payment_days', 'Days to pay', 'days']]],
   ['Fair pricing (% of the AI market rate for farmers, % above cost for shops)', [['farmer_min_pct', 'Farmer, minimum', '%'], ['farmer_default_pct', 'Farmer, suggested', '%'],
     ['markup_suggest_pct', 'Shop markup, suggested', '%'], ['markup_max_pct', 'Shop markup, maximum', '%']]],
-  ['ApnaDairy commission on app and bulk orders', [['commission_pct', 'Commission', '%']]],
+  ['Customer orders on the app (milk per order)', [['order_min_l', 'Smallest order', 'L'], ['order_max_l', 'Largest order', 'L']]],
 ]
 
 export default function AdminBilling() {
@@ -40,10 +40,13 @@ export default function AdminBilling() {
   const collected = inv.filter((i) => i.status === 'paid' && i.paid_at?.slice(0, 7) === month).reduce((n, i) => n + Number(i.amount), 0)
   const outstanding = inv.filter((i) => i.status === 'due').reduce((n, i) => n + Number(i.amount), 0)
   const late = inv.filter(overdue)
-  const commission = inv.filter((i) => i.status !== 'void' && i.period_month?.slice(0, 7) === month).reduce((n, i) => n + Number(i.commission), 0)
+  const devices = inv.filter((i) => i.kind === 'device' && i.status !== 'void')
   const list = inv.filter((i) => view === 'all' || (view === 'overdue' ? overdue(i) : i.status === view))
 
   const saveSettings = async () => {
+    if (Number(s.order_min_l) <= 0 || Number(s.order_max_l) < Number(s.order_min_l)) return toast('The largest order must be at least the smallest order, and both above 0.', 'error')
+    if (Number(s.farmer_min_pct) > Number(s.farmer_default_pct)) return toast('The suggested farmer share cannot be below the minimum.', 'error')
+    if (Number(s.markup_suggest_pct) > Number(s.markup_max_pct)) return toast('The suggested shop markup cannot be above the maximum.', 'error')
     setBusy(true)
     try { await savePlatformSettings(s); toast('Settings saved. They apply to new offers, prices and bills.'); setForm(null); await reload() } catch (e) { toast(e.message, 'error') }
     setBusy(false)
@@ -55,7 +58,7 @@ export default function AdminBilling() {
   }
   const bill = async () => {
     const label = monthLabel(`${month}-01`)
-    if (!(await confirm({ title: `Create ${label} bills?`, body: 'Every approved center without a bill for this month gets one: the platform fee after its discount, plus commission on last month’s online orders.', confirmLabel: 'Create bills' }))) return
+    if (!(await confirm({ title: `Create ${label} bills?`, body: 'Every approved center without a bill for this month gets one: the monthly platform fee after its discount. ApnaDairy takes nothing from milk sales.', confirmLabel: 'Create bills' }))) return
     try { const n = await generateInvoices(); toast(n ? `${n} bills created.` : 'Every center already has a bill for this month.'); await reload() } catch (e) { toast(e.message, 'error') }
   }
   const cash = async (i) => {
@@ -71,7 +74,7 @@ export default function AdminBilling() {
 
   return (
     <>
-      <PageHeader title="Billing" description="Device sales, monthly fees and commission from every milk center, plus the pricing rules the whole platform follows.">
+      <PageHeader title="Billing" description="ApnaDairy earns from two things only: the IoT device and the monthly fee. Milk sales stay with the centers.">
         <button className="btn-primary" onClick={bill}><Icon name="plus" size={17} />Create {monthLabel(`${month}-01`).split(' ')[0]} bills</button>
       </PageHeader>
       <Alert>{error}</Alert>
@@ -80,7 +83,7 @@ export default function AdminBilling() {
         <Kpi accent label="Collected this month" value={data ? rs(Math.round(collected)) : null} icon={<Icon name="wallet" size={16} />} />
         <Kpi label="Waiting to be paid" value={data ? rs(Math.round(outstanding)) : null} note={(() => { const n = inv.filter((i) => i.status === 'due').length; return `${n} ${n === 1 ? 'bill' : 'bills'}` })()} />
         <Kpi label="Overdue centers" value={data ? new Set(late.map((i) => i.area_manager_id)).size : null} note="bidding and testing paused" />
-        <Kpi label="Commission this month" value={data ? rs(Math.round(commission)) : null} note="billed on last month’s online orders" />
+        <Kpi label="Devices paid for" value={data ? devices.filter((i) => i.status === 'paid').length : null} note={data ? `of ${devices.length} device ${devices.length === 1 ? 'bill' : 'bills'}` : ''} />
       </div>
 
       <Card className="mt-5" title="Bills" bodyClass="pt-3"
@@ -97,7 +100,7 @@ export default function AdminBilling() {
                 <tr key={i.id}>
                   <td><p className="font-semibold">{i.center_name}</p><p className="text-[12.5px] text-muted">{i.city}</p></td>
                   <td><p className="font-medium">{i.kind === 'device' ? 'IoT device' : monthLabel(i.period_month)}</p>
-                    <p className="text-[12.5px] text-muted">{i.kind === 'monthly' ? `${i.tier}${i.discount_pct ? ` ${i.discount_pct}% off` : ''}${Number(i.commission) ? ` · commission ${rs(Math.round(i.commission))}` : ''}` : 'one-time'}</p></td>
+                    <p className="text-[12.5px] text-muted">{i.kind === 'monthly' ? `${i.tier}${i.discount_pct ? ` ${i.discount_pct}% off` : ''}` : 'one-time'}</p></td>
                   <td className="num text-right font-semibold">{rs(i.amount)}</td>
                   <td className={`num ${overdue(i) ? 'font-semibold text-danger' : ''}`}>{date(i.due_date)}</td>
                   <td>{i.status === 'paid' ? <><Badge tone="green">Paid</Badge><p className="mt-1 text-[12px] text-muted">{paymentLabel[i.payment_method]} · {date(i.paid_at)}</p></>
@@ -127,7 +130,7 @@ export default function AdminBilling() {
                       <span className="text-[13.5px]">{label}</span>
                       <span className="flex items-center gap-1.5">
                         {unit === 'Rs' && <span className="text-[13px] text-muted">Rs</span>}
-                        <input className="input num h-10 w-24 text-right font-semibold" type="number" min="0" value={s[k] ?? ''}
+                        <input className="input num h-10 w-24 text-right font-semibold" type="number" min="0" step="any" value={s[k] ?? ''}
                           onChange={(e) => setForm({ ...s, [k]: e.target.value })} aria-label={label} />
                         {unit !== 'Rs' && <span className="w-8 text-[12px] text-muted">{unit}</span>}
                       </span>
@@ -140,7 +143,7 @@ export default function AdminBilling() {
           <button className="btn-primary mt-5 w-full" disabled={!dirty || busy} onClick={saveSettings}>Save rules</button>
         </Card>
 
-        <Card title="Discount tiers" subtitle="Monthly fee discount by last month’s online orders (app and bulk). Counter sales do not count, since the platform cannot verify them.">
+        <Card title="Discount tiers" subtitle="The monthly fee gets cheaper for centers that sold more last month through delivered app and bulk orders.">
           <div className="grid gap-2">
             {(data?.tiers ?? []).map((t) => {
               const e = tierEdits[t.name] ?? t
@@ -156,7 +159,7 @@ export default function AdminBilling() {
               )
             })}
           </div>
-          <p className="mt-3 text-[12.5px] text-muted">Example: a center with {rsShort(2500000)} of online orders last month pays the Gold fee this month.</p>
+          <p className="mt-3 text-[12.5px] text-muted">Example: a center with {rsShort(2500000)} of delivered orders last month pays the Gold fee this month.</p>
           <button className="btn-primary mt-4 w-full" disabled={!Object.keys(tierEdits).length || busy} onClick={saveTiers}>Save tiers</button>
         </Card>
       </div>

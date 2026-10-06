@@ -4,11 +4,11 @@ import { useLoad } from '../../lib/useLoad'
 import { useUi } from '../../context/UiContext'
 import { useAuth } from '../../context/AuthContext'
 import {
-  collectionsOn, myCenter, expireMyOffers, demoFarmerAnswer, cancelCollection, correctCollection, offerExpiresAt,
-  todayKey, dayKey, shortDay, timeOf, milkLabel, gradeLabel, gradeTone, PARAMS, inRange,
+  collectionsOn, myCenter, myFirstDay, expireMyOffers, demoFarmerAnswer, cancelCollection, offerExpiresAt,
+  todayKey, timeOf, milkLabel, gradeLabel, gradeTone, PARAMS, inRange,
 } from '../../lib/center'
 import Receipt from '../../components/Receipt'
-import Sheet from '../../components/Sheet'
+import DayPicker from '../../components/DayPicker'
 import { rs, litres } from '../../lib/format'
 import PageHeader from '../../components/PageHeader'
 import Segmented from '../../components/Segmented'
@@ -18,19 +18,17 @@ import Alert from '../../components/Alert'
 import Icon from '../../components/Icon'
 import { SkeletonRows } from '../../components/Skeleton'
 
-const days = () => [0, 1, 2].map((n) => dayKey(Date.now() - n * 864e5))
-
 export default function Collection() {
   const [day, setDay] = useState(todayKey())
   const [shift, setShift] = useState('all')
   const { profile } = useAuth()
   // unanswered offers older than 2 hours are closed first, so the list is never stale
   const { data: center } = useLoad(() => myCenter(profile.id), [profile.id])
+  const { data: firstDay } = useLoad(() => myFirstDay().catch(() => null))
   const { data, error, loading, reload } = useLoad(async () => { await expireMyOffers().catch(() => {}); return collectionsOn(day) }, [day])
   const { toast, confirm } = useUi()
   const [busy, setBusy] = useState(null)
   const [receipt, setReceipt] = useState(null)
-  const [fixing, setFixing] = useState(null)
 
   const rows = (data ?? []).filter((c) => shift === 'all' || c.shift === shift)
   const accepted = rows.filter((c) => c.status === 'accepted')
@@ -55,7 +53,7 @@ export default function Collection() {
     run(c, () => cancelCollection(c.id, reason), () => 'Cancelled. The reason is saved in the history.')
   }
   const canChange = (c) => c.status !== 'rejected' && !c.payout_id && c.payment !== 'paid' && Date.now() - new Date(c.collected_at) < 24 * 36e5
-  const props = { busy, demo: center?.is_demo, onDemo: demoAnswer, onCancel: cancel, onFix: setFixing, onReceipt: setReceipt, canChange }
+  const props = { busy, demo: center?.is_demo, onDemo: demoAnswer, onCancel: cancel, onReceipt: setReceipt, canChange }
 
   return (
     <>
@@ -71,7 +69,7 @@ export default function Collection() {
       </div>
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <Segmented value={day} onChange={setDay} options={days().map((d, i) => ({ value: d, label: i === 0 ? 'Today' : i === 1 ? 'Yesterday' : shortDay(d) }))} />
+        <DayPicker value={day} onChange={setDay} min={firstDay ?? undefined} />
         <Segmented size="sm" value={shift} onChange={setShift} options={[{ value: 'all', label: 'Both shifts' }, { value: 'morning', label: 'Morning' }, { value: 'evening', label: 'Evening' }]} />
       </div>
       <Alert>{error}</Alert>
@@ -90,10 +88,10 @@ export default function Collection() {
                 <tr key={c.id}>
                   <td className="num text-muted">{timeOf(c.collected_at)}<p className="text-[12px] capitalize">{c.shift}</p></td>
                   <td><Link to={`/manager/farmers/${c.farmer?.id}`} className="font-semibold hover:text-forest">{c.farmer?.full_name}</Link><p className="text-[12.5px] text-muted">{milkLabel[c.milk_type]} · {c.farmer?.village}</p></td>
-                  <td className="num text-right font-semibold">{litres(c.quantity_l)}</td>
+                  <td className="num whitespace-nowrap text-right font-semibold">{litres(c.quantity_l)}</td>
                   <td><Readings c={c} />{c.test_source === 'manual' && <Manual c={c} />}</td>
                   <td>{c.quality ? <Badge tone={gradeTone[c.quality]} dot={false}>{gradeLabel[c.quality]}</Badge> : <Badge tone="red" dot={false}>Failed</Badge>}</td>
-                  <td className="num text-right">{c.price_per_l ? <>{rs(c.price_per_l)}<p className="text-[12.5px] text-muted">{rs(Math.round(c.total_amount))}</p></> : <span className="text-muted">—</span>}</td>
+                  <td className="num whitespace-nowrap text-right">{c.price_per_l ? <>{rs(c.price_per_l)}<p className="text-[12.5px] text-muted">{rs(Math.round(c.total_amount))}</p></> : <span className="text-muted">—</span>}</td>
                   <td><Status c={c} {...props} /></td>
                 </tr>
               ))}
@@ -129,7 +127,6 @@ export default function Collection() {
         </p>
       )}
       <Receipt kind="collection" data={receipt} center={center} onClose={() => setReceipt(null)} />
-      <CorrectSheet key={fixing?.id ?? 'none'} c={fixing} onClose={() => setFixing(null)} onSaved={reload} />
     </>
   )
 }
@@ -139,33 +136,6 @@ function Manual({ c }) {
     <p className="mt-1 inline-flex items-center gap-1 rounded-md bg-haldi-soft px-1.5 py-0.5 text-[11.5px] font-semibold text-amber" title={c.manual_reason ?? 'Readings typed by hand'}>
       <Icon name="edit" size={11} />Typed by hand{c.manual_reason ? `: ${c.manual_reason}` : ''}
     </p>
-  )
-}
-
-// litres typed wrong: correct them with a reason; the farmer accepts the corrected offer again
-function CorrectSheet({ c, onClose, onSaved }) {
-  const { toast } = useUi()
-  const [qty, setQty] = useState(c ? String(Number(c.quantity_l)) : '')
-  const [reason, setReason] = useState('')
-  const [busy, setBusy] = useState(false)
-  const save = async () => {
-    if (!reason.trim()) return toast('Give a reason for the correction.', 'error')
-    setBusy(true)
-    try { await correctCollection(c.id, qty, reason); toast('Corrected. The farmer gets the new offer to accept in the app.'); onSaved(); onClose() } catch (e) { toast(e.message, 'error') }
-    setBusy(false)
-  }
-  return (
-    <Sheet open={!!c} onClose={onClose} title="Correct the litres" subtitle={c ? `${c.farmer?.full_name}, recorded at ${timeOf(c.collected_at)}` : ''}
-      footer={<><button className="btn-secondary" onClick={onClose}>Cancel</button><button className="btn-primary" onClick={save} disabled={busy}>{busy ? 'Saving…' : 'Save correction'}</button></>}>
-      {c && (
-        <div className="grid gap-4">
-          <div className="field"><label htmlFor="cq">Correct litres</label>
-            <div className="flex items-center gap-2"><input id="cq" className="input num w-32" type="number" min="0.5" step="0.5" value={qty} onChange={(e) => setQty(e.target.value)} /><span className="text-muted">was {litres(c.quantity_l)}</span></div></div>
-          <div className="field"><label htmlFor="cr">Reason</label><input id="cr" className="input" placeholder="e.g. typed 21 instead of 12" value={reason} onChange={(e) => setReason(e.target.value)} /></div>
-          <p className="rounded-2xl bg-cream px-4 py-3 text-[13px] text-muted">The test result and price stay the same. The change and your reason are saved in the history, and the farmer must accept the corrected offer in the app.</p>
-        </div>
-      )}
-    </Sheet>
   )
 }
 
@@ -199,7 +169,7 @@ function Readings({ c }) {
   )
 }
 
-function Status({ c, busy, demo, onDemo, onCancel, onFix, onReceipt, canChange }) {
+function Status({ c, busy, demo, onDemo, onCancel, onReceipt, canChange }) {
   const off = busy === c.id ? 'pointer-events-none opacity-50' : ''
   if (c.status === 'offered') {
     const mins = Math.max(0, Math.round((offerExpiresAt(c) - Date.now()) / 6e4))
@@ -210,7 +180,6 @@ function Status({ c, busy, demo, onDemo, onCancel, onFix, onReceipt, canChange }
         <div className="mt-2 flex flex-wrap gap-1.5">
           {demo && <button className="btn-primary btn-sm" onClick={() => onDemo(c, true)}>Accepts (demo)</button>}
           {demo && <button className="btn-secondary btn-sm" onClick={() => onDemo(c, false)}>Refuses (demo)</button>}
-          <button className="btn-ghost btn-sm" onClick={() => onFix(c)}>Correct</button>
           <button className="btn-ghost btn-sm text-danger" onClick={() => onCancel(c)}>Cancel</button>
         </div>
       </div>
@@ -223,7 +192,6 @@ function Status({ c, busy, demo, onDemo, onCancel, onFix, onReceipt, canChange }
       <p className="mt-1 text-[12px] text-muted">{c.payment === 'paid' ? 'Farmer paid' : c.payout_id ? 'Payment sent, waiting for farmer' : 'Not paid yet'}</p>
       <div className="mt-1.5 flex flex-wrap gap-1.5">
         {c.receipt_no && <button className="text-[12.5px] font-semibold text-forest hover:underline" onClick={() => onReceipt(c)}>Receipt {c.receipt_no}</button>}
-        {canChange(c) && <button className="text-[12.5px] font-semibold text-muted hover:text-ink" onClick={() => onFix(c)}>Correct</button>}
         {canChange(c) && <button className="text-[12.5px] font-semibold text-danger hover:underline" onClick={() => onCancel(c)}>Cancel</button>}
       </div>
     </div>

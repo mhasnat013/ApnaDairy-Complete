@@ -1,10 +1,9 @@
 import { useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
 import { useLoad } from '../../lib/useLoad'
 import { useAuth } from '../../context/AuthContext'
 import { useUi } from '../../context/UiContext'
 import {
-  activeOrders, pastOrders, products, myMilkShelf, myCenter, recordSale, updateShopOrder,
+  activeOrders, pastOrders, myCenter, myFirstDay, updateShopOrder, todayKey,
   orderStatusLabel, orderTone, nextOrderStep, timeOf,
 } from '../../lib/center'
 import { rs, date, relative } from '../../lib/format'
@@ -13,7 +12,7 @@ import Segmented from '../../components/Segmented'
 import Badge from '../../components/Badge'
 import Alert from '../../components/Alert'
 import Icon from '../../components/Icon'
-import Sheet from '../../components/Sheet'
+import DayPicker from '../../components/DayPicker'
 import EmptyState from '../../components/EmptyState'
 import { SkeletonRows } from '../../components/Skeleton'
 import DeliverySheet from '../../components/DeliverySheet'
@@ -22,28 +21,25 @@ const COLUMNS = ['pending', 'preparing', 'out_for_delivery']
 const qtyText = (i) => `${Number(i.quantity)} ${i.unit === 'litre' ? 'L' : i.unit === 'kg' || Number(i.quantity) === 1 ? i.unit : `${i.unit}s`}`
 
 export default function ShopOrders() {
-  const [params, setParams] = useSearchParams()
   const [tab, setTab] = useState('active')
+  const [day, setDay] = useState(todayKey)
   const active = useLoad(activeOrders)
-  const past = useLoad(() => (tab === 'active' ? Promise.resolve(null) : pastOrders(tab)), [tab])
-  const [selling, setSelling] = useState(params.get('sale') === '1')
-  const closeSale = () => { setSelling(false); if (params.get('sale')) setParams({}) }
+  const first = useLoad(myFirstDay)
+  const past = useLoad(() => (tab === 'active' ? Promise.resolve(null) : pastOrders(tab, day)), [tab, day])
 
   return (
     <>
-      <PageHeader title="Shop orders" description="Orders from the customer app and sales at your counter. Move each app order along until it is delivered.">
-        <button className="btn-primary" onClick={() => setSelling(true)}><Icon name="cart" size={17} />New sale</button>
-      </PageHeader>
-      <div className="mb-5">
+      <PageHeader title="Shop orders" description="Customers order through the ApnaDairy app. Move each order along until the customer gives you their delivery code." />
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <Segmented value={tab} onChange={setTab} options={[
           { value: 'active', label: 'Open', count: active.data?.length },
           { value: 'delivered', label: 'Delivered' },
           { value: 'cancelled', label: 'Cancelled' },
         ]} />
+        {tab !== 'active' && <DayPicker value={day} onChange={setDay} min={first.data ?? undefined} />}
       </div>
       <Alert>{active.error || past.error}</Alert>
-      {tab === 'active' ? <Board data={active.data} loading={active.loading} reload={active.reload} /> : <History rows={past.data} loading={past.loading} />}
-      <SaleForm key={selling ? 'open' : 'closed'} open={selling} onClose={closeSale} onSaved={() => { active.reload(); if (tab !== 'active') past.reload() }} />
+      {tab === 'active' ? <Board data={active.data} loading={active.loading} reload={active.reload} /> : <History rows={past.data} loading={past.loading} status={tab} />}
     </>
   )
 }
@@ -60,7 +56,7 @@ function Board({ data, loading, reload }) {
       if (!ok) return
     }
     // app orders are delivered with the customer's code
-    if (status === 'delivered' && o.channel === 'app') return setDelivering(o)
+    if (status === 'delivered') return setDelivering(o)
     setBusy(o.id)
     try { await updateShopOrder(o.id, status); toast(status === 'cancelled' ? 'Order cancelled.' : `${o.customer_name}: ${orderStatusLabel[status].toLowerCase()}.`); await reload() } catch (e) { toast(e.message, 'error') }
     setBusy(null)
@@ -112,90 +108,36 @@ function Board({ data, loading, reload }) {
   )
 }
 
-function History({ rows, loading }) {
+function History({ rows, loading, status }) {
+  const litres = (rows ?? []).reduce((n, o) => n + o.items.filter((i) => i.unit === 'litre').reduce((m, i) => m + Number(i.quantity), 0), 0)
+  const total = (rows ?? []).reduce((n, o) => n + Number(o.total_amount), 0)
   return (
+    <>
+    {!loading && rows?.length > 0 && (
+      <div className="mb-4 grid grid-cols-3 gap-3">
+        {[[status === 'delivered' ? 'Orders delivered' : 'Orders cancelled', rows.length], ['Milk', `${+litres.toFixed(1)} L`], [status === 'delivered' ? 'Sales' : 'Value', rs(Math.round(total))]].map(([k, v]) => (
+          <div key={k} className="rounded-[18px] border border-line bg-surface px-4 py-3"><p className="text-[12.5px] text-muted">{k}</p><p className="display num mt-0.5 text-[20px] text-forest-deep sm:text-[22px]">{v}</p></div>
+        ))}
+      </div>
+    )}
     <div className="panel overflow-x-auto">
       <table className="table min-w-[680px]">
         <thead><tr><th>Customer</th><th>Items</th><th className="text-right">Total</th><th>When</th><th>Status</th></tr></thead>
         <tbody>
           {loading && <SkeletonRows cols={5} />}
-          {!loading && rows?.length === 0 && <tr><td colSpan={5}><EmptyState title="Nothing here yet" /></td></tr>}
+          {!loading && rows?.length === 0 && <tr><td colSpan={5}><EmptyState title={status === 'delivered' ? 'No orders delivered on this day' : 'No orders cancelled on this day'}>Pick another day with the arrows or the calendar.</EmptyState></td></tr>}
           {!loading && rows?.map((o) => (
             <tr key={o.id}>
-              <td><p className="font-semibold">{o.customer_name}</p><p className="text-[12.5px] text-muted">{o.channel === 'app' ? 'App order' : 'Counter sale'}</p></td>
+              <td><p className="font-semibold">{o.customer_name}</p><p className="max-w-[220px] truncate text-[12.5px] text-muted">{o.delivery_address ?? 'App order'}</p></td>
               <td className="max-w-[300px] truncate text-[13.5px] text-muted">{o.items.map((i) => `${qtyText(i)} ${i.name.toLowerCase()}`).join(', ')}</td>
               <td className="num text-right font-semibold">{rs(o.total_amount)}</td>
-              <td className="num">{date(o.created_at)}<p className="text-[12.5px] text-muted">{timeOf(o.created_at)}</p></td>
+              <td className="num">{date(status === 'delivered' ? o.delivered_at ?? o.created_at : o.created_at)}<p className="text-[12.5px] text-muted">{timeOf(status === 'delivered' ? o.delivered_at ?? o.created_at : o.created_at)}</p></td>
               <td><Badge tone={orderTone[o.status]}>{orderStatusLabel[o.status]}</Badge></td>
             </tr>
           ))}
         </tbody>
       </table>
     </div>
-  )
-}
-
-// counter sale: tap products, adjust quantities, record. stock is checked by the database.
-function SaleForm({ open, onClose, onSaved }) {
-  const { toast } = useUi()
-  // every milk listing can be sold at the counter, even one hidden from the app; only fresh milk counts
-  const { data } = useLoad(async () => (open ? Promise.all([products(), myMilkShelf()]) : null), [open])
-  const [cart, setCart] = useState({})
-  const [name, setName] = useState('')
-  const [busy, setBusy] = useState(false)
-  const [err, setErr] = useState('')
-  const [prods, stock] = data ?? [[], []]
-  const avail = prods.filter((p) => p.category === 'milk')
-  const left = (p) => Math.max(0, Number(stock.find((s) => s.milk_type === p.milk_type)?.sellable_l ?? 0))
-  const price = (p) => p.price * (100 - p.discount_pct) / 100
-  const step = () => 0.5
-  const change = (p, d) => setCart((c) => {
-    const v = Math.max(0, Math.min(left(p), +((c[p.id] || 0) + d * step(p)).toFixed(2)))
-    return { ...c, [p.id]: v }
-  })
-  const lines = avail.filter((p) => cart[p.id] > 0)
-  const total = lines.reduce((n, p) => n + cart[p.id] * price(p), 0)
-
-  const submit = async () => {
-    setBusy(true); setErr('')
-    try {
-      await recordSale(lines.map((p) => ({ product_id: p.id, quantity: cart[p.id] })), name)
-      toast(`Sale recorded: ${rs(Math.round(total))}.`); onSaved(); onClose()
-    } catch (e) { setErr(e.message) }
-    setBusy(false)
-  }
-
-  return (
-    <Sheet open={open} onClose={onClose} wide title="New counter sale" subtitle="Tap + for each item the customer takes."
-      footer={(
-        <div className="flex w-full items-center justify-between gap-3">
-          <div><p className="text-[12.5px] text-muted">Total</p><p className="display num text-[24px]">{rs(Math.round(total))}</p></div>
-          <button className="btn-primary" onClick={submit} disabled={busy || lines.length === 0}>{busy ? 'Saving…' : 'Record sale'}</button>
-        </div>
-      )}>
-      <Alert>{err}</Alert>
-      <div className="field mb-4"><label htmlFor="cn">Customer name (optional)</label><input id="cn" className="input" placeholder="Walk-in customer" value={name} onChange={(e) => setName(e.target.value)} /></div>
-      {!data && <div className="grid gap-2">{[1, 2, 3, 4].map((i) => <div key={i} className="skeleton h-16" />)}</div>}
-      {data && avail.length === 0 && <EmptyState title="No milk to sell yet">Add a milk listing on the My shop page first.</EmptyState>}
-      <ul className="grid gap-2">
-        {avail.map((p) => {
-          const q = cart[p.id] || 0
-          const max = left(p)
-          return (
-            <li key={p.id} className={`flex items-center gap-3 rounded-2xl border px-3 py-2.5 transition-colors ${q > 0 ? 'border-forest bg-mint-soft' : 'border-line bg-white'}`}>
-              <div className="min-w-0 flex-1">
-                <p className="truncate font-semibold">{p.name}</p>
-                <p className="text-[12.5px] text-muted">{rs(Math.round(price(p)))} per {p.unit}{p.discount_pct ? ` · ${p.discount_pct}% off` : ''} · {+max.toFixed(1)} L fresh</p>
-              </div>
-              <div className="flex items-center gap-1">
-                <button type="button" className="grid h-9 w-9 place-items-center rounded-full border border-line bg-white disabled:opacity-40" onClick={() => change(p, -1)} disabled={q <= 0} aria-label={`Less ${p.name}`}><Icon name="minus" size={16} /></button>
-                <span className="num w-12 text-center font-bold">{q}</span>
-                <button type="button" className="grid h-9 w-9 place-items-center rounded-full bg-forest text-cream disabled:opacity-40" onClick={() => change(p, 1)} disabled={q + step(p) > max + 1e-9} aria-label={`More ${p.name}`}><Icon name="plus" size={16} /></button>
-              </div>
-            </li>
-          )
-        })}
-      </ul>
-    </Sheet>
+    </>
   )
 }

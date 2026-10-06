@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { requirementForCenter, placeBid, withdrawBid, milkLabel, qualityLabel, qualityHint } from '../../lib/b2b'
 import { useLoad } from '../../lib/useLoad'
-import { myBidCapacity } from '../../lib/center'
+import { bidCapacity, todayKey } from '../../lib/center'
 import { useUi } from '../../context/UiContext'
 import { rs, litres, date, dateTime, relative, cap } from '../../lib/format'
 import PageHeader from '../../components/PageHeader'
@@ -13,6 +13,28 @@ import { MilkChurn } from '../../components/Farm'
 import OffersList from '../../components/OffersList'
 
 const freshPicks = [6, 12, 24, 48]
+
+// fresh stock (if delivery is within 2 days) + about 2 days of collection − milk already promised
+function Capacity({ cap, kind, over, onUse, useLabel }) {
+  const r1 = (n) => Math.round(Number(n) * 10) / 10
+  const none = Number(cap.max_l) < 1
+  const rows = [
+    Number(cap.days) < 2 && ['Fresh in stock now', `${litres(r1(cap.stock_l))}`],
+    Number(cap.coming_l) > 0 && [`Collected by then (about ${litres(Math.round(cap.daily_l))} a day)`, `+ ${litres(r1(cap.coming_l))}`],
+    Number(cap.promised_l) > 0 && ['Already promised around that day', `− ${litres(r1(cap.promised_l))}`],
+  ].filter(Boolean)
+  return (
+    <div className={`-mt-2 rounded-2xl px-4 py-3 text-[13px] ${over || none ? 'bg-[#f8e2dc] text-danger' : 'bg-cream text-muted'}`}>
+      <dl className="grid gap-1">
+        {rows.map(([k, v]) => <div key={k} className="flex justify-between gap-3"><dt>{k}</dt><dd className="num shrink-0">{v}</dd></div>)}
+        <div className={`mt-1 flex justify-between gap-3 border-t pt-1.5 font-semibold ${over || none ? 'border-danger/20' : 'border-line text-ink'}`}><dt>You can offer</dt><dd className="num shrink-0">{litres(cap.max_l)}</dd></div>
+      </dl>
+      {none && <p className="mt-2 text-[12.5px]">{Number(cap.daily_l) > 0 ? `Your ${kind} for that day is already promised. Pick another delivery date.` : `You have no ${kind} to offer yet. Buy and test milk from farmers first.`}</p>}
+      {over && !none && <p className="mt-2 text-[12.5px]">You can’t offer more milk than you will have. <button type="button" className="font-semibold underline" onClick={onUse}>Use {useLabel}</button></p>}
+      {!over && !none && Number(cap.days) >= 2 && <p className="mt-2 text-[12px]">Delivery is 2 or more days away, so only fresh milk from the 2 days before it counts.</p>}
+    </div>
+  )
+}
 
 function BidForm({ req, onSaved }) {
   const { toast, confirm } = useUi()
@@ -25,13 +47,14 @@ function BidForm({ req, onSaved }) {
     max_age: live ? mine.max_age_hours ?? '' : req.quality === 'fresh' ? 12 : '',
     notes: live ? mine.notes ?? '' : '',
   }))
-  const [today] = useState(() => new Date().toISOString().slice(0, 10))
+  const [today] = useState(todayKey)
   const [busy, setBusy] = useState(false)
   const set = (k) => (e) => setF((p) => ({ ...p, [k]: e?.target ? e.target.value : e }))
-  // a center can promise at most 2 days of the milk it collects, the database enforces it
-  const { data: capacity } = useLoad(() => myBidCapacity(req.milk_type), [req.milk_type])
-  const maxBid = capacity ? Math.min(Number(req.quantity_l), Number(capacity.max_bid_l)) : Number(req.quantity_l)
-  const overCap = capacity && Number(f.quantity) > Number(capacity.max_bid_l)
+  // what the center can really supply on the delivery day; the database checks the same numbers
+  const { data: capacity } = useLoad(() => (f.delivery_date >= today ? bidCapacity(req.milk_type, f.delivery_date, req.id) : Promise.resolve(null)), [req.milk_type, f.delivery_date, req.id])
+  const capMax = capacity ? Number(capacity.max_l) : null
+  const maxBid = capacity ? Math.min(Number(req.quantity_l), capMax) : Number(req.quantity_l)
+  const overCap = capacity && Number(f.quantity) > capMax
   const kind = req.milk_type === 'mixed' ? 'milk' : milkLabel[req.milk_type]?.toLowerCase()
 
   const total = Number(f.price || 0) * Number(f.quantity || 0)
@@ -101,14 +124,7 @@ function BidForm({ req, onSaved }) {
           <input id="d" type="date" required className="input num" min={today} value={f.delivery_date} onChange={set('delivery_date')} />
         </div>
       </div>
-      {capacity && (
-        <p className={`-mt-2 rounded-2xl px-4 py-3 text-[12.5px] ${overCap || Number(capacity.max_bid_l) < 1 ? 'bg-[#f8e2dc] text-danger' : 'bg-cream text-muted'}`}>
-          {Number(capacity.max_bid_l) < 1
-            ? `Record a few days of ${kind} collection first. Bids are limited to 2 days of the milk you collect.`
-            : <>You collect about <b className="num">{litres(Math.round(capacity.daily_l))}</b> of {kind} a day, so you can bid up to <b className="num">{litres(capacity.max_bid_l)}</b> (2 days of milk). {litres(Math.round(capacity.fresh_now_l))} fresh in stock now.
-              {overCap && <button type="button" className="ml-1 font-semibold underline" onClick={() => set('quantity')(String(maxBid))}>Use {litres(maxBid)}</button>}</>}
-        </p>
-      )}
+      {capacity && <Capacity cap={capacity} kind={kind} over={overCap} onUse={() => set('quantity')(String(maxBid))} useLabel={litres(maxBid)} />}
 
       <div className="field">
         <span className="label">How fresh on arrival?</span>
@@ -140,7 +156,7 @@ function BidForm({ req, onSaved }) {
         <span className="font-medium text-muted">Order value</span>
         <span className="display num text-[28px] text-forest-deep">{rs(total)}</span>
       </div>
-      <button className="btn-primary h-12 w-full text-[15.5px]" disabled={busy || overCap}>{busy ? 'Sending…' : live ? 'Update my bid' : 'Send bid'}</button>
+      <button className="btn-primary h-12 w-full text-[15.5px]" disabled={busy || overCap || (capacity && capMax < 1)}>{busy ? 'Sending…' : live ? 'Update my bid' : 'Send bid'}</button>
       {live && <button type="button" className="btn-danger w-full" disabled={busy} onClick={withdraw}>Withdraw bid</button>}
     </form>
   )

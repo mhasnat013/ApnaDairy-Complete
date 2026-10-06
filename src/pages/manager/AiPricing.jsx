@@ -22,7 +22,7 @@ export default function AiPricing() {
   const [ai, setAi] = useState(null)
 
   const rates = data?.rates ?? { cow: 170, buffalo: 200, mixed: 185 }
-  const pf = data?.platform ?? { farmer_min_pct: 90, farmer_default_pct: 95, markup_suggest_pct: 20, markup_max_pct: 30, commission_pct: 5 }
+  const pf = data?.platform ?? { farmer_min_pct: 90, farmer_default_pct: 95, markup_suggest_pct: 20, markup_max_pct: 30 }
 
   // live result while the sliders move
   useEffect(() => {
@@ -43,7 +43,6 @@ export default function AiPricing() {
   const farmerGets = Math.round(market * pf.farmer_default_pct / 100)
   const sell = Math.round(farmerGets * (100 + Number(pf.markup_suggest_pct)) / 100)
   const sellMax = Math.floor(farmerGets * (100 + Number(pf.markup_max_pct)) / 100)
-  const fee = Math.round(sell * pf.commission_pct / 100)
 
   return (
     <>
@@ -63,7 +62,7 @@ export default function AiPricing() {
             ['spark', 'Market rate', rs(market), ai ? `AI price for ${gradeLabel[ai.quality]?.toLowerCase() ?? 'this'} milk` : 'ApnaDairy market rate'],
             ['users', 'Farmer gets', rs(farmerGets), `${Number(pf.farmer_default_pct)}% of market, never below ${Number(pf.farmer_min_pct)}%`],
             ['store', 'You sell at', rs(sell), `+${Number(pf.markup_suggest_pct)}% suggested, at most ${rs(sellMax)} (+${Number(pf.markup_max_pct)}%)`],
-            ['wallet', 'ApnaDairy keeps', rs(fee), `${Number(pf.commission_pct)}% of app and bulk orders only`],
+            ['wallet', 'You keep', rs(sell - farmerGets), 'all of it, ApnaDairy takes no cut'],
           ].map(([ic, label, value, note], i) => (
             <li key={label} className="relative rounded-2xl bg-cream px-4 py-4">
               <span className="grid h-9 w-9 place-items-center rounded-full bg-forest text-cream"><Icon name={ic} size={16} /></span>
@@ -74,7 +73,7 @@ export default function AiPricing() {
             </li>
           ))}
         </ol>
-        <p className="mt-3 text-[12.5px] text-muted">Your margin on this litre: {rs(sell - farmerGets)} before costs{' '}·{' '}counter sales pay no commission.</p>
+        <p className="mt-3 text-[12.5px] text-muted">Your margin is before your own costs like the chiller, transport and staff. ApnaDairy only charges the device and the monthly fee.</p>
       </Card>
 
       <div className="mt-4 grid gap-4 sm:mt-5 sm:gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]">

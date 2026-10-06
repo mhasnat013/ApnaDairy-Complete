@@ -1,10 +1,11 @@
 import { useRef, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { useUi } from '../../context/UiContext'
 import { useLoad } from '../../lib/useLoad'
 import {
   myCenter, milkListings, myPublicListings, myPublicShop, shopProfile, saveShopProfile, shopPhotos, uploadShopPhoto, deleteShopPhoto,
-  setCoverPhoto, photoUrl, myReviews, replyReview, createListing, saveListing, milkStock, milkCost, platformSettings, stockLeft, milkLabel,
+  setCoverPhoto, photoUrl, myReviews, replyReview, createListing, saveListing, myMilkShelf, stockGrade, milkCost, platformSettings, milkLabel, gradeLabel,
 } from '../../lib/center'
 import { rs, litres, date, relative } from '../../lib/format'
 import PageHeader from '../../components/PageHeader'
@@ -22,11 +23,11 @@ export default function MyShop() {
   const [tab, setTab] = useState('listings')
   const { data, error, reload } = useLoad(async () => {
     const center = await myCenter(profile.id)
-    const [listings, pub, shop, prof, photos, reviews, stock, cost, platform] = await Promise.all([
+    const [listings, pub, shop, prof, photos, reviews, shelf, cost, platform, ...g] = await Promise.all([
       milkListings(), myPublicListings(center.id), myPublicShop(center.id), shopProfile(), shopPhotos(), myReviews(),
-      milkStock(), milkCost(), platformSettings(),
+      myMilkShelf(), milkCost(), platformSettings(), ...TYPES.map((t) => stockGrade(center.id, t).catch(() => null)),
     ])
-    return { center, listings, pub, shop, prof, photos, reviews, stock, cost, platform }
+    return { center, listings, pub, shop, prof, photos, reviews, shelf, cost, platform, grades: Object.fromEntries(TYPES.map((t, i) => [t, g[i]])) }
   }, [profile.id])
 
   // fair price: what this center paid farmers, plus the suggested and maximum markup
@@ -66,32 +67,85 @@ export default function MyShop() {
 }
 
 // ---------- listings ----------
+// the area manager lists litres of tested milk; every app order takes its litres off the listing.
+// quality comes from the ai grades of the milk in stock, litres per order are set by apnadairy.
 function Listings({ data, guide, reload }) {
+  const [params] = useSearchParams()
+  const focus = params.get('list')
   if (!data) return <div className="grid gap-4">{TYPES.map((t) => <div key={t} className="skeleton h-48 rounded-[20px]" />)}</div>
+  const lim = data.platform ? `${Number(data.platform.order_min_l)} to ${Number(data.platform.order_max_l)} L` : ''
   return (
     <div className="grid gap-4">
       <p className="rounded-2xl bg-mint-soft px-4 py-3 text-[13.5px] text-forest">
-        Milk you buy from farmers goes straight into these listings. Customers see the fresh litres in stock, your price, your city and a freshness score from the AI.
+        List the tested milk you want to sell to homes. Customers see the litres you list, your price and the quality and freshness from the AI. Each order takes its litres off the listing{lim ? `, and a customer can order ${lim} at a time (set by ApnaDairy)` : ''}.
       </p>
       {TYPES.map((t) => {
         const l = data.listings.find((x) => x.milk_type === t)
-        const s = data.stock.find((x) => x.milk_type === t)
+        const fresh = Math.floor(Number(data.shelf.find((x) => x.milk_type === t)?.sellable_l ?? 0) * 2) / 2
         const pub = data.pub.find((x) => x.milk_type === t)
+        const grade = data.grades[t]
         return l
-          ? <ListingCard key={l.id} listing={l} pub={pub} stock={s ? stockLeft(s) : 0} guide={guide(t)} reload={reload} />
-          : <NewListing key={t} type={t} stock={s ? stockLeft(s) : 0} guide={guide(t)} reload={reload} />
+          ? <ListingCard key={l.id} listing={l} pub={pub} fresh={fresh} grade={grade} guide={guide(t)} reload={reload} focus={focus === t} />
+          : <NewListing key={t} type={t} fresh={fresh} grade={grade} guide={guide(t)} reload={reload} focus={focus === t} />
       })}
     </div>
   )
 }
 
-function ListingCard({ listing, pub, stock, guide, reload }) {
+function GradeChip({ grade }) {
+  if (!grade) return <span className="rounded-full bg-cream-2 px-2.5 py-0.5 text-[12px] font-semibold text-muted">No fresh milk</span>
+  return <span className={`rounded-full px-2.5 py-0.5 text-[12px] font-semibold ${grade === 'premium' ? 'bg-haldi-soft text-forest-deep' : 'bg-mint-soft text-forest'}`}>{gradeLabel[grade]} · AI tested</span>
+}
+
+function Stat({ label, value, hint }) {
+  return (
+    <div className="min-w-0 rounded-2xl bg-cream px-3 py-2.5">
+      <p className="truncate text-[12px] text-muted">{label}</p>
+      <p className="num mt-0.5 truncate text-[17px] font-bold text-forest-deep sm:text-[19px]">{value}</p>
+      <p className="truncate text-[11.5px] text-muted">{hint}</p>
+    </div>
+  )
+}
+
+function LitresField({ id, value, onChange, fresh, onAll }) {
+  return (
+    <div className="field">
+      <label htmlFor={id}>Litres on the app</label>
+      <div className="flex flex-wrap items-center gap-2">
+        <input id={id} className={`input num w-28 ${Number(value) > fresh ? 'border-danger' : ''}`} type="number" min="0" step="0.5" max={fresh} value={value} onChange={onChange} />
+        <span className="text-[13px] text-muted">of {litres(fresh)} fresh</span>
+        {fresh > 0 && Number(value) !== fresh && <button type="button" className="text-[13px] font-semibold text-forest underline" onClick={onAll}>List all</button>}
+      </div>
+      {Number(value) > fresh && <span className="hint font-semibold text-danger">You have {litres(fresh)} of fresh milk. List that much or less.</span>}
+    </div>
+  )
+}
+
+function PriceField({ id, value, onChange, guide, onSuggest }) {
+  const over = guide && Number(value) > guide.max
+  return (
+    <div className="field">
+      <label htmlFor={id}>Price per litre</label>
+      <div className="flex items-center gap-2"><span className="text-muted">Rs</span>
+        <input id={id} className={`input num w-full ${over ? 'border-danger' : ''}`} type="number" min="1" value={value} onChange={onChange} /></div>
+      {guide && (
+        <span className={`hint ${over ? 'font-semibold text-danger' : ''}`}>
+          You pay farmers {rs(Math.round(guide.cost))}. Fair price {rs(guide.suggest)} (+{guide.suggestPct}%), at most {rs(guide.max)}.
+          {Number(value) !== guide.suggest && <button type="button" className="ml-1 font-semibold text-forest underline" onClick={onSuggest}>Use {rs(guide.suggest)}</button>}
+        </span>
+      )}
+    </div>
+  )
+}
+
+function ListingCard({ listing, pub, fresh, grade, guide, reload, focus }) {
   const { toast } = useUi()
-  const [l, setL] = useState(listing)
+  // a listing without a litre count (older sample data) shows all its fresh milk
+  const start = { ...listing, listed_l: String(listing.listed_l == null ? Number(pub?.available_l ?? Math.floor(fresh)) : Number(listing.listed_l)) }
+  const [l, setL] = useState(start)
   const [busy, setBusy] = useState(false)
-  const set = (k) => (e) => setL({ ...l, [k]: e.target.type === 'checkbox' ? e.target.checked : e.target.value })
-  const dirty = ['price', 'discount_pct', 'is_available', 'min_order_l', 'delivers', 'description'].some((k) => String(l[k] ?? '') !== String(listing[k] ?? ''))
-  const over = guide && Number(l.price) > guide.max
+  const set = (k) => (e) => setL({ ...l, [k]: e.target.value })
+  const dirty = ['price', 'discount_pct', 'listed_l', 'description'].some((k) => String(l[k] ?? '') !== String(start[k] ?? ''))
   const save = async (patch) => {
     const next = { ...l, ...patch }
     if (guide && Number(next.price) > guide.max) return toast(`The most you can charge is ${rs(guide.max)} a litre (${guide.maxPct}% above what you pay farmers).`, 'error')
@@ -99,12 +153,13 @@ function ListingCard({ listing, pub, stock, guide, reload }) {
     try { await saveListing(next); toast(patch?.is_available === false ? `${listing.name} hidden from the app.` : patch?.is_available ? `${listing.name} is on the app.` : 'Listing saved.'); await reload() } catch (e) { toast(e.message, 'error') }
     setBusy(false)
   }
+  const onApp = pub ? Number(pub.available_l) : 0
   return (
-    <section className={`panel animate-rise p-5 sm:p-6 ${listing.is_available ? '' : 'opacity-80'}`}>
+    <section className={`panel animate-rise p-5 sm:p-6 ${listing.is_available ? '' : 'opacity-80'} ${focus ? 'ring-2 ring-haldi' : ''}`}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="display text-[20px] text-forest-deep">{listing.name}</p>
-          <p className="text-[13px] text-muted">{listing.is_available ? 'Customers can order it now' : 'Hidden from customers'}</p>
+          <div className="flex flex-wrap items-center gap-2"><p className="display text-[20px] text-forest-deep">{listing.name}</p><GradeChip grade={grade} /></div>
+          <p className="mt-0.5 text-[13px] text-muted">{!listing.is_available ? 'Hidden from customers' : onApp > 0 ? 'Customers can order it now' : 'Sold out on the app. Add litres to sell more.'}</p>
         </div>
         <button role="switch" aria-checked={listing.is_available} aria-label="Show on the app" disabled={busy}
           onClick={() => save({ is_available: !listing.is_available })}
@@ -114,79 +169,71 @@ function ListingCard({ listing, pub, stock, guide, reload }) {
       </div>
 
       <div className="mt-4 grid grid-cols-3 gap-2">
-        <Stat label={pub ? 'Fresh on the app' : 'In stock'} value={pub ? litres(+Number(pub.available_l).toFixed(1)) : litres(+stock.toFixed(1))} />
+        <Stat label="On the app now" value={litres(onApp)} hint={`${litres(fresh)} fresh in stock`} />
         <Stat label="Freshness" value={pub ? `${pub.freshness_score}/100` : '—'} hint={pub?.hours_left ? `about ${Math.round(pub.hours_left)} h left` : 'no fresh milk'} />
         <Stat label="Price on the app" value={rs(Math.round(l.price * (100 - (Number(l.discount_pct) || 0)) / 100))} hint="per litre" />
       </div>
 
       <div className="mt-5 grid gap-4 sm:grid-cols-2">
-        <div className="field">
-          <label htmlFor={`p-${listing.id}`}>Price per litre</label>
-          <div className="flex items-center gap-2"><span className="text-muted">Rs</span>
-            <input id={`p-${listing.id}`} className={`input num w-full ${over ? 'border-danger' : ''}`} type="number" min="1" value={l.price} onChange={set('price')} /></div>
-          {guide && (
-            <span className={`hint ${over ? 'font-semibold text-danger' : ''}`}>
-              You pay farmers {rs(Math.round(guide.cost))}. Fair price {rs(guide.suggest)} (+{guide.suggestPct}%), at most {rs(guide.max)}.
-              {Number(l.price) !== guide.suggest && <button type="button" className="ml-1 font-semibold text-forest underline" onClick={() => setL({ ...l, price: guide.suggest })}>Use {rs(guide.suggest)}</button>}
-            </span>
-          )}
-        </div>
+        <LitresField id={`q-${listing.id}`} value={l.listed_l} onChange={set('listed_l')} fresh={fresh} onAll={() => setL({ ...l, listed_l: String(fresh) })} />
+        <PriceField id={`p-${listing.id}`} value={l.price} onChange={set('price')} guide={guide} onSuggest={() => setL({ ...l, price: guide.suggest })} />
         <div className="field">
           <label htmlFor={`d-${listing.id}`}>Discount %</label>
           <input id={`d-${listing.id}`} className="input num w-28" type="number" min="0" max="90" value={l.discount_pct} onChange={set('discount_pct')} />
           <span className="hint">Shown as a deal in the app</span>
         </div>
         <div className="field">
-          <span className="label">Litres on the app</span>
-          <p className="rounded-2xl bg-cream px-4 py-3 text-[13px] text-muted">All your fresh stock. Every app order, counter sale and bulk dispatch takes its litres out straight away, and milk past its shelf life is never shown.</p>
-        </div>
-        <div className="field">
-          <label htmlFor={`m-${listing.id}`}>Smallest order</label>
-          <div className="flex items-center gap-2"><input id={`m-${listing.id}`} className="input num w-24" type="number" min="0.5" step="0.5" value={l.min_order_l} onChange={set('min_order_l')} /><span className="text-[13px] text-muted">litres</span></div>
-          <label className="mt-2 flex items-center gap-2 text-[14px]"><input type="checkbox" className="h-4 w-4 accent-[#1f4d36]" checked={!!l.delivers} onChange={set('delivers')} />Home delivery</label>
-        </div>
-        <div className="field sm:col-span-2">
           <label htmlFor={`x-${listing.id}`}>Short description</label>
           <input id={`x-${listing.id}`} className="input" maxLength={140} placeholder="e.g. Thick buffalo milk, collected this morning" value={l.description ?? ''} onChange={set('description')} />
         </div>
       </div>
       {dirty && (
         <div className="mt-4 flex justify-end gap-2">
-          <button className="btn-ghost" onClick={() => setL(listing)}>Undo</button>
-          <button className="btn-primary" onClick={() => save()} disabled={busy}>{busy ? 'Saving…' : 'Save listing'}</button>
+          <button className="btn-ghost" onClick={() => setL(start)}>Undo</button>
+          <button className="btn-primary" onClick={() => save()} disabled={busy || Number(l.listed_l) > fresh}>{busy ? 'Saving…' : 'Save listing'}</button>
         </div>
       )}
     </section>
   )
 }
 
-function NewListing({ type, stock, guide, reload }) {
+function NewListing({ type, fresh, grade, guide, reload, focus }) {
   const { toast } = useUi()
+  const [open, setOpen] = useState(focus)
+  const [f, setF] = useState({ litres: String(fresh || ''), price: String(guide?.suggest ?? ({ cow: 205, buffalo: 240, mixed: 210 })[type]), description: '' })
   const [busy, setBusy] = useState(false)
-  const price = guide?.suggest ?? ({ cow: 205, buffalo: 240, mixed: 210 })[type]
+  const set = (k) => (e) => setF({ ...f, [k]: e.target.value })
   const add = async () => {
+    if (!(Number(f.litres) > 0)) return toast('Say how many litres to list.', 'error')
+    if (guide && Number(f.price) > guide.max) return toast(`The most you can charge is ${rs(guide.max)} a litre.`, 'error')
     setBusy(true)
-    try { await createListing(type, price); toast(`${milkLabel[type]} milk is now on the app at ${rs(price)} a litre.`); await reload() } catch (e) { toast(e.message, 'error') }
+    try { await createListing(type, f.price, f.litres, f.description); toast(`${litres(Number(f.litres))} of ${milkLabel[type].toLowerCase()} milk is on the app.`); await reload() } catch (e) { toast(e.message, 'error') }
     setBusy(false)
   }
   return (
-    <section className="flex flex-wrap items-center justify-between gap-4 rounded-[20px] border border-dashed border-line bg-surface/60 p-5">
-      <div>
-        <p className="font-semibold">{milkLabel[type]} milk is not on the app</p>
-        <p className="text-[13px] text-muted">{stock > 0 ? `${Math.round(stock)} L in stock right now` : 'No stock yet. Listings fill up as you buy milk.'}</p>
+    <section className={`rounded-[20px] border border-dashed border-line bg-surface/60 p-5 ${focus ? 'ring-2 ring-haldi' : ''}`}>
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <div className="flex flex-wrap items-center gap-2"><p className="font-semibold">{milkLabel[type]} milk is not on the app</p>{fresh > 0 && <GradeChip grade={grade} />}</div>
+          <p className="text-[13px] text-muted">{fresh > 0 ? `${litres(fresh)} of fresh, tested milk in stock` : 'No fresh milk in stock. Buy and test milk first.'}</p>
+        </div>
+        {!open && <button className="btn-secondary" onClick={() => setOpen(true)} disabled={fresh <= 0}><Icon name="plus" size={16} />List on the app</button>}
       </div>
-      <button className="btn-secondary" onClick={add} disabled={busy}><Icon name="plus" size={16} />List at {rs(price)} a litre</button>
+      {open && fresh > 0 && (
+        <div className="mt-4 grid gap-4 border-t border-line pt-4 sm:grid-cols-2">
+          <LitresField id={`nq-${type}`} value={f.litres} onChange={set('litres')} fresh={fresh} onAll={() => setF({ ...f, litres: String(fresh) })} />
+          <PriceField id={`np-${type}`} value={f.price} onChange={set('price')} guide={guide} onSuggest={() => setF({ ...f, price: String(guide.suggest) })} />
+          <div className="field sm:col-span-2">
+            <label htmlFor={`nx-${type}`}>Short description (optional)</label>
+            <input id={`nx-${type}`} className="input" maxLength={140} placeholder="e.g. Thick buffalo milk, collected this morning" value={f.description} onChange={set('description')} />
+          </div>
+          <div className="flex justify-end gap-2 sm:col-span-2">
+            <button className="btn-ghost" onClick={() => setOpen(false)}>Cancel</button>
+            <button className="btn-primary" onClick={add} disabled={busy || Number(f.litres) > fresh}>{busy ? 'Listing…' : `List ${litres(Number(f.litres) || 0)} on the app`}</button>
+          </div>
+        </div>
+      )}
     </section>
-  )
-}
-
-function Stat({ label, value, hint }) {
-  return (
-    <div className="rounded-2xl bg-cream px-3 py-2.5">
-      <p className="text-[12px] text-muted">{label}</p>
-      <p className="display num text-[19px] sm:text-[21px]">{value}</p>
-      {hint && <p className="text-[11.5px] text-muted">{hint}</p>}
-    </div>
   )
 }
 
@@ -374,7 +421,7 @@ function PhonePreview({ data }) {
         </div>
         <div className="px-4 pb-5 pt-4">
           <p className="display text-[20px] leading-tight text-forest-deep">{shop?.center_name ?? data?.center?.center_name ?? 'Your shop'}</p>
-          <p className="mt-0.5 flex items-center gap-1.5 text-[12px] text-muted"><Icon name="store" size={12} />{shop?.city ?? data?.center?.city}{shop?.delivery_radius_km ? ` · delivers ${Number(shop.delivery_radius_km)} km` : ''}</p>
+          <p className="mt-0.5 flex items-center gap-1.5 text-[12px] text-muted"><Icon name="store" size={12} />{shop?.city ?? data?.center?.city}</p>
           <div className="mt-2 flex items-center gap-2 text-[12px]">
             {shop?.rating ? <><Stars value={Number(shop.rating)} size={13} /><b>{Number(shop.rating).toFixed(1)}</b><span className="text-muted">({shop.review_count})</span></> : <span className="text-muted">No reviews yet</span>}
           </div>
@@ -388,7 +435,7 @@ function PhonePreview({ data }) {
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     <p className="truncate text-[13.5px] font-semibold">{l.name}</p>
-                    <p className="text-[11.5px] text-muted">{Number(l.available_l) > 0 ? `${Math.floor(l.available_l)} L available` : 'Sold out for now'}</p>
+                    <p className="text-[11.5px] text-muted">{Number(l.available_l) > 0 ? `${Math.floor(l.available_l)} L available` : 'Sold out for now'}{l.quality ? ` · ${l.quality[0].toUpperCase()}${l.quality.slice(1)}` : ''}</p>
                   </div>
                   <div className="text-right">
                     <p className="num text-[14px] font-bold">{rs(l.price_per_l)}<span className="text-[11px] font-medium text-muted">/L</span></p>

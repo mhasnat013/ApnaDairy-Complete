@@ -104,10 +104,11 @@ export const products = async () => must(await supabase.from('products').select(
 const ORDER_FIELDS = '*, items:shop_order_items(id, name, quantity, unit, unit_price, line_total, category)'
 export const activeOrders = async () =>
   must(await supabase.from('shop_orders').select(ORDER_FIELDS).in('status', ['pending', 'preparing', 'out_for_delivery']).order('created_at'))
-export const pastOrders = async (status, limit = 40) => {
-  let q = supabase.from('shop_orders').select(ORDER_FIELDS).order('created_at', { ascending: false }).limit(limit)
-  q = status === 'all' ? q.in('status', ['delivered', 'cancelled']) : q.eq('status', status)
-  return must(await q)
+// delivered or cancelled orders of one day (pakistan time): delivered by delivery time, cancelled by order time
+export const pastOrders = async (status, day) => {
+  const from = new Date(`${day}T00:00:00+05:00`).toISOString(), to = new Date(new Date(`${day}T00:00:00+05:00`).getTime() + 864e5).toISOString()
+  const col = status === 'delivered' ? 'delivered_at' : 'created_at'
+  return must(await supabase.from('shop_orders').select(ORDER_FIELDS).eq('status', status).gte(col, from).lt(col, to).order(col, { ascending: false }).limit(300))
 }
 
 // ---------- writes ----------
@@ -120,7 +121,6 @@ export const recordCollection = (a) => rpc('record_collection', {
   p_ph: a.reading.ph, p_ec: a.reading.ec_ms, p_tds: a.reading.tds_ppm,
   p_source: a.source, p_price: a.price ?? null, p_manual_reason: a.manualReason || null, p_reading: a.readingId || null,
 })
-export const recordSale = (items, name) => rpc('record_sale', { p_items: items, p_customer_name: name || null })
 // returns null when done, or a message when the customer's delivery code was wrong
 export const updateShopOrder = (id, status, code) => rpc('update_shop_order', { p_id: id, p_status: status, p_code: code ?? null })
 export const seedSample = () => rpc('seed_sample_data_v2')
@@ -148,26 +148,6 @@ export const setProduct = async (id, patch) => must(await supabase.from('product
 export const recordUsage = async (u) => must(await supabase.from('milk_usage').insert({ milk_type: u.milk_type, litres: Number(u.litres), reason: u.reason, note: u.note || null }))
 export const saveSettings = async (centerId, s) =>
   must(await supabase.from('center_settings').upsert({ area_manager_id: centerId, cow_rate: Number(s.cow_rate), buffalo_rate: Number(s.buffalo_rate), mixed_rate: Number(s.mixed_rate), updated_at: new Date().toISOString() }))
-
-// ---------- simulated iot device ----------
-// realistic readings around the normal range, with the occasional problem sample so the ai has something to catch
-export function simulateReading(milkType = 'mixed') {
-  const rnd = (a, b) => a + Math.random() * (b - a)
-  const r = {
-    temperature_c: +rnd(33, 37).toFixed(1),
-    ph: +rnd(6.62, 6.78).toFixed(2),
-    ec_ms: +((milkType === 'buffalo' ? 4.3 : 4.7) + rnd(-0.4, 0.4)).toFixed(2),
-  }
-  const roll = Math.random()
-  if (roll < 0.08) r.ec_ms = +rnd(3.0, 3.4).toFixed(2)          // water added
-  else if (roll < 0.12) r.ph = +rnd(6.3, 6.38).toFixed(2)       // souring
-  else if (roll < 0.15) r.ec_ms = +rnd(6.7, 7.3).toFixed(2)     // salt
-  else if (roll < 0.17) r.ph = +rnd(6.95, 7.03).toFixed(2)      // soda
-  else if (roll < 0.27) r.ph = +rnd(6.47, 6.54).toFixed(2)      // slightly acidic
-  r.tds_ppm = Math.round(r.ec_ms * 640 * rnd(0.98, 1.02))        // the device works out ec = tds / 640
-  r.reading_at = new Date().toISOString()                        // firmware timestamp
-  return r
-}
 
 // ---------- stock: which collections are still on the shelf (first in, first out) ----------
 // the oldest milk is sold first, so what is left in stock is the newest milk
@@ -197,7 +177,7 @@ export const adminInvoices = async () => must(await supabase.from('admin_billing
 export const generateInvoices = (month) => rpc('generate_monthly_invoices', { p_month: month ?? null })
 export const voidInvoice = (id) => rpc('void_invoice', { p_invoice: id })
 export const savePlatformSettings = async (s) => {
-  const keys = ['device_price', 'monthly_fee', 'commission_pct', 'farmer_min_pct', 'farmer_default_pct', 'markup_suggest_pct', 'markup_max_pct', 'payment_days']
+  const keys = ['device_price', 'monthly_fee', 'order_min_l', 'order_max_l', 'farmer_min_pct', 'farmer_default_pct', 'markup_suggest_pct', 'markup_max_pct', 'payment_days']
   const row = Object.fromEntries(keys.map((k) => [k, Number(s[k])]))
   return must(await supabase.from('platform_settings').update({ ...row, updated_at: new Date().toISOString() }).eq('id', true))
 }
@@ -236,14 +216,15 @@ export const setCoverPhoto = async (photos, id) => {
 export const myReviews = async () => must(await supabase.from('shop_reviews').select('*').order('created_at', { ascending: false }).limit(200))
 export const replyReview = (id, reply) => rpc('reply_review', { p_review: id, p_reply: reply })
 export const milkListings = async () => must(await supabase.from('products').select('*').eq('category', 'milk'))
-export const createListing = async (type, price) => must(await supabase.from('products').insert({
-  name: `Fresh ${({ cow: 'cow', buffalo: 'buffalo', mixed: 'mixed' })[type]} milk`, category: 'milk', milk_type: type, unit: 'litre', price, is_available: true,
+export const createListing = async (type, price, litres, description) => must(await supabase.from('products').insert({
+  name: `Fresh ${({ cow: 'cow', buffalo: 'buffalo', mixed: 'mixed' })[type]} milk`, category: 'milk', milk_type: type, unit: 'litre',
+  price: Number(price), listed_l: Number(litres), description: description || null, is_available: true,
 }).select().single())
 export const saveListing = async (l) => must(await supabase.from('products').update({
   price: Number(l.price), discount_pct: Number(l.discount_pct) || 0, is_available: !!l.is_available,
-  listed_l: null,
-  min_order_l: Number(l.min_order_l) || 1, delivers: !!l.delivers, description: l.description || null,
+  listed_l: Number(l.listed_l) || 0, description: l.description || null,
 }).eq('id', l.id))
+export const stockGrade = (centerId, type) => rpc('listing_grade', { p_center: centerId, p_type: type })
 
 // ---------- market rates (set by the super admin per city) ----------
 export const myMarketRates = () => rpc('my_market_rates')
@@ -261,7 +242,6 @@ export const offerExpiresAt = (c) => new Date(c.collected_at).getTime() + OFFER_
 export const expireMyOffers = () => rpc('expire_my_offers')
 export const demoFarmerAnswer = (id, accept) => rpc('demo_farmer_answer', { p_id: id, p_accept: accept })
 export const cancelCollection = (id, reason) => rpc('cancel_collection', { p_id: id, p_reason: reason })
-export const correctCollection = (id, quantity, reason) => rpc('correct_collection', { p_id: id, p_quantity: Number(quantity), p_reason: reason })
 export const collectionAudit = async (ids) => must(await supabase.from('collection_audit').select('*').in('collection_id', ids).order('created_at'))
 export const sendPayout = (farmerId, method, reference) => rpc('send_payout', { p_farmer: farmerId, p_method: method, p_reference: reference || null })
 export const demoAnswerPayout = (id, confirm) => rpc('demo_farmer_answer_payout', { p_id: id, p_confirm: confirm })
@@ -278,7 +258,6 @@ export const adminUsageAudit = async () => must(await supabase.from('usage_audit
 export const auditLabel = { cancelled: 'Cancelled', corrected: 'Corrected', expired: 'Offer expired', usage_undone: 'Stock entry undone' }
 // ---------- stock and orders: fresh stock, delivery codes, bid limits ----------
 export const myMilkShelf = () => rpc('my_milk_shelf')
-export const myBidCapacity = (type) => rpc('my_bid_capacity', { p_type: type }).then((r) => (Array.isArray(r) ? r[0] : r))
 export const demoDeliveryCode = (kind, id) => rpc('demo_delivery_code', { p_kind: kind, p_order: id })
 // ---------- the real iot device (esp32 → firebase → edge function → device_readings) ----------
 export const myDevice = async () => must(await supabase.from('iot_devices').select('*').maybeSingle())
@@ -297,5 +276,18 @@ async function iot(body) {
 export const startDeviceTest = () => iot({ action: 'start' })
 export const takeDeviceSample = (session) => iot({ action: 'sample', session }).then((d) => d.sample)
 export const finishDeviceTest = (session) => iot({ action: 'finish', session }).then((d) => d.reading)
+// ---------- any date, listings, bulk capacity, admin ----------
+export const myFirstDay = () => rpc('my_first_day')
+export const dayBook = (day) => rpc('center_day_book', { p_day: day })
+export const farmerUsual = (farmerId) => rpc('farmer_usual_litres', { p_farmer: farmerId })
+export const bidCapacity = (type, date, requirementId) => rpc('my_bid_capacity', { p_type: type, p_delivery: date, p_requirement: requirementId ?? null })
+export const adminAnalytics = (days = 30) => rpc('admin_analytics', { p_days: days })
+export const deviceActivity = () => rpc('device_activity')
+export const allDevices = async () => must(await supabase.from('iot_devices').select('*, center:area_managers(id, center_name, city)').order('serial'))
+export const saveDevice = async (d) => must(await supabase.from('iot_devices').upsert({
+  serial: d.serial.trim().toUpperCase(), db_url: d.db_url.trim().replace(/\/$/, ''), path: d.path.trim() || 'Result', label: d.label?.trim() || null, is_active: d.is_active ?? true,
+}).select().single())
+export const assignDevice = (serial, centerId) => rpc('assign_device', { p_serial: serial, p_center: centerId })
+export const activeCenters = async () => must(await supabase.from('area_managers').select('id, center_name, city').eq('type', 'milk_center').eq('verification_status', 'active').order('center_name'))
 export const payoutStatusLabel = { sent: 'Waiting for farmer', confirmed: 'Confirmed', disputed: 'Disputed by farmer' }
 export const payoutTone = { sent: 'amber', confirmed: 'green', disputed: 'red' }
