@@ -249,7 +249,6 @@ export const recordFarmerAnswer = (id, accept) => rpc('record_farmer_answer', { 
 export const cancelCollection = (id, reason) => rpc('cancel_collection', { p_id: id, p_reason: reason })
 export const collectionAudit = async (ids) => must(await supabase.from('collection_audit').select('*').in('collection_id', ids).order('created_at'))
 export const sendPayout = (farmerId, method, reference) => rpc('send_payout', { p_farmer: farmerId, p_method: method, p_reference: reference || null })
-export const confirmFarmerLink = (farmerId, accept) => rpc('confirm_farmer_link', { p_farmer: farmerId, p_accept: accept })
 export const demoAnswerPayout = (id, confirm) => rpc('demo_farmer_answer_payout', { p_id: id, p_confirm: confirm })
 export const farmerPayouts = async (farmerId) => must(await supabase.from('farmer_payouts').select('*').eq('farmer_id', farmerId).order('created_at', { ascending: false }).limit(50))
 export const collectionById = async (id) => must(await supabase.from('milk_collections').select('*, farmer:farmers(id, full_name, village)').eq('id', id).single())

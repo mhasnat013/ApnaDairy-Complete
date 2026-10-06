@@ -5,11 +5,12 @@
 alter table public.bulk_orders drop constraint if exists bulk_orders_requirement_id_key;
 alter table public.bulk_orders add column if not exists cancelled_by text check (cancelled_by in ('center', 'business'));
 
--- ---------- 2. farmer app accounts link only after the center confirms ----------
--- before: anyone could sign up as a farmer with a farmer's phone number and take over their records
-alter table public.farmers add column if not exists link_request uuid references public.profiles(id) on delete set null;
+-- ---------- 2. farmer app accounts: linked by phone, as before ----------
+-- the area manager adds farmers; a farmer who signs up in the app with the same phone is linked automatically.
+-- only that automatic link can set profile_id, so a center cannot link a farmer record to its own account.
+alter table public.farmers drop column if exists link_request;
+drop function if exists public.confirm_farmer_link(uuid, boolean);
 
--- new farmer rows are never linked automatically
 create or replace function public.link_farmer_profile()
 returns trigger
 language plpgsql security definer set search_path = public
@@ -17,13 +18,13 @@ as $$
 begin
   if tg_op = 'INSERT' then
     new.profile_id := null;
-    new.link_request := null;
-  elsif new.profile_id is distinct from old.profile_id or new.link_request is distinct from old.link_request then
-    -- only the two functions below may change these
-    if coalesce(current_setting('apnadairy.farmer_link', true), '') <> 'on' then
-      new.profile_id := old.profile_id;
-      new.link_request := old.link_request;
-    end if;
+  elsif new.profile_id is distinct from old.profile_id and coalesce(current_setting('apnadairy.farmer_link', true), '') <> 'on' then
+    new.profile_id := old.profile_id;
+  end if;
+  -- link to the farmer app account with the same phone
+  if new.profile_id is null and coalesce(new.phone, '') <> '' then
+    select id into new.profile_id from profiles
+     where role = 'farmer' and public.norm_phone(phone) = public.norm_phone(new.phone) limit 1;
   end if;
   return new;
 end;
@@ -32,7 +33,6 @@ drop trigger if exists farmers_link_profile on public.farmers;
 create trigger farmers_link_profile before insert or update on public.farmers
   for each row execute function public.link_farmer_profile();
 
--- the farmer app asks to link; the center sees the request on the farmer's page
 create or replace function public.link_my_farmer_records()
 returns integer
 language plpgsql security definer set search_path = public
@@ -42,27 +42,11 @@ begin
   select phone into v_phone from profiles where id = auth.uid() and role = 'farmer';
   if coalesce(v_phone, '') = '' then raise exception 'add your phone number to your profile first'; end if;
   perform set_config('apnadairy.farmer_link', 'on', true);
-  update farmers set link_request = auth.uid()
+  update farmers set profile_id = auth.uid()
    where profile_id is null and public.norm_phone(phone) = public.norm_phone(v_phone);
   get diagnostics v_n = row_count;
   perform set_config('apnadairy.farmer_link', 'off', true);
-  return v_n;   -- number of centers asked; each center confirms it is really this farmer
-end;
-$$;
-
-create or replace function public.confirm_farmer_link(p_farmer uuid, p_accept boolean)
-returns void
-language plpgsql security definer set search_path = public
-as $$
-declare v public.farmers;
-begin
-  select * into v from farmers where id = p_farmer and area_manager_id = public.my_milk_center_id();
-  if v.id is null then raise exception 'farmer not found'; end if;
-  if v.link_request is null then raise exception 'there is no request to link an app account'; end if;
-  if exists (select 1 from profiles where id = v.link_request and role <> 'farmer') then raise exception 'only a farmer account can be linked'; end if;
-  perform set_config('apnadairy.farmer_link', 'on', true);
-  update farmers set profile_id = case when p_accept then link_request else profile_id end, link_request = null where id = p_farmer;
-  perform set_config('apnadairy.farmer_link', 'off', true);
+  return v_n;
 end;
 $$;
 
@@ -294,7 +278,7 @@ revoke execute on function public.has_required_docs(uuid), public.base_role(uuid
 grant execute on function public.has_required_docs(uuid), public.base_role(uuid) to authenticated;
 
 revoke execute on function public.link_farmer_profile(), public.guard_sample_rows() from public, anon, authenticated;
-revoke execute on function public.confirm_farmer_link(uuid, boolean), public.center_track_record(uuid[]),
+revoke execute on function public.center_track_record(uuid[]),
   public.pay_invoice(uuid, text, text), public.clear_sample_data() from public, anon;
-grant execute on function public.confirm_farmer_link(uuid, boolean), public.center_track_record(uuid[]),
+grant execute on function public.center_track_record(uuid[]),
   public.pay_invoice(uuid, text, text), public.clear_sample_data(), public.link_my_farmer_records() to authenticated;

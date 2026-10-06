@@ -66,7 +66,7 @@ export default function Farmers() {
                   {f.full_name.split(' ').map((w) => w[0]).slice(0, 2).join('')}
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate font-semibold group-hover:text-forest">{f.full_name}{f.link_request && <span className="ml-2 rounded-full bg-haldi-soft px-2 py-0.5 text-[11px] font-semibold text-amber">wants to link app</span>}</p>
+                  <p className="truncate font-semibold group-hover:text-forest">{f.full_name}</p>
                   <p className="truncate text-[13px] text-muted">{milkLabel[f.milk_type]} milk · {f.village ?? 'No village'}{f.is_active ? '' : ' · inactive'}</p>
                 </div>
                 {Number(s.unpaid_amount) > 0 && <span className="num shrink-0 rounded-full bg-haldi-soft px-2.5 py-1 text-[12px] font-semibold text-amber">{rs(Math.round(s.unpaid_amount))}</span>}
