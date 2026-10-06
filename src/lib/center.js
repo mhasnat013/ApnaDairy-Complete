@@ -179,12 +179,10 @@ export const adminInvoices = async () => must(await supabase.from('admin_billing
 export const generateInvoices = (month) => rpc('generate_monthly_invoices', { p_month: month ?? null })
 export const voidInvoice = (id) => rpc('void_invoice', { p_invoice: id })
 export const savePlatformSettings = async (s) => {
-  const keys = ['device_price', 'monthly_fee', 'order_min_l', 'order_max_l', 'farmer_min_pct', 'farmer_default_pct', 'markup_suggest_pct', 'markup_max_pct', 'payment_days']
+  const keys = ['device_price', 'monthly_fee', 'discount_min_sales', 'discount_pct', 'order_min_l', 'order_max_l', 'farmer_min_pct', 'farmer_default_pct', 'markup_suggest_pct', 'markup_max_pct', 'payment_days']
   const row = Object.fromEntries(keys.map((k) => [k, Number(s[k])]))
   return must(await supabase.from('platform_settings').update({ ...row, updated_at: new Date().toISOString() }).eq('id', true))
 }
-export const adminCenterFees = () => rpc('admin_center_fees')
-export const setFeeDiscount = (centerId, pct) => rpc('set_fee_discount', { p_center: centerId, p_pct: pct })
 export const paymentLabel = { jazzcash: 'JazzCash', easypaisa: 'EasyPaisa', bank: 'Bank transfer', cash: 'Cash' }
 export const monthLabel = (d) => (d ? new Date(`${d.slice(0, 10)}T12:00:00`).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }) : '')
 
