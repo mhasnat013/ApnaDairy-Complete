@@ -4,7 +4,6 @@ import { useLoad } from '../lib/useLoad'
 import PublicHeader from '../components/landing/PublicHeader'
 import Hero from '../components/landing/Hero'
 import ModuleDial from '../components/landing/ModuleDial'
-import Problem from '../components/landing/Problem'
 import HowItWorks from '../components/landing/HowItWorks'
 import Journey from '../components/landing/Journey'
 import LiveBoard from '../components/landing/LiveBoard'
@@ -12,7 +11,7 @@ import WhoFor from '../components/landing/WhoFor'
 import CtaBand from '../components/landing/CtaBand'
 import Footer from '../components/landing/Footer'
 
-// the public homepage: hero → marquee → modules → problem → six steps → video
+// the public homepage: hero → marquee → modules → video → six steps
 // → live bulk market → who it's for → call to action
 export default function Home() {
   const { data: requests } = useLoad(async () => {
@@ -37,9 +36,8 @@ export default function Home() {
         
         </div>
         <ModuleDial />
-        <Problem />
-        <HowItWorks />
         <Journey />
+        <HowItWorks />
         <LiveBoard requests={requests} />
         <WhoFor />
         <CtaBand />

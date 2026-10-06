@@ -143,23 +143,25 @@ html { scroll-behavior: smooth; scroll-padding-top: 68px; }
   height: 46px; padding: 0 5px 0 20px; border-radius: 999px;
   color: #fdf8ec; font-size: 14.5px; font-weight: 650; letter-spacing: .01em;
   text-decoration: none; white-space: nowrap;
-  background:
-    radial-gradient(120% 140% at 50% -40%, rgb(255 255 255 / .16), transparent 55%),
-    var(--color-forest-deep);
+  --red: #b8322a;
+  background-color: var(--color-forest-deep);
+  background-image: radial-gradient(120% 140% at 50% -40%, rgb(255 255 255 / .16), transparent 55%);
   box-shadow:
     inset 0 1px 0 rgb(255 255 255 / .14),
     inset 0 0 0 1px rgb(226 169 59 / .28),
     0 1px 2px rgb(23 58 40 / .4),
     0 10px 24px -14px rgb(23 58 40 / .9);
-  transition: transform .35s cubic-bezier(.2,.8,.2,1), box-shadow .35s ease;
+  transition: transform .35s cubic-bezier(.2,.8,.2,1), box-shadow .35s ease, background-color .35s ease;
 }
+/* on hover the button turns red */
 .jb:hover {
   transform: translateY(-2px);
+  background-color: var(--red);
   box-shadow:
     inset 0 1px 0 rgb(255 255 255 / .18),
-    inset 0 0 0 1px rgb(226 169 59 / .5),
-    0 2px 4px rgb(23 58 40 / .35),
-    0 18px 34px -14px rgb(226 169 59 / .65);
+    inset 0 0 0 1px rgb(255 233 176 / .35),
+    0 2px 4px rgb(120 28 22 / .35),
+    0 18px 34px -14px rgb(184 50 42 / .7);
 }
 .jb:active { transform: translateY(0) scale(.98); }
 
