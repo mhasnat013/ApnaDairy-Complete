@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useUi } from '../../context/UiContext'
-import { milkLabel, qualityLabel, qualityHint, productLabel, PRODUCTS, defaultUnit, qtyText, perUnit } from '../../lib/b2b'
+import { milkLabel, qualityLabel, qualityHint, productLabel, PRODUCTS, defaultUnit, qtyText, perUnit, GRADES } from '../../lib/b2b'
 import { rs, date } from '../../lib/format'
 import PageHeader from '../../components/PageHeader'
 import ChoiceCards from '../../components/ChoiceCards'
@@ -21,7 +21,7 @@ export default function NewRequirement() {
   const { toast } = useUi()
   const [today] = useState(() => iso(new Date()))
   const [f, setF] = useState(() => ({
-    product: 'milk', unit: 'litre', milk_type: 'cow', quantity_l: '', required_date: iso(plusDays(7)), quality: 'fresh',
+    product: 'milk', unit: 'litre', milk_type: 'cow', quantity_l: '', required_date: iso(plusDays(7)), quality: 'standard',
     target_price: '', deadline_date: iso(plusDays(5)), deadline_time: '18:00',
     delivery_city: '', delivery_address: '', notes: '',
   }))
@@ -84,7 +84,7 @@ export default function NewRequirement() {
             <span className="label">What do you need?</span>
             <div className="flex flex-wrap gap-1.5">
               {['milk', ...PRODUCTS].map((v) => (
-                <button key={v} type="button" onClick={() => setF((p) => ({ ...p, product: v, unit: v === 'milk' ? 'litre' : defaultUnit[v], quality: v === 'milk' ? (p.quality || 'fresh') : 'standard', quantity_l: '' }))}
+                <button key={v} type="button" onClick={() => setF((p) => ({ ...p, product: v, unit: v === 'milk' ? 'litre' : defaultUnit[v], quality: v === 'milk' ? (p.quality || 'standard') : 'standard', quantity_l: '' }))}
                   className={`rounded-full border-[1.5px] px-3.5 py-1.5 text-[14px] font-medium transition-all ${f.product === v ? 'border-forest bg-mint-soft text-forest' : 'border-line bg-white hover:border-[#cdbd98]'}`}>
                   {productLabel[v]}
                 </button>
@@ -103,8 +103,8 @@ export default function NewRequirement() {
             <div className="field">
               <span className="label">Quality</span>
               <ChoiceCards name="Quality" value={f.quality} onChange={set('quality')}
-                options={['fresh', 'standard', 'premium'].map((v) => ({ value: v, label: qualityLabel[v], hint: qualityHint[v] }))} />
-              <p className="hint">Milk quality is tested by the center's IoT device and graded by the AI.</p>
+                options={GRADES.map((v) => ({ value: v, label: qualityLabel[v], hint: qualityHint[v] }))} />
+              <p className="hint">The grade comes from the center's IoT milk test. Milk is tested again before dispatch, and only milk of this grade or better can be sent to you.</p>
             </div>
           )}
 

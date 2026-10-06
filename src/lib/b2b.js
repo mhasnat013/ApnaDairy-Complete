@@ -1,11 +1,16 @@
 import { supabase } from './supabase'
 
 export const milkLabel = { cow: 'Cow milk', buffalo: 'Buffalo milk', mixed: 'Mixed milk' }
-export const qualityLabel = { fresh: 'Farm fresh', standard: 'Standard', premium: 'Premium' }
+// bulk milk grades are the iot test grades (supabase/24_bulk_grades.sql)
+export const qualityLabel = { standard: 'Standard', fresh: 'Fresh', premium: 'Premium' }
+export const GRADES = ['standard', 'fresh', 'premium']
+// what the dispatch test has to show
+export const gradeRule = (q) => (q === 'premium' ? 'Premium' : `${qualityLabel[q] ?? 'Standard'} or better`)
+export const gradeOk = (got, need) => GRADES.indexOf(got) >= GRADES.indexOf(need ?? 'standard')
 export const qualityHint = {
-  fresh: 'Milked the same day',
-  standard: 'Regular raw milk',
-  premium: 'Best grade, rich and creamy',
+  standard: 'Passes the IoT milk test',
+  fresh: 'IoT quality score 82 or more',
+  premium: 'IoT quality score 88 or more'
 }
 export const productQualityHint = { standard: 'Good everyday quality', premium: 'Best grade, pure and rich' }
 export const orderSteps = ['confirmed', 'dispatched', 'delivered']
@@ -29,18 +34,15 @@ export const stillNeeded = (req) => Math.max(0, Number(req.quantity_l) - covered
 export const isExpired = (req) => req.status === 'open' && req.required_date < new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Karachi' })
 const one = (x) => (Array.isArray(x) ? x[0] ?? null : x ?? null)
 
-// a bid "qualifies" when it covers the litres still needed, arrives on time,
-// and for farm fresh requests promises milk under 24 hours old
+// a bid "qualifies" when it covers the quantity still needed and arrives on time
+// (milk grade is checked by the iot test at dispatch)
 export function bidIssues(bid, req) {
   const issues = []
   const need = req.orders ? stillNeeded(req) || Number(req.quantity_l) : Number(req.quantity_l)
   if (Number(bid.quantity_l) < need) issues.push(`Covers ${qtyText(bid.quantity_l, req.unit)} of ${qtyText(need, req.unit)}`)
   if (bid.delivery_date > req.required_date) issues.push('Arrives after your date')
-  if (isMilk(req) && req.quality === 'fresh' && (!bid.max_age_hours || bid.max_age_hours > 24)) issues.push('Not same-day milk')
   return issues
 }
-
-export const freshnessText = (h) => (h ? `Under ${h} h old on arrival` : 'Freshness not stated')
 
 // best 3 qualifying bids by price, then everything else
 export function rankBids(bids, req) {

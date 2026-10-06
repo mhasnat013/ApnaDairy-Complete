@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { centerOrders, updateBulkOrder, milkLabel, qualityLabel, qtyText, perUnit, isMilk, productLabel } from '../../lib/b2b'
+import { centerOrders, updateBulkOrder, milkLabel, qualityLabel, qtyText, perUnit, isMilk, productLabel, gradeRule, gradeOk } from '../../lib/b2b'
 import { useLoad } from '../../lib/useLoad'
 import { useAuth } from '../../context/AuthContext'
 import { myCenter, assessMilk, gradeLabel } from '../../lib/center'
@@ -95,7 +95,9 @@ function DispatchTest({ order, onClose, onDone }) {
   const [busy, setBusy] = useState(false)
   const [fail, setFail] = useState('')
   const type = order.requirement?.milk_type ?? 'mixed'
-  const ok = reading && reading.status === 'ok' && ai?.accept
+  const need = order.requirement?.quality ?? 'standard'
+  const gradeGood = ai?.accept && gradeOk(ai.quality, need)
+  const ok = reading && reading.status === 'ok' && gradeGood
   // the same ai check the database runs before it lets the milk go
   useEffect(() => {
     let live = true
@@ -110,7 +112,7 @@ function DispatchTest({ order, onClose, onDone }) {
   }
   return (
     <Sheet open onClose={() => { cancel(); onClose() }} title={`Test and dispatch ${qtyText(order.quantity_l, 'litre')}`}
-      subtitle={`For ${order.buyer?.business_name}. Dip the probes in the milk that is going out. Old or adulterated milk cannot be sent.`}
+      subtitle={`For ${order.buyer?.business_name}, who asked for ${gradeRule(need).toLowerCase()} milk. Dip the probes in the milk that is going out. Only milk that tests ${gradeRule(need).toLowerCase()} can be sent.`}
       footer={<><button className="btn-secondary" onClick={() => { cancel(); onClose() }}>Cancel</button><button className="btn-primary" disabled={!ok || busy} onClick={send}>{busy ? 'Dispatching…' : 'Dispatch'}</button></>}>
       <Alert>{err || fail}</Alert>
       {test ? (
@@ -133,8 +135,10 @@ function DispatchTest({ order, onClose, onDone }) {
           </dl>
           {reading.status !== 'ok' ? (
             <p className="rounded-2xl bg-haldi-soft px-4 py-3 text-[13.5px] text-amber">{(reading.problems ?? []).join(' ') || 'The test did not finish properly.'} Test again.</p>
-          ) : !ai ? <div className="skeleton h-14" /> : ai.accept ? (
+          ) : !ai ? <div className="skeleton h-14" /> : gradeGood ? (
             <p className="rounded-2xl bg-mint-soft px-4 py-3 text-[13.5px] text-forest"><b>Passed: {gradeLabel[ai.quality]} milk.</b> Fresh for about {Math.round(ai.freshness_hours)} more hours. The buyer sees this test with the order.</p>
+          ) : ai.accept ? (
+            <p className="rounded-2xl bg-[#f8e2dc] px-4 py-3 text-[13.5px] text-danger"><b>This milk tests {gradeLabel[ai.quality]}, the buyer asked for {gradeRule(need).toLowerCase()}.</b> It cannot be sent. Test better milk, or cancel the order.</p>
           ) : (
             <p className="rounded-2xl bg-[#f8e2dc] px-4 py-3 text-[13.5px] text-danger"><b>Failed: this milk cannot be sent.</b> {(ai.notes ?? []).join('. ')}. Use other milk and test again, or cancel the order.</p>
           )}

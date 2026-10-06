@@ -30,7 +30,7 @@ export default function OffersList({ requirementId, target, highlight, dark = fa
                 {mine && <span className="text-[12px] font-medium text-forest">(you)</span>}
               </p>
               <p className={`num text-[13px] ${muted}`}>
-                {b.center_city}, {qtyText(b.quantity_l, unit)} by {date(b.delivery_date)}{b.max_age_hours ? `, under ${b.max_age_hours} h old` : ''}
+                {b.center_city}, {qtyText(b.quantity_l, unit)} by {date(b.delivery_date)}
               </p>
             </div>
             <div className="shrink-0 text-right">

@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase'
 import { useLoad } from '../lib/useLoad'
 import { useAuth } from '../context/AuthContext'
 import { homeFor } from '../lib/roles'
-import { milkLabel, qualityLabel, qualityHint, qtyText, perUnit, isMilk, productLabel } from '../lib/b2b'
+import { milkLabel, qualityLabel, qualityHint, qtyText, perUnit, isMilk, productLabel, GRADES } from '../lib/b2b'
 import { rs, date, dateTime, relative } from '../lib/format'
 import PublicHeader from '../components/landing/PublicHeader'
 import Footer from '../components/landing/Footer'
@@ -210,7 +210,7 @@ export default function PublicRequests() {
             ]} />
             <Segmented size="sm" value={quality} onChange={setQuality} options={[
               { value: 'all', label: 'Any quality' },
-              ...['fresh', 'standard', 'premium'].map((v) => ({ value: v, label: qualityLabel[v], count: all.filter((r) => isMilk(r) && r.quality === v).length })),
+              ...GRADES.map((v) => ({ value: v, label: qualityLabel[v], count: all.filter((r) => isMilk(r) && r.quality === v).length })),
             ]} />
             <label className="ml-auto flex items-center gap-2 text-[14px] text-muted">
               Sort

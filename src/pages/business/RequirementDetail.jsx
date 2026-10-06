@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { requirementWithBids, rankBids, bidIssues, freshnessText, acceptBid, cancelRequirement, qualityLabel, coveredL, stillNeeded, isExpired, reqTitle, qtyText, perUnit, isMilk, productLabel } from '../../lib/b2b'
+import { requirementWithBids, rankBids, bidIssues, gradeRule, acceptBid, cancelRequirement, qualityLabel, coveredL, stillNeeded, isExpired, reqTitle, qtyText, perUnit, isMilk, productLabel } from '../../lib/b2b'
 import { useLoad } from '../../lib/useLoad'
 import { useUi } from '../../context/UiContext'
 import { rs, date, dateTime, relative } from '../../lib/format'
@@ -57,7 +57,7 @@ function BidCard({ b, req, rank, canAccept, onAccept, busy, highlight }) {
         <div className="flex justify-between gap-3"><dt className="text-muted">Supplies</dt><dd className="num font-medium">{Q(b.quantity_l)}</dd></div>
         <div className="flex justify-between gap-3"><dt className="text-muted">Arrives</dt><dd className="num font-medium">{date(b.delivery_date)}</dd></div>
         {isMilk(req)
-          ? <div className="flex justify-between gap-3"><dt className="text-muted">Freshness</dt><dd className="font-medium">{freshnessText(b.max_age_hours)}</dd></div>
+          ? <div className="flex justify-between gap-3"><dt className="text-muted">Quality</dt><dd className="text-right font-medium">{gradeRule(req.quality)}, tested at dispatch</dd></div>
           : <div className="flex justify-between gap-3"><dt className="text-muted">Ready</dt><dd className="font-medium">{Number(b.make_qty) > 0 ? `${Q(b.quantity_l - b.make_qty)} in stock, ${Q(b.make_qty)} to be made` : 'All in stock'}</dd></div>}
         <div className="flex justify-between gap-3"><dt className="text-muted">Total</dt><dd className="num font-bold">{rs(b.price_per_l * b.quantity_l)}</dd></div>
       </dl>

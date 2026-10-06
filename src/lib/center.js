@@ -294,7 +294,7 @@ export const finishDeviceTest = (session) => iot({ action: 'finish', session }).
 export const myFirstDay = () => rpc('my_first_day')
 export const dayBook = (day) => rpc('center_day_book', { p_day: day })
 export const farmerUsual = (farmerId) => rpc('farmer_usual_litres', { p_farmer: farmerId })
-export const bidCapacity = (type, date, requirementId) => rpc('my_bid_capacity', { p_type: type, p_delivery: date, p_requirement: requirementId ?? null })
+export const bidCapacity = (type, date, requirementId, grade) => rpc('my_bid_capacity', { p_type: type, p_delivery: date, p_requirement: requirementId ?? null, p_grade: grade ?? 'standard' })
 export const adminAnalytics = (days = 30) => rpc('admin_analytics', { p_days: days })
 export const deviceActivity = () => rpc('device_activity')
 export const allDevices = async () => must(await supabase.from('iot_devices').select('*, center:area_managers(id, center_name, city)').order('serial'))

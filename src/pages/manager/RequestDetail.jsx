@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useParams, useOutletContext } from 'react-router-dom'
-import { requirementForCenter, placeBid, withdrawBid, milkLabel, qualityLabel, qualityHint, myProductCapacity, isMilk, qtyText, perUnit, productLabel } from '../../lib/b2b'
+import { requirementForCenter, placeBid, withdrawBid, milkLabel, qualityLabel, qualityHint, gradeRule, myProductCapacity, isMilk, qtyText, perUnit, productLabel } from '../../lib/b2b'
 import { useLoad } from '../../lib/useLoad'
 import { bidCapacity, todayKey } from '../../lib/center'
 import { useUi } from '../../context/UiContext'
@@ -13,24 +13,31 @@ import { MilkChurn } from '../../components/Farm'
 import OffersList from '../../components/OffersList'
 import { numberError, firstError } from '../../lib/validate'
 
-const freshPicks = [6, 12, 24, 48]
-
-// milk still fresh on delivery day + collection by then − milk already promised
+// milk of the asked grade still fresh on delivery day + that grade's share of collection by then − milk already promised
 function Capacity({ cap, kind, over, onUse, useLabel }) {
   const r1 = (n) => Math.round(Number(n) * 10) / 10
   const none = Number(cap.max_l) < 1
+  const graded = cap.grade && cap.grade !== 'standard'
+  const g = graded ? `${qualityLabel[cap.grade]} ` : ''
+  const share = graded ? `, ${Math.round(Number(cap.share) * 100)}% of your milk tests ${gradeRule(cap.grade).toLowerCase()}` : ''
   const rows = [
-    Number(cap.stock_l) > 0 && ['Still fresh on delivery day', `${litres(r1(cap.stock_l))}`],
-    Number(cap.coming_l) > 0 && [`Collected by then (about ${litres(Math.round(cap.daily_l))} a day)`, `+ ${litres(r1(cap.coming_l))}`],
+    Number(cap.stock_l) > 0 && [`${g}milk still fresh on delivery day`.replace(/^m/, 'M'), `${litres(r1(cap.stock_l))}`],
+    Number(cap.coming_l) > 0 && [`${g}milk collected by then (about ${litres(Math.round(cap.daily_l))} a day${share})`.replace(/^m/, 'M'), `+ ${litres(r1(cap.coming_l))}`],
     Number(cap.promised_l) > 0 && ['Already promised around that day', `− ${litres(r1(cap.promised_l))}`],
   ].filter(Boolean)
+  // all milk, after app listings and every other promise, can be less than the graded milk
+  const limited = cap.total_l != null && Number(cap.total_l) < Math.floor(Number(cap.stock_l) + Number(cap.coming_l) - Number(cap.promised_l))
   return (
     <div className={`-mt-2 rounded-2xl px-4 py-3 text-[13px] ${over || none ? 'bg-[#f8e2dc] text-danger' : 'bg-cream text-muted'}`}>
       <dl className="grid gap-1">
         {rows.map(([k, v]) => <div key={k} className="flex justify-between gap-3"><dt>{k}</dt><dd className="num shrink-0">{v}</dd></div>)}
+        {limited && <div className="flex justify-between gap-3"><dt>All your milk, after app listings and other promises</dt><dd className="num shrink-0">{litres(cap.total_l)}</dd></div>}
         <div className={`mt-1 flex justify-between gap-3 border-t pt-1.5 font-semibold ${over || none ? 'border-danger/20' : 'border-line text-ink'}`}><dt>You can offer</dt><dd className="num shrink-0">{litres(cap.max_l)}</dd></div>
       </dl>
-      {none && <p className="mt-2 text-[12.5px]">{Number(cap.daily_l) > 0 ? `Your ${kind} for that day is already promised. Pick another delivery date.` : `You have no ${kind} to offer yet. Buy and test milk from farmers first.`}</p>}
+      {none && <p className="mt-2 text-[12.5px]">{graded && Number(cap.share) === 0 && Number(cap.stock_l) === 0
+        ? `None of your milk in the last 14 days tested ${qualityLabel[cap.grade].toLowerCase()} or better, so you cannot offer it yet.`
+        : Number(cap.daily_l) > 0 ? `Your ${kind} for that day is already promised. Pick another delivery date.` : `You have no ${kind} to offer yet. Buy and test milk from farmers first.`}</p>}
+      {!none && <p className="mt-2 text-[12px]">The milk is tested on your IoT device before dispatch. Only {gradeRule(cap.grade).toLowerCase()} milk can be sent.</p>}
       {over && !none && <p className="mt-2 text-[12.5px]">You can’t offer more milk than you will have. <button type="button" className="font-semibold underline" onClick={onUse}>Use {useLabel}</button></p>}
       {!over && !none && Number(cap.days) >= 2 && <p className="mt-2 text-[12px]">Delivery is 2 or more days away, so only fresh milk from the 2 days before it counts.</p>}
     </div>
@@ -63,7 +70,6 @@ function BidForm({ req, onSaved }) {
     price: live ? mine.price_per_l : '',
     quantity: live ? mine.quantity_l : (req.remaining_l ?? req.quantity_l),
     delivery_date: live ? mine.delivery_date : req.required_date,
-    max_age: live ? mine.max_age_hours ?? '' : req.quality === 'fresh' ? 12 : '',
     notes: live ? mine.notes ?? '' : '',
     make: live ? String(Number(mine.make_qty ?? 0)) : '0',
   }))
@@ -71,7 +77,7 @@ function BidForm({ req, onSaved }) {
   const [busy, setBusy] = useState(false)
   const set = (k) => (e) => setF((p) => ({ ...p, [k]: e?.target ? e.target.value : e }))
   // what the center can really supply on the delivery day; the database checks the same numbers
-  const { data: capacity } = useLoad(() => (!milk ? myProductCapacity(req.product, req.id) : f.delivery_date >= today ? bidCapacity(req.milk_type, f.delivery_date, req.id) : Promise.resolve(null)), [req.milk_type, req.product, f.delivery_date, req.id])
+  const { data: capacity } = useLoad(() => (!milk ? myProductCapacity(req.product, req.id) : f.delivery_date >= today ? bidCapacity(req.milk_type, f.delivery_date, req.id, req.quality) : Promise.resolve(null)), [req.milk_type, req.product, f.delivery_date, req.id])
   const make = milk ? 0 : Math.max(0, Number(f.make) || 0)
   const capMax = capacity ? (milk ? Number(capacity.max_l) : Number(capacity.available) + make) : null
   const need = req.remaining_l ?? Number(req.quantity_l)
@@ -89,7 +95,6 @@ function BidForm({ req, onSaved }) {
   if (Number(f.quantity) > need) warnings.push(`Only ${Q(need)} is still needed.`)
   else if (Number(f.quantity) < need) warnings.push(`You're offering less than the ${Q(need)} needed. The buyer can combine bids.`)
   if (f.delivery_date > req.required_date) warnings.push(`You'd deliver after ${date(req.required_date)}.`)
-  if (milk && req.quality === 'fresh' && (!f.max_age || Number(f.max_age) > 24)) warnings.push('Farm fresh means milk under 24 hours old.')
 
   const submit = async (e) => {
     e.preventDefault()
@@ -98,7 +103,6 @@ function BidForm({ req, onSaved }) {
       numberError(f.quantity, { min: 1, max: Math.max(1, need), whole: req.unit === 'pack', what: 'quantity' }),
       overCap ? `You can offer at most ${Q(capMax)}.` : '',
       !f.delivery_date ? 'Pick the delivery date.' : f.delivery_date < today ? 'The delivery date is in the past.' : '',
-      milk && f.max_age !== '' ? numberError(f.max_age, { min: 1, max: 96, whole: true, what: 'milk age' }) : '',
       makeBad ? 'What you will make cannot be more than the quantity, and needs at least a day.' : '',
       f.notes.length > 300 ? 'The note is too long.' : '',
     )
@@ -107,7 +111,7 @@ function BidForm({ req, onSaved }) {
     try {
       await placeBid({
         p_requirement: req.id, p_price: Number(f.price), p_quantity: Number(f.quantity), p_delivery_date: f.delivery_date,
-        p_max_age_hours: milk && f.max_age ? Number(f.max_age) : null, p_notes: f.notes.trim() || null, p_make: make,
+        p_max_age_hours: null, p_notes: f.notes.trim() || null, p_make: make,
       })
       toast(live ? 'Bid updated. The buyer sees your new price.' : 'Bid sent. Good luck!')
       await onSaved()
@@ -168,19 +172,6 @@ function BidForm({ req, onSaved }) {
       {capacity && milk && <Capacity cap={capacity} kind={kind} over={overCap} onUse={() => set('quantity')(String(maxBid))} useLabel={Q(maxBid)} />}
       {capacity && !milk && <ProductCapacity cap={capacity} unit={req.unit} make={make} over={overCap} />}
 
-      {milk && <div className="field">
-        <span className="label">How fresh on arrival?</span>
-        <div className="flex flex-wrap gap-1.5">
-          {freshPicks.map((h) => (
-            <button key={h} type="button" onClick={() => set('max_age')(Number(f.max_age) === h ? '' : h)}
-              className={`num rounded-full border-[1.5px] px-3.5 py-1.5 text-[13.5px] font-medium transition-all active:scale-95 ${
-                Number(f.max_age) === h ? 'border-forest bg-mint-soft text-forest' : 'border-line bg-white hover:border-[#cdbd98]'}`}>
-              Under {h} h
-            </button>
-          ))}
-        </div>
-        <p className="hint">Hours since milking when it reaches the buyer.</p>
-      </div>}
 
       <div className="field">
         <label htmlFor="n">Note to buyer <span className="font-normal text-muted">(optional)</span></label>
@@ -259,7 +250,7 @@ export default function RequestDetail() {
         <aside className="lg:sticky lg:top-10 lg:self-start">
           <div className="panel animate-rise p-6">
             <div className="mb-5 flex items-center justify-between gap-3">
-              <h2 className="display text-[26px]">{mine?.status === 'submitted' ? 'Your bid' : 'Place your bid'}</h2>
+              <h2 className="display text-[26px]">{mine?.status === 'submitted' || mine?.status === 'accepted' ? 'Your bid' : 'Place your bid'}</h2>
               {mine && mine.status !== 'withdrawn' && <Badge status={mine.status}>{mine.status === 'submitted' ? 'Sent' : mine.status === 'accepted' ? 'Won' : undefined}</Badge>}
             </div>
             {mine?.status === 'accepted' ? (
