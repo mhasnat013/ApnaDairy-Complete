@@ -1,7 +1,7 @@
 import Reveal from './Reveal'
 
 const cards = [
-  { title: 'Test', text: 'A sensor reads every delivery at the center, so quality is measured instead of argued about.', tag: 'Temperature, pH, density' },
+  { title: 'Test', text: 'A sensor reads every delivery at the center, so quality is measured instead of argued about.', tag: 'Temperature, pH, EC, TDS' },
   { title: 'Price', text: 'The farmer sees a recommended rate per litre before selling, and can say no.', tag: 'Recommended, never forced' },
   { title: 'Trace', text: 'Bought milk becomes a batch with its farm, test and time attached, all the way to the buyer.', tag: 'Farm to buyer, one record' },
 ]

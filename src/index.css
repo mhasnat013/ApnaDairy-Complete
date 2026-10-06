@@ -296,3 +296,9 @@ html { scroll-behavior: smooth; scroll-padding-top: 68px; }
 .film-seek:hover::-webkit-slider-thumb, .film-seek:focus-visible::-webkit-slider-thumb { transform: scale(1.2); }
 .film-seek:focus-visible { outline: none; }
 .film-seek:focus-visible::-webkit-slider-runnable-track { box-shadow: 0 0 0 3px rgb(226 169 59 / .45); }
+
+/* Join button fits next to the menu on small phones */
+@media (max-width: 420px) {
+  .jb { height: 40px; gap: 8px; padding: 0 4px 0 14px; font-size: 13.5px; }
+  .jb-badge { width: 32px; height: 32px; }
+}

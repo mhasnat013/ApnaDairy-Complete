@@ -32,7 +32,7 @@ export default function PublicHeader() {
             <a key={to} href={to} className="rounded-full px-4 py-2 text-[14.5px] font-medium text-ink/80 transition-colors hover:bg-cream-2 hover:text-ink">{label}</a>
           ))}
         </nav>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-1.5 sm:gap-3">
           {!profile && (
             <Link to="/login" className="btn-ghost btn-sm hidden sm:inline-flex">Sign in</Link>
           )}

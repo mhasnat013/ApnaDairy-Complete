@@ -6,12 +6,13 @@ import Hero from '../components/landing/Hero'
 import ModuleDial from '../components/landing/ModuleDial'
 import HowItWorks from '../components/landing/HowItWorks'
 import Journey from '../components/landing/Journey'
+import Problem from '../components/landing/Problem'
 import LiveBoard from '../components/landing/LiveBoard'
 import WhoFor from '../components/landing/WhoFor'
 import CtaBand from '../components/landing/CtaBand'
 import Footer from '../components/landing/Footer'
 
-// the public homepage: hero → marquee → modules → video → six steps
+// the public homepage: hero → marquee → modules → video → six steps → live bulk market → who it's for → problem → call to action
 // → live bulk market → who it's for → call to action
 export default function Home() {
   const { data: requests } = useLoad(async () => {
@@ -40,6 +41,7 @@ export default function Home() {
         <HowItWorks />
         <LiveBoard requests={requests} />
         <WhoFor />
+        <Problem />
         <CtaBand />
       </main>
       <Footer />
