@@ -244,7 +244,8 @@ export const cityLabel = (c) => (c === '*' ? 'All other cities' : c.replace(/\b\
 export const OFFER_HOURS = 2
 export const offerExpiresAt = (c) => new Date(c.collected_at).getTime() + OFFER_HOURS * 36e5
 export const expireMyOffers = () => rpc('expire_my_offers')
-export const demoFarmerAnswer = (id, accept) => rpc('demo_farmer_answer', { p_id: id, p_accept: accept })
+// the farmer answers at the center; the area manager records it
+export const recordFarmerAnswer = (id, accept) => rpc('record_farmer_answer', { p_id: id, p_accept: accept })
 export const cancelCollection = (id, reason) => rpc('cancel_collection', { p_id: id, p_reason: reason })
 export const collectionAudit = async (ids) => must(await supabase.from('collection_audit').select('*').in('collection_id', ids).order('created_at'))
 export const sendPayout = (farmerId, method, reference) => rpc('send_payout', { p_farmer: farmerId, p_method: method, p_reference: reference || null })

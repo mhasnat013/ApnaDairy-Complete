@@ -4,7 +4,7 @@ import { useLoad } from '../../lib/useLoad'
 import { useAuth } from '../../context/AuthContext'
 import { useUi } from '../../context/UiContext'
 import {
-  farmersWithStats, settings, assessMilk, recordCollection, demoFarmerAnswer, collectionById, myCenter, myDevice, startDeviceTest, takeDeviceSample, finishDeviceTest, farmerUsual, OFFER_HOURS, currentShift, billingOverview, milkListings,
+  farmersWithStats, settings, assessMilk, recordCollection, recordFarmerAnswer, collectionById, myCenter, myDevice, startDeviceTest, takeDeviceSample, finishDeviceTest, farmerUsual, OFFER_HOURS, currentShift, billingOverview, milkListings,
   milkLabel, gradeLabel, riskLabel, PARAMS, inRange,
 } from '../../lib/center'
 import { rs, litres } from '../../lib/format'
@@ -112,10 +112,10 @@ export default function RecordMilk() {
     setSaving(false)
   }
   const listing = data?.listings?.find((l) => l.milk_type === farmer?.milk_type)
-  // demo accounts only: stands in for the farmer answering in the app
+  // the farmer answers at the counter; the area manager records it
   const farmerSays = async (yes) => {
     try {
-      const r = await demoFarmerAnswer(done.id, yes)
+      const r = await recordFarmerAnswer(done.id, yes)
       if (r === 'expired') { toast('This offer had expired, so it was closed.', 'error'); return nav('/manager/collection') }
       if (!yes) { toast(`${farmer.full_name} refused the offer.`); return nav('/manager/collection') }
       const row = await collectionById(done.id)
@@ -132,25 +132,22 @@ export default function RecordMilk() {
           <span className={`mx-auto grid h-16 w-16 place-items-center rounded-full ${done.accepted ? 'bg-mint-soft text-forest' : 'bg-[#f8e2dc] text-danger'}`}>
             <Icon name={done.accepted ? 'check' : 'x'} size={30} />
           </span>
-          <h1 className="display mt-4 text-[28px] text-forest-deep">{done.answered ? 'Farmer accepted' : done.accepted ? 'Offer sent to the farmer' : 'Recorded as not bought'}</h1>
+          <h1 className="display mt-4 text-[28px] text-forest-deep">{done.answered ? 'Farmer accepted' : done.accepted ? 'Show the farmer the offer' : 'Recorded as not bought'}</h1>
           <p className="mt-2 text-muted">
             {done.answered
               ? <>{farmer.full_name} accepted {litres(qty)} at {rs(price)} per litre. Receipt {done.row?.receipt_no} was generated.</>
               : done.accepted
-              ? <>{farmer.full_name} sees {litres(qty)} at {rs(price)} per litre ({rs(Math.round(qty * price))}) in the ApnaDairy app and accepts or refuses it there. Unanswered offers close at {new Date(done.until).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}.</>
-              : <>The milk failed the quality test, so it was not added to stock. {farmer.full_name} can see the test result in the app.</>}
+              ? <>Tell {farmer.full_name} the test result and the price: {litres(qty)} at {rs(price)} per litre, {rs(Math.round(qty * price))} in total. Then press their answer below.</>
+              : <>The milk failed the quality test, so it was not added to stock. Show {farmer.full_name} the test result.</>}
           </p>
           {done.accepted && !done.answered && (
             <div className="mt-5 rounded-2xl bg-cream px-4 py-3 text-left text-[13px] text-muted">
-              <p className="flex items-center gap-2 font-semibold text-ink"><Icon name="clock" size={15} />Waiting for {farmer.full_name.split(' ')[0]}</p>
-              <p className="mt-1">The milk joins your stock only after the farmer accepts. You can follow it on the collection page.</p>
-              {data?.center?.is_demo && (
-                <div className="mt-3 flex flex-wrap gap-2 border-t border-line pt-3">
-                  <span className="w-full text-[12px]">Demo account: answer as the farmer would in the app</span>
-                  <button className="btn-primary btn-sm" onClick={() => farmerSays(true)}><Icon name="check" size={15} />Accepts (demo)</button>
-                  <button className="btn-secondary btn-sm" onClick={() => farmerSays(false)}>Refuses (demo)</button>
-                </div>
-              )}
+              <p className="flex items-center gap-2 font-semibold text-ink"><Icon name="clock" size={15} />What did {farmer.full_name.split(' ')[0]} say?</p>
+              <p className="mt-1">The milk joins your stock only after the farmer accepts. If you answer later, it waits on the collection page until {new Date(done.until).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}.</p>
+              <div className="mt-3 flex flex-wrap gap-2 border-t border-line pt-3">
+                <button className="btn-primary btn-sm" onClick={() => farmerSays(true)}><Icon name="check" size={15} />Farmer accepted</button>
+                <button className="btn-secondary btn-sm" onClick={() => farmerSays(false)}>Farmer refused</button>
+              </div>
             </div>
           )}
           {done.answered && done.row?.receipt_no && (

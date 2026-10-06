@@ -4,7 +4,7 @@ import { useLoad } from '../../lib/useLoad'
 import { useUi } from '../../context/UiContext'
 import { useAuth } from '../../context/AuthContext'
 import {
-  collectionsOn, myCenter, myFirstDay, expireMyOffers, demoFarmerAnswer, cancelCollection, offerExpiresAt,
+  collectionsOn, myCenter, myFirstDay, expireMyOffers, recordFarmerAnswer, cancelCollection, offerExpiresAt,
   todayKey, timeOf, milkLabel, gradeLabel, gradeTone, PARAMS, inRange,
 } from '../../lib/center'
 import Receipt from '../../components/Receipt'
@@ -41,8 +41,8 @@ export default function Collection() {
     try { const r = await fn(); toast(done(r)); await reload() } catch (e) { toast(e.message, 'error') }
     setBusy(null)
   }
-  // demo accounts only: the farmer's answer, as it would come from the app
-  const demoAnswer = (c, accept) => run(c, () => demoFarmerAnswer(c.id, accept),
+  // the farmer answers at the center and the area manager records it
+  const answer = (c, accept) => run(c, () => recordFarmerAnswer(c.id, accept),
     (r) => r === 'expired' ? 'This offer had expired, so it was closed.' : accept ? `${c.farmer?.full_name} accepted. ${litres(c.quantity_l)} added to stock.` : `${c.farmer?.full_name} refused the offer.`)
   const cancel = async (c) => {
     const reason = await confirm({ title: c.status === 'offered' ? 'Cancel this offer?' : 'Cancel this collection?',
@@ -53,7 +53,7 @@ export default function Collection() {
     run(c, () => cancelCollection(c.id, reason), () => 'Cancelled. The reason is saved in the history.')
   }
   const canChange = (c) => c.status !== 'rejected' && !c.payout_id && c.payment !== 'paid' && Date.now() - new Date(c.collected_at) < 24 * 36e5
-  const props = { busy, demo: center?.is_demo, onDemo: demoAnswer, onCancel: cancel, onReceipt: setReceipt, canChange }
+  const props = { busy, onAnswer: answer, onCancel: cancel, onReceipt: setReceipt, canChange }
 
   return (
     <>
@@ -169,17 +169,17 @@ function Readings({ c }) {
   )
 }
 
-function Status({ c, busy, demo, onDemo, onCancel, onReceipt, canChange }) {
+function Status({ c, busy, onAnswer, onCancel, onReceipt, canChange }) {
   const off = busy === c.id ? 'pointer-events-none opacity-50' : ''
   if (c.status === 'offered') {
     const mins = Math.max(0, Math.round((offerExpiresAt(c) - Date.now()) / 6e4))
     return (
       <div className={off}>
-        <span className="flex items-center gap-1 text-[12.5px] font-semibold text-amber"><Icon name="clock" size={14} />Waiting for farmer</span>
-        <p className="text-[12px] text-muted">answers in the app · {mins >= 60 ? `${Math.floor(mins / 60)} h ${mins % 60} min` : `${mins} min`} left</p>
+        <span className="flex items-center gap-1 text-[12.5px] font-semibold text-amber"><Icon name="clock" size={14} />Farmer's answer?</span>
+        <p className="text-[12px] text-muted">offer closes in {mins >= 60 ? `${Math.floor(mins / 60)} h ${mins % 60} min` : `${mins} min`}</p>
         <div className="mt-2 flex flex-wrap gap-1.5">
-          {demo && <button className="btn-primary btn-sm" onClick={() => onDemo(c, true)}>Accepts (demo)</button>}
-          {demo && <button className="btn-secondary btn-sm" onClick={() => onDemo(c, false)}>Refuses (demo)</button>}
+          <button className="btn-primary btn-sm" onClick={() => onAnswer(c, true)}>Farmer accepted</button>
+          <button className="btn-secondary btn-sm" onClick={() => onAnswer(c, false)}>Farmer refused</button>
           <button className="btn-ghost btn-sm text-danger" onClick={() => onCancel(c)}>Cancel</button>
         </div>
       </div>
