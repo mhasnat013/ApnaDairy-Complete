@@ -14,12 +14,12 @@ import OffersList from '../../components/OffersList'
 
 const freshPicks = [6, 12, 24, 48]
 
-// fresh stock (if delivery is within 2 days) + about 2 days of collection − milk already promised
+// milk still fresh on delivery day + collection by then − milk already promised
 function Capacity({ cap, kind, over, onUse, useLabel }) {
   const r1 = (n) => Math.round(Number(n) * 10) / 10
   const none = Number(cap.max_l) < 1
   const rows = [
-    Number(cap.days) < 2 && ['Fresh in stock now', `${litres(r1(cap.stock_l))}`],
+    Number(cap.stock_l) > 0 && ['Still fresh on delivery day', `${litres(r1(cap.stock_l))}`],
     Number(cap.coming_l) > 0 && [`Collected by then (about ${litres(Math.round(cap.daily_l))} a day)`, `+ ${litres(r1(cap.coming_l))}`],
     Number(cap.promised_l) > 0 && ['Already promised around that day', `− ${litres(r1(cap.promised_l))}`],
   ].filter(Boolean)

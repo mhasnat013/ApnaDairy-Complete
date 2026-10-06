@@ -9,6 +9,7 @@ import OrderProgress from '../../components/OrderProgress'
 import Alert from '../../components/Alert'
 import EmptyState from '../../components/EmptyState'
 import Sheet from '../../components/Sheet'
+import { gradeLabel } from '../../lib/center'
 
 export default function BusinessOrders() {
   const { data, error, loading, reload } = useLoad(async () => {
@@ -51,7 +52,10 @@ export default function BusinessOrders() {
                 <td className="num text-right">{rs(o.price_per_l)}<span className="text-[12px] text-muted"> / {perUnit(o.requirement?.unit)}</span></td>
                 <td className="num text-right font-semibold">{rs(o.total_amount)}</td>
                 <td className="num">{date(o.delivery_date)}<p className="text-[13px] text-muted">{o.delivery_city}</p></td>
-                <td><OrderProgress order={o} /></td>
+                <td><OrderProgress order={o} />{o.dispatch_quality && (
+                  <p className="mt-1.5 inline-flex items-center gap-1 rounded-md bg-mint-soft px-1.5 py-0.5 text-[11.5px] font-semibold text-forest" title={`Tested on device ${o.dispatch_quality.device} before dispatch: ${o.dispatch_quality.temperature_c} °C, pH ${o.dispatch_quality.ph}, TDS ${Math.round(o.dispatch_quality.tds_ppm)}`}>
+                    Tested before dispatch: {gradeLabel[o.dispatch_quality.quality] ?? o.dispatch_quality.quality}, pH {Number(o.dispatch_quality.ph)}, {Number(o.dispatch_quality.temperature_c)} °C
+                  </p>)}</td>
                 <td>{o.code && ['confirmed', 'dispatched'].includes(o.status)
                   ? <span className="num rounded-xl bg-haldi-soft px-3 py-1.5 text-[17px] font-bold tracking-[0.25em] text-forest-deep" title="Give this code to the driver when the milk arrives">{o.code}</span>
                   : <span className="text-[13px] text-muted">{o.status === 'delivered' ? 'Used' : '—'}</span>}</td>
