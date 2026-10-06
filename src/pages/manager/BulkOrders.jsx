@@ -67,6 +67,9 @@ export default function BulkOrders() {
                   <div className={`flex justify-end gap-2 ${busy === o.id ? 'pointer-events-none opacity-50' : ''}`}>
                     {next[o.status] && <button className="btn-primary btn-sm" onClick={() => move(o, next[o.status][0])}>{next[o.status][1]}</button>}
                     {o.status === 'confirmed' && <button className="btn-danger btn-sm" onClick={() => move(o, 'cancelled')}>Cancel</button>}
+                    {o.status === 'delivered' && (o.review
+                      ? <span className="text-right text-[13px]" title={o.review.comment ?? ''}><span className="text-haldi">{'★'.repeat(o.review.rating)}</span><span className="text-line">{'★'.repeat(5 - o.review.rating)}</span>{o.review.comment && <p className="max-w-[200px] truncate text-[12px] text-muted">“{o.review.comment}”</p>}</span>
+                      : <span className="text-[12.5px] text-muted">Not rated yet</span>)}
                   </div>
                 </td>
               </tr>

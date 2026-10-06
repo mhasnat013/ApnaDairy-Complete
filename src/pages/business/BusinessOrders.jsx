@@ -1,4 +1,5 @@
-import { businessOrders, updateBulkOrder, myDeliveryCodes, milkLabel } from '../../lib/b2b'
+import { useState } from 'react'
+import { businessOrders, updateBulkOrder, myDeliveryCodes, rateOrder, milkLabel } from '../../lib/b2b'
 import { useLoad } from '../../lib/useLoad'
 import { useUi } from '../../context/UiContext'
 import { SkeletonRows } from '../../components/Skeleton'
@@ -7,6 +8,7 @@ import PageHeader from '../../components/PageHeader'
 import OrderProgress from '../../components/OrderProgress'
 import Alert from '../../components/Alert'
 import EmptyState from '../../components/EmptyState'
+import Sheet from '../../components/Sheet'
 
 export default function BusinessOrders() {
   const { data, error, loading, reload } = useLoad(async () => {
@@ -15,6 +17,7 @@ export default function BusinessOrders() {
     return orders.map((o) => ({ ...o, code: byOrder[o.id] }))
   })
   const { toast, confirm } = useUi()
+  const [rating, setRating] = useState(null)
 
   const cancel = async (o) => {
     const ok = await confirm({ title: 'Cancel this order?', body: `${litres(o.quantity_l)} from ${o.center?.center_name}. They haven't dispatched it yet.`, confirmLabel: 'Cancel order', danger: true, cancelLabel: 'Keep order' })
@@ -29,7 +32,7 @@ export default function BusinessOrders() {
 
   return (
     <>
-      <PageHeader title="Bulk orders" description="Bids you accepted. Give the delivery code to the driver when the milk arrives, or press Received yourself." />
+      <PageHeader title="Bulk orders" description="Bids you accepted. Give the delivery code to the driver when the milk arrives. You pay the center directly; ApnaDairy takes no cut." />
       <Alert>{error}</Alert>
       <div className="panel overflow-x-auto">
         <table className="table min-w-[980px]">
@@ -55,12 +58,47 @@ export default function BusinessOrders() {
                 <td className="text-right">
                   {o.status === 'confirmed' && <button className="btn-danger btn-sm" onClick={() => cancel(o)}>Cancel</button>}
                   {o.status === 'dispatched' && <button className="btn-primary btn-sm" onClick={() => received(o)}>Received</button>}
+                  {o.status === 'delivered' && (o.review
+                    ? <button className="text-[13.5px] font-semibold text-forest hover:underline" onClick={() => setRating(o)} title="Change your rating"><span className="text-haldi">{'★'.repeat(o.review.rating)}</span><span className="text-line">{'★'.repeat(5 - o.review.rating)}</span></button>
+                    : <button className="btn-secondary btn-sm" onClick={() => setRating(o)}>Rate</button>)}
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+      <RateSheet key={rating?.id ?? 'closed'} order={rating} onClose={() => setRating(null)} onSaved={reload} />
     </>
+  )
+}
+
+// after delivery the business rates the center; other businesses see it next to that center's bids
+function RateSheet({ order, onClose, onSaved }) {
+  const { toast } = useUi()
+  const [stars, setStars] = useState(order?.review?.rating ?? 0)
+  const [comment, setComment] = useState(order?.review?.comment ?? '')
+  const [busy, setBusy] = useState(false)
+  const words = ['', 'Poor', 'Below what was promised', 'Okay', 'Good', 'Excellent']
+  const save = async () => {
+    setBusy(true)
+    try { await rateOrder(order.id, stars, comment); toast('Thank you. Your rating helps other businesses choose.'); onSaved(); onClose() } catch (e) { toast(e.message, 'error') }
+    setBusy(false)
+  }
+  return (
+    <Sheet open={!!order} onClose={onClose} title={`Rate ${order?.center?.center_name ?? 'the center'}`}
+      subtitle={order ? `${litres(order.quantity_l)} delivered for ${rs(order.total_amount)}. Was the milk as promised and on time?` : ''}
+      footer={<><button className="btn-secondary" onClick={onClose}>Cancel</button><button className="btn-primary" disabled={!stars || busy} onClick={save}>{busy ? 'Saving…' : 'Save rating'}</button></>}>
+      <div className="flex gap-1" role="radiogroup" aria-label="Stars">
+        {[1, 2, 3, 4, 5].map((n) => (
+          <button key={n} type="button" role="radio" aria-checked={stars === n} aria-label={`${n} ${n === 1 ? 'star' : 'stars'}`} onClick={() => setStars(n)}
+            className={`text-[40px] leading-none transition-transform active:scale-90 ${n <= stars ? 'text-haldi' : 'text-line hover:text-haldi/50'}`}>★</button>
+        ))}
+      </div>
+      <p className="mt-2 h-5 text-[14px] font-semibold text-forest">{words[stars]}</p>
+      <div className="field mt-4">
+        <label htmlFor="rc">Comment <span className="font-normal text-muted">(optional)</span></label>
+        <textarea id="rc" rows={3} maxLength={300} className="input" value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Milk arrived chilled and on time…" />
+      </div>
+    </Sheet>
   )
 }

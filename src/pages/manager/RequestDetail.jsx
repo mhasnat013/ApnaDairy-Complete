@@ -42,7 +42,7 @@ function BidForm({ req, onSaved }) {
   const live = mine?.status === 'submitted'
   const [f, setF] = useState(() => ({
     price: live ? mine.price_per_l : '',
-    quantity: live ? mine.quantity_l : req.quantity_l,
+    quantity: live ? mine.quantity_l : (req.remaining_l ?? req.quantity_l),
     delivery_date: live ? mine.delivery_date : req.required_date,
     max_age: live ? mine.max_age_hours ?? '' : req.quality === 'fresh' ? 12 : '',
     notes: live ? mine.notes ?? '' : '',
@@ -53,7 +53,8 @@ function BidForm({ req, onSaved }) {
   // what the center can really supply on the delivery day; the database checks the same numbers
   const { data: capacity } = useLoad(() => (f.delivery_date >= today ? bidCapacity(req.milk_type, f.delivery_date, req.id) : Promise.resolve(null)), [req.milk_type, f.delivery_date, req.id])
   const capMax = capacity ? Number(capacity.max_l) : null
-  const maxBid = capacity ? Math.min(Number(req.quantity_l), capMax) : Number(req.quantity_l)
+  const need = req.remaining_l ?? Number(req.quantity_l)
+  const maxBid = capacity ? Math.min(need, capMax) : need
   const overCap = capacity && Number(f.quantity) > capMax
   const kind = req.milk_type === 'mixed' ? 'milk' : milkLabel[req.milk_type]?.toLowerCase()
 
@@ -63,7 +64,8 @@ function BidForm({ req, onSaved }) {
   const diff = t && f.price ? Number(f.price) - t : null
 
   const warnings = []
-  if (Number(f.quantity) < Number(req.quantity_l)) warnings.push(`You're offering less than the ${litres(req.quantity_l)} needed.`)
+  if (Number(f.quantity) > need) warnings.push(`Only ${litres(need)} is still needed.`)
+  else if (Number(f.quantity) < need) warnings.push(`You're offering less than the ${litres(need)} needed. The buyer can combine bids.`)
   if (f.delivery_date > req.required_date) warnings.push(`You'd deliver after ${date(req.required_date)}.`)
   if (req.quality === 'fresh' && (!f.max_age || Number(f.max_age) > 24)) warnings.push('Farm fresh means milk under 24 hours old.')
 
@@ -175,7 +177,7 @@ export default function RequestDetail() {
   return (
     <>
       <PageHeader back={{ to: '/manager/bulk-requests', label: 'Bulk requests' }}
-        title={`${req.business?.business_name ?? 'A business'} needs ${litres(req.quantity_l)}`}
+        title={`${req.business?.business_name ?? 'A business'} needs ${litres(req.remaining_l ?? req.quantity_l)}${req.remaining_l != null && req.remaining_l < Number(req.quantity_l) ? ' more' : ''}`}
         description={`${cap(req.business?.business_type)} in ${req.delivery_city}, needed on ${date(req.required_date)}.`} />
 
       <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_400px]">

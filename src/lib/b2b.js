@@ -9,11 +9,18 @@ export const qualityHint = {
 }
 export const orderSteps = ['confirmed', 'dispatched', 'delivered']
 
-// a bid "qualifies" when it covers the full quantity, arrives on time,
-// and — for farm fresh requests — promises milk under 24 hours old
+// litres already ordered on a requirement (several bids can cover one requirement)
+export const coveredL = (req) => (req.orders ?? []).filter((o) => o.status !== 'cancelled').reduce((n, o) => n + Number(o.quantity_l), 0)
+export const stillNeeded = (req) => Math.max(0, Number(req.quantity_l) - coveredL(req))
+export const isExpired = (req) => req.status === 'open' && req.required_date < new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Karachi' })
+const one = (x) => (Array.isArray(x) ? x[0] ?? null : x ?? null)
+
+// a bid "qualifies" when it covers the litres still needed, arrives on time,
+// and for farm fresh requests promises milk under 24 hours old
 export function bidIssues(bid, req) {
   const issues = []
-  if (Number(bid.quantity_l) < Number(req.quantity_l)) issues.push(`Only ${Number(bid.quantity_l)} of ${Number(req.quantity_l)} L`)
+  const need = req.orders ? stillNeeded(req) || Number(req.quantity_l) : Number(req.quantity_l)
+  if (Number(bid.quantity_l) < need) issues.push(`Covers ${Number(bid.quantity_l)} of ${need} L`)
   if (bid.delivery_date > req.required_date) issues.push('Arrives after your date')
   if (req.quality === 'fresh' && (!bid.max_age_hours || bid.max_age_hours > 24)) issues.push('Not same-day milk')
   return issues
@@ -23,7 +30,8 @@ export const freshnessText = (h) => (h ? `Under ${h} h old on arrival` : 'Freshn
 
 // best 3 qualifying bids by price, then everything else
 export function rankBids(bids, req) {
-  const live = bids.filter((b) => b.status === 'submitted' || b.status === 'accepted')
+  // accepted bids are already orders, so only bids still waiting are compared
+  const live = bids.filter((b) => b.status === 'submitted')
   const byPrice = (a, b) => a.price_per_l - b.price_per_l || a.delivery_date.localeCompare(b.delivery_date)
   const qualifying = live.filter((b) => bidIssues(b, req).length === 0).sort(byPrice)
   const top = qualifying.slice(0, 3)
@@ -37,29 +45,38 @@ const BID_FIELDS = 'id, price_per_l, quantity_l, delivery_date, max_age_hours, n
 export async function myRequirements() {
   const { data, error } = await supabase
     .from('bulk_requirements')
-    .select('*, bids(id, status)')
+    .select('*, bids(id, status), orders:bulk_orders(quantity_l, status)')
     .order('created_at', { ascending: false })
   if (error) throw error
-  return data.map((r) => ({ ...r, bid_count: r.bids.filter((b) => b.status === 'submitted' || b.status === 'accepted').length }))
+  return data.map((r) => ({ ...r, bid_count: r.bids.filter((b) => b.status === 'submitted').length }))
 }
 
 export async function requirementWithBids(id) {
   const { data, error } = await supabase
     .from('bulk_requirements')
-    .select(`*, bids(${BID_FIELDS}, center:area_managers(center_name, city))`)
+    .select(`*, bids(${BID_FIELDS}, center:area_managers(center_name, city)), orders:bulk_orders(id, bid_id, quantity_l, status)`)
     .eq('id', id)
     .single()
   if (error) throw error
-  return data
+  const ids = [...new Set(data.bids.map((b) => b.area_manager_id))]
+  const rec = ids.length ? await trackRecord(ids).catch(() => []) : []
+  return { ...data, bids: data.bids.map((b) => ({ ...b, record: rec.find((r) => r.center_id === b.area_manager_id) ?? null })) }
+}
+
+// how each center has done: ai test results, on-time delivery and ratings from businesses
+export async function trackRecord(ids) {
+  const { data, error } = await supabase.rpc('center_track_record', { p_centers: ids })
+  if (error) throw error
+  return data ?? []
 }
 
 export async function businessOrders() {
   const { data, error } = await supabase
     .from('bulk_orders')
-    .select('*, center:area_managers(center_name, city), requirement:bulk_requirements(milk_type, quality)')
+    .select('*, center:area_managers(center_name, city), requirement:bulk_requirements(milk_type, quality), review:bulk_reviews(rating, comment)')
     .order('created_at', { ascending: false })
   if (error) throw error
-  return data
+  return data.map((o) => ({ ...o, review: one(o.review) }))
 }
 
 // ---------- milk center ----------
@@ -85,17 +102,20 @@ export async function requirementForCenter(id) {
     .eq('id', id)
     .single()
   if (error) throw error
-  const { data: bids } = await supabase.from('bids').select(BID_FIELDS).eq('requirement_id', id)
-  return { ...data, my_bid: bids?.[0] ?? null }
+  const [{ data: bids }, { data: board }] = await Promise.all([
+    supabase.from('bids').select(BID_FIELDS).eq('requirement_id', id),
+    supabase.from('request_board').select('remaining_l').eq('id', id).maybeSingle(),
+  ])
+  return { ...data, my_bid: bids?.[0] ?? null, remaining_l: board ? Number(board.remaining_l) : null }
 }
 
 export async function centerOrders() {
   const { data, error } = await supabase
     .from('bulk_orders')
-    .select('*, buyer:business_profiles(business_name, business_type), requirement:bulk_requirements(milk_type, quality)')
+    .select('*, buyer:business_profiles(business_name, business_type), requirement:bulk_requirements(milk_type, quality), review:bulk_reviews(rating, comment)')
     .order('created_at', { ascending: false })
   if (error) throw error
-  return data
+  return data.map((o) => ({ ...o, review: one(o.review) }))
 }
 
 // ---------- open offers (visible to everyone) ----------
@@ -119,6 +139,7 @@ export const placeBid = (a) => rpc('place_bid', a)
 export const withdrawBid = (id) => rpc('withdraw_bid', { p_bid: id })
 export const acceptBid = (id) => rpc('accept_bid', { p_bid: id })
 export const cancelRequirement = (id) => rpc('cancel_requirement', { p_requirement: id })
+export const rateOrder = (id, rating, comment) => rpc('rate_bulk_order', { p_order: id, p_rating: rating, p_comment: comment || null })
 // returns null when done, or a message when the delivery code was wrong
 export const updateBulkOrder = (id, status, code) => rpc('update_bulk_order', { p_order: id, p_status: status, p_code: code ?? null })
 export const myDeliveryCodes = async () => { const { data, error } = await supabase.from('delivery_codes').select('order_id, code').eq('order_kind', 'bulk'); if (error) throw error; return data }

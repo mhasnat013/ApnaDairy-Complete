@@ -9,7 +9,7 @@ import ChoiceCards from '../../components/ChoiceCards'
 import Alert from '../../components/Alert'
 import { MilkChurn } from '../../components/Farm'
 
-const iso = (d) => d.toISOString().slice(0, 10)
+const iso = (d) => d.toLocaleDateString('en-CA', { timeZone: 'Asia/Karachi' })
 const plusDays = (n) => { const d = new Date(); d.setDate(d.getDate() + n); return d }
 const milkHint = { cow: 'Lighter, everyday milk', buffalo: 'Thicker, more cream', mixed: 'Either is fine' }
 const quickQty = [100, 250, 500, 1000]
@@ -27,7 +27,7 @@ export default function NewRequirement() {
   const [busy, setBusy] = useState(false)
   const set = (k) => (e) => setF((prev) => ({ ...prev, [k]: e?.target ? e.target.value : e }))
 
-  const deadline = useMemo(() => new Date(`${f.deadline_date}T${f.deadline_time}`), [f.deadline_date, f.deadline_time])
+  const deadline = useMemo(() => new Date(`${f.deadline_date}T${f.deadline_time}:00+05:00`), [f.deadline_date, f.deadline_time])
 
   const onSubmit = async (e) => {
     e.preventDefault()
@@ -59,7 +59,7 @@ export default function NewRequirement() {
   return (
     <>
       <PageHeader title="What milk do you need?" back={{ to: '/business/requirements', label: 'My requirements' }}
-        description="Verified collection centers see this and send their best price. You choose who supplies you." />
+        description="Verified collection centers see this and send their best price. You choose who supplies you, and can split a large order between centers." />
 
       <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_340px]">
         <form onSubmit={onSubmit} className="panel space-y-7 p-6 sm:p-8">
@@ -80,7 +80,7 @@ export default function NewRequirement() {
           <div className="grid gap-5 sm:grid-cols-2">
             <div className="field">
               <label htmlFor="qty">How many litres?</label>
-              <input id="qty" type="number" min="1" step="1" className="input num" required value={f.quantity_l} onChange={set('quantity_l')} placeholder="500" />
+              <input id="qty" type="number" min="1" max="50000" step="1" className="input num" required value={f.quantity_l} onChange={set('quantity_l')} placeholder="500" />
               <div className="flex flex-wrap gap-1.5">
                 {quickQty.map((q) => (
                   <button key={q} type="button" onClick={() => set('quantity_l')(String(q))}

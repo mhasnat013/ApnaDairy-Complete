@@ -68,6 +68,7 @@ export default function BulkRequests() {
                       <Link to={`/manager/bulk-requests/${r.id}`} onClick={(e) => e.stopPropagation()} className="num font-semibold hover:underline">
                         {litres(r.quantity_l)} {milkLabel[r.milk_type].toLowerCase()}
                       </Link>
+                      {r.remaining_l != null && Number(r.remaining_l) < Number(r.quantity_l) && <p className="num text-[12.5px] font-semibold text-amber">{litres(Number(r.remaining_l))} still needed</p>}
                       <span className={`mt-1 inline-block rounded-full px-2 py-0.5 text-[12px] font-semibold ${r.quality === 'fresh' ? 'bg-mint-soft text-forest' : r.quality === 'premium' ? 'bg-haldi-soft text-amber' : 'bg-cream-2 text-muted'}`}>{qualityLabel[r.quality]}</span>
                     </td>
                     <td className="num">{date(r.required_date)}<p className="text-[13px] text-muted">{r.delivery_city}</p></td>

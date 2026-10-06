@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { myRequirements, milkLabel, qualityLabel } from '../../lib/b2b'
+import { myRequirements, milkLabel, qualityLabel, coveredL, isExpired } from '../../lib/b2b'
 import { useLoad } from '../../lib/useLoad'
 import { rs, litres, date, relative } from '../../lib/format'
 import PageHeader from '../../components/PageHeader'
@@ -12,8 +12,8 @@ import { SkeletonRows } from '../../components/Skeleton'
 
 const filters = [
   { value: 'open', label: 'Receiving bids' },
-  { value: 'awarded', label: 'Awarded' },
-  { value: 'cancelled', label: 'Cancelled' },
+  { value: 'awarded', label: 'Ordered' },
+  { value: 'cancelled', label: 'Closed' },
   { value: 'all', label: 'All' },
 ]
 
@@ -22,8 +22,10 @@ export default function Requirements() {
   const { data, error, loading } = useLoad(myRequirements)
   const [filter, setFilter] = useState('open')
 
-  const rows = useMemo(() => (data ?? []).filter((r) => filter === 'all' || r.status === filter), [data, filter])
-  const count = (s) => (data ?? []).filter((r) => s === 'all' || r.status === s).length
+  // ordered = covered, or stopped after some litres were ordered; closed = cancelled or the date passed
+  const group = (r) => (isExpired(r) ? (coveredL(r) > 0 ? 'awarded' : 'cancelled') : r.status === 'closed' ? 'awarded' : r.status)
+  const rows = useMemo(() => (data ?? []).filter((r) => filter === 'all' || group(r) === filter), [data, filter])
+  const count = (s) => (data ?? []).filter((r) => s === 'all' || group(r) === s).length
 
   return (
     <>
@@ -57,13 +59,14 @@ export default function Requirements() {
                   <Link to={`/business/requirements/${r.id}`} className="font-semibold text-ink hover:underline" onClick={(e) => e.stopPropagation()}>
                     {litres(r.quantity_l)} {milkLabel[r.milk_type].toLowerCase()}
                   </Link>
-                  <p className="text-[13px] text-muted">{qualityLabel[r.quality]}</p>
+                  <p className="text-[13px] text-muted">{qualityLabel[r.quality]}{coveredL(r) > 0 ? ` · ${litres(coveredL(r))} ordered` : ''}</p>
                 </td>
                 <td className="num">{date(r.required_date)}<p className="text-[13px] text-muted">{r.delivery_city}</p></td>
                 <td className="num text-right">{r.target_price ? rs(r.target_price) : <span className="text-muted">Open</span>}</td>
                 <td className="text-right"><span className={`num inline-grid h-7 min-w-7 place-items-center rounded-full px-2 text-[13px] font-semibold ${r.bid_count ? 'bg-haldi-soft text-amber' : 'bg-cream-2 text-muted'}`}>{r.bid_count}</span></td>
-                <td className="text-muted">{r.status === 'open' ? (new Date(r.bid_deadline) > new Date() ? relative(r.bid_deadline) : 'Closed, choose a bid') : '—'}</td>
-                <td><Badge status={r.status === 'open' ? 'open' : r.status}>{r.status === 'open' ? 'Receiving bids' : undefined}</Badge></td>
+                <td className="text-muted">{r.status === 'open' && !isExpired(r) ? (new Date(r.bid_deadline) > new Date() ? relative(r.bid_deadline) : 'Closed, choose a bid') : '—'}</td>
+                <td>{isExpired(r) ? <Badge tone="grey">Date passed</Badge>
+                  : <Badge status={r.status}>{r.status === 'open' ? (coveredL(r) > 0 ? 'Part ordered' : 'Receiving bids') : r.status === 'awarded' ? 'Covered' : r.status === 'closed' ? 'Stopped' : undefined}</Badge>}</td>
               </tr>
             ))}
           </tbody>

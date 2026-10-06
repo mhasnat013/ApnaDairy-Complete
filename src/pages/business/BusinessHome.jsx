@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../context/AuthContext'
-import { myRequirements, businessOrders, milkLabel } from '../../lib/b2b'
+import { myRequirements, businessOrders, milkLabel, isExpired } from '../../lib/b2b'
 import { useLoad } from '../../lib/useLoad'
 import { rs, litres, date, relative } from '../../lib/format'
 import WelcomeBanner from '../../components/WelcomeBanner'
@@ -20,7 +20,7 @@ export default function BusinessHome() {
     return { biz, reqs, orders }
   }, [profile.id])
 
-  const open = data?.reqs.filter((r) => r.status === 'open') ?? []
+  const open = data?.reqs.filter((r) => r.status === 'open' && !isExpired(r)) ?? []
   const active = data?.orders.filter((o) => o.status === 'confirmed' || o.status === 'dispatched') ?? []
   const delivered = data?.orders.filter((o) => o.status === 'delivered') ?? []
 
