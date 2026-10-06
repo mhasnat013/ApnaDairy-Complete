@@ -59,7 +59,7 @@ export default function BulkOrders() {
             {data?.map((o) => (
               <tr key={o.id}>
                 <td><p className="font-semibold">{o.buyer?.business_name}</p><p className="text-[13px] text-muted">{cap(o.buyer?.business_type)}</p></td>
-                <td className="num">{qtyText(o.quantity_l, o.requirement?.unit)} at {rs(o.price_per_l)}/{perUnit(o.requirement?.unit)}<p className="text-[13px] text-muted">{isMilk(o.requirement) ? milkLabel[o.requirement?.milk_type] : productLabel[o.requirement?.product]}, {qualityLabel[o.requirement?.quality]?.toLowerCase()}</p></td>
+                <td className="num">{qtyText(o.quantity_l, o.requirement?.unit)} at {rs(o.price_per_l)}/{perUnit(o.requirement?.unit)}<p className="text-[13px] text-muted">{isMilk(o.requirement) ? `${milkLabel[o.requirement?.milk_type]}, ${qualityLabel[o.requirement?.quality]?.toLowerCase()}` : productLabel[o.requirement?.product]}</p></td>
                 <td className="num text-right font-semibold">{rs(o.total_amount)}</td>
                 <td className="num">{date(o.delivery_date)}<p className="text-[13px] text-muted">{o.delivery_address ? `${o.delivery_address}, ` : ''}{o.delivery_city}</p></td>
                 <td><OrderProgress order={o} /></td>

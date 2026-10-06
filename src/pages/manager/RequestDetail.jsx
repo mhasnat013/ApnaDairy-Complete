@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { requirementForCenter, placeBid, withdrawBid, milkLabel, qualityLabel, qualityHint, productQualityHint, myProductCapacity, isMilk, qtyText, perUnit, productLabel } from '../../lib/b2b'
+import { requirementForCenter, placeBid, withdrawBid, milkLabel, qualityLabel, qualityHint, myProductCapacity, isMilk, qtyText, perUnit, productLabel } from '../../lib/b2b'
 import { useLoad } from '../../lib/useLoad'
 import { bidCapacity, todayKey } from '../../lib/center'
 import { useUi } from '../../context/UiContext'
@@ -215,8 +215,8 @@ export default function RequestDetail() {
             <MilkChurn size={84} stroke="#fffcf4" className="absolute -bottom-2 right-5 opacity-90" />
             <p className="display num text-[54px] leading-none">{qtyText(req.quantity_l, req.unit)}</p>
             <p className="mt-2 text-[17px] font-semibold">{isMilk(req) ? milkLabel[req.milk_type] : `${productLabel[req.product]}, from ${milkLabel[req.milk_type].toLowerCase()}`}</p>
-            <span className="mt-4 inline-flex rounded-full bg-haldi px-3 py-1 text-[13px] font-bold text-forest-deep">{qualityLabel[req.quality]}</span>
-            <p className="mt-1.5 text-[13.5px] text-cream/70">{isMilk(req) ? qualityHint[req.quality] : productQualityHint[req.quality]}</p>
+            {isMilk(req) && <span className="mt-4 inline-flex rounded-full bg-haldi px-3 py-1 text-[13px] font-bold text-forest-deep">{qualityLabel[req.quality]}</span>}
+            {isMilk(req) && <p className="mt-1.5 text-[13.5px] text-cream/70">{qualityHint[req.quality]}</p>}
           </div>
 
           <dl className="panel divide-y divide-line">

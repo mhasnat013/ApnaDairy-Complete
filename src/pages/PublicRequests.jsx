@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase'
 import { useLoad } from '../lib/useLoad'
 import { useAuth } from '../context/AuthContext'
 import { homeFor } from '../lib/roles'
-import { milkLabel, qualityLabel, qualityHint, productQualityHint, qtyText, perUnit, isMilk, productLabel } from '../lib/b2b'
+import { milkLabel, qualityLabel, qualityHint, qtyText, perUnit, isMilk, productLabel } from '../lib/b2b'
 import { rs, date, dateTime, relative } from '../lib/format'
 import PublicHeader from '../components/landing/PublicHeader'
 import Footer from '../components/landing/Footer'
@@ -56,7 +56,7 @@ function RequestCard({ r, onOpen, i }) {
     <button onClick={() => onOpen(r)} style={{ animationDelay: `${Math.min(i, 8) * 50}ms` }}
       className="panel group flex animate-rise flex-col p-5 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-forest/40 hover:shadow-[0_24px_40px_-30px_rgb(23_58_40/.7)] focus-visible:-translate-y-0.5">
       <div className="flex items-start justify-between gap-3">
-        <span className={`rounded-full px-2.5 py-1 text-[12.5px] font-semibold ${qualityTone[r.quality]}`}>{qualityLabel[r.quality]}</span>
+        {isMilk(r) && <span className={`rounded-full px-2.5 py-1 text-[12.5px] font-semibold ${qualityTone[r.quality]}`}>{qualityLabel[r.quality]}</span>}
         <span className="num rounded-full bg-cream-2 px-2.5 py-1 text-[12.5px] font-medium text-muted">{r.bid_count} {r.bid_count === 1 ? 'offer' : 'offers'}</span>
       </div>
       <p className="display num mt-4 text-[38px] leading-none text-forest-deep">{qtyText(r.quantity_l, r.unit)}</p>
@@ -93,8 +93,8 @@ function DetailPanel({ r, onClose }) {
           <MilkChurn size={56} stroke="#fffcf4" className="mb-3" />
           <p className="display num text-[44px] leading-none">{qtyText(r.quantity_l, r.unit)}</p>
           <p className="mt-2 text-[17px] font-semibold">{isMilk(r) ? milkLabel[r.milk_type] : `${productLabel[r.product]}, from ${milkLabel[r.milk_type].toLowerCase()}`}</p>
-          <span className="mt-3 inline-flex rounded-full bg-haldi px-3 py-1 text-[13px] font-bold text-forest-deep">{qualityLabel[r.quality]}</span>
-          <p className="mt-1.5 text-[13.5px] text-cream/70">{isMilk(r) ? qualityHint[r.quality] : productQualityHint[r.quality]}</p>
+          {isMilk(r) && <span className="mt-3 inline-flex rounded-full bg-haldi px-3 py-1 text-[13px] font-bold text-forest-deep">{qualityLabel[r.quality]}</span>}
+          {isMilk(r) && <p className="mt-1.5 text-[13.5px] text-cream/70">{qualityHint[r.quality]}</p>}
         </div>
 
         <dl className="divide-y divide-line px-6">
@@ -156,7 +156,7 @@ export default function PublicRequests() {
   const all = data ?? []
   const shown = useMemo(() => all
     .filter((r) => milk === 'all' || (milk === 'milk' ? isMilk(r) : !isMilk(r)))
-    .filter((r) => quality === 'all' || r.quality === quality)
+    .filter((r) => quality === 'all' || (isMilk(r) && r.quality === quality))
     .filter((r) => !q.trim() || r.delivery_city.toLowerCase().includes(q.trim().toLowerCase()) || r.business_type.includes(q.trim().toLowerCase()))
     .sort(sorts[sort].fn), [all, milk, quality, q, sort])
 
@@ -211,7 +211,7 @@ export default function PublicRequests() {
             ]} />
             <Segmented size="sm" value={quality} onChange={setQuality} options={[
               { value: 'all', label: 'Any quality' },
-              ...['fresh', 'standard', 'premium'].map((v) => ({ value: v, label: qualityLabel[v], count: count('quality', v) })),
+              ...['fresh', 'standard', 'premium'].map((v) => ({ value: v, label: qualityLabel[v], count: all.filter((r) => isMilk(r) && r.quality === v).length })),
             ]} />
             <label className="ml-auto flex items-center gap-2 text-[14px] text-muted">
               Sort
@@ -250,7 +250,7 @@ export default function PublicRequests() {
               <p className="display text-[20px]">How bulk bidding works</p>
               <ol className="mt-4 space-y-4">
                 {[
-                  ['A business posts a need', 'Milk or a dairy product, how much, quality, date and a target price.'],
+                  ['A business posts a need', 'Milk or a dairy product, how much, the date and a target price.'],
                   ['Sellers post offers', 'Every offer is visible here, so prices stay fair.'],
                   ['The buyer chooses', 'One seller, or a big order split between sellers. Each delivers and tracks its part.'],
                 ].map(([t, d], i) => (

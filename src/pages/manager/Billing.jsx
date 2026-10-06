@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import { useLoad } from '../../lib/useLoad'
 import { useUi } from '../../context/UiContext'
-import { billingOverview, myInvoices, billingTiers, payInvoice, paymentLabel, monthLabel, rsShort, todayKey } from '../../lib/center'
+import { billingOverview, myInvoices, payInvoice, paymentLabel, monthLabel, rsShort, todayKey } from '../../lib/center'
 import { rs, date } from '../../lib/format'
 import PageHeader from '../../components/PageHeader'
 import Card from '../../components/Card'
@@ -18,16 +18,13 @@ export default function Billing() {
   const { center } = useOutletContext() ?? {}
   const seller = center?.type === 'byproduct'
   const { data, error, reload } = useLoad(async () => {
-    const [o, invoices, tiers] = await Promise.all([billingOverview(), myInvoices(), billingTiers()])
-    return { o, invoices, tiers }
+    const [o, invoices] = await Promise.all([billingOverview(), myInvoices()])
+    return { o, invoices }
   })
   const [paying, setPaying] = useState(null)
   const o = data?.o
   const due = (data?.invoices ?? []).filter((i) => i.status === 'due')
   const past = (data?.invoices ?? []).filter((i) => i.status !== 'due')
-  const tiers = data?.tiers ?? []
-  const nextAt = Number(o?.next_tier_at || 0)
-  const progress = o && nextAt ? Math.min(100, (Number(o.this_month_online) / nextAt) * 100) : 100
 
   return (
     <>
@@ -54,32 +51,20 @@ export default function Billing() {
               <dd><span className="rounded-full bg-[#7fd39b]/20 px-2.5 py-1 text-[12.5px] font-semibold text-[#a9e6bd]">100% yours</span></dd>
             </div>
           </dl>
-          <p className="mt-4 text-[12.5px] leading-relaxed text-cream/65">ApnaDairy takes no cut from what you sell. The monthly fee gets smaller when you sell more through the app and bulk orders, see the tiers below.</p>
+          <p className="mt-4 text-[12.5px] leading-relaxed text-cream/65">ApnaDairy takes no cut from what you sell. One monthly fee, and ApnaDairy may give you a discount when your sales are high.</p>
         </section>
 
-        <Card title="This month" subtitle="Delivered app and bulk orders so far decide next month’s discount">
+        <Card title="This month" subtitle="One plan for every seller. ApnaDairy may give a discount on the monthly fee to sellers who sell a lot.">
           <div className="grid grid-cols-3 gap-3">
-            <div className="rounded-2xl bg-cream px-3 py-3"><p className="text-[12px] text-muted">Sales so far</p><p className="display num mt-0.5 text-[20px] sm:text-[24px]">{o ? rsShort(o.this_month_online) : '—'}</p></div>
-            <div className="rounded-2xl bg-cream px-3 py-3"><p className="text-[12px] text-muted">Next month’s fee</p><p className="display num mt-0.5 text-[20px] sm:text-[24px]">{o ? rs(Math.round(Number(o.monthly_fee) * (100 - Number(o.tier_now_discount || 0)) / 100)) : '—'}</p></div>
+            <div className="rounded-2xl bg-cream px-3 py-3"><p className="text-[12px] text-muted">Sales so far</p><p className="display num mt-0.5 text-[20px] sm:text-[24px]">{o ? rs(Math.round(o.this_month_online)) : '—'}</p></div>
+            <div className="rounded-2xl bg-cream px-3 py-3"><p className="text-[12px] text-muted">Your monthly fee</p><p className="display num mt-0.5 text-[20px] sm:text-[24px]">{o ? rs(Math.round(Number(o.monthly_fee) * (100 - Number(o.fee_discount_pct || 0)) / 100)) : '—'}</p></div>
             <div className="rounded-2xl bg-cream px-3 py-3"><p className="text-[12px] text-muted">Cut from sales</p><p className="display num mt-0.5 text-[20px] text-forest sm:text-[24px]">Rs 0</p></div>
           </div>
-          <div className="mt-5">
-            <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <p className="text-[14px]"><b>{o?.tier_now ?? '—'}</b>{o?.tier_now_discount ? ` · ${o.tier_now_discount}% off` : ''}</p>
-              {o?.next_tier ? <p className="text-[13px] text-muted">{rs(Math.max(0, Math.round(nextAt - o.this_month_online)))} more sales to reach <b className="text-ink">{o.next_tier}</b> ({o.next_tier_discount}% off)</p>
-                : <p className="text-[13px] font-semibold text-forest">Top tier reached</p>}
-            </div>
-            <div className="mt-2 h-3 rounded-full bg-cream-2"><div className="h-3 rounded-full bg-haldi transition-all" style={{ width: `${progress}%` }} /></div>
+          <div className={`mt-5 rounded-2xl px-4 py-3 text-[13.5px] ${Number(o?.fee_discount_pct) ? 'bg-mint-soft text-forest' : 'bg-cream text-muted'}`}>
+            {Number(o?.fee_discount_pct)
+              ? <><b>{o.fee_discount_pct}% off</b> your monthly fee, given by ApnaDairy for your sales. It applies to your next bills.</>
+              : 'No discount yet. Sellers with high monthly sales through the app and bulk orders can get one from ApnaDairy.'}
           </div>
-          <ul className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-4">
-            {tiers.map((t) => (
-              <li key={t.name} className={`rounded-2xl border px-3 py-2.5 ${o?.tier_now === t.name ? 'border-forest bg-mint-soft' : 'border-line'}`}>
-                <p className="text-[13px] font-semibold">{t.name}</p>
-                <p className="text-[12px] text-muted">{Number(t.min_monthly_sales) ? `from ${rsShort(t.min_monthly_sales)} a month` : 'any sales'}</p>
-                <p className="num mt-1 text-[15px] font-bold text-forest">{t.discount_pct}% off</p>
-              </li>
-            ))}
-          </ul>
         </Card>
       </div>
 
@@ -135,7 +120,7 @@ export function Breakdown({ i }) {
   if (Number(i.device_fee)) rows.push(['IoT milk tester', rs(i.device_fee)])
   if (Number(i.subscription_fee)) {
     rows.push(['Platform fee', rs(i.subscription_fee)])
-    if (i.discount_pct) rows.push([`${i.tier} discount (${i.discount_pct}%), on ${rsShort(i.sales_basis)} sales last month`, `−${rs(Math.round(i.subscription_fee * i.discount_pct) / 100)}`])
+    if (i.discount_pct) rows.push([`Discount (${i.discount_pct}%) from ApnaDairy`, `−${rs(Math.round(i.subscription_fee * i.discount_pct) / 100)}`])
   }
   // bills from before the subscription-only plan may still show a commission line
   if (Number(i.commission)) rows.push([`Commission ${Number(i.commission_pct)}% of ${rs(i.online_sales)} online orders`, rs(i.commission)])

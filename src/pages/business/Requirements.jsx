@@ -59,7 +59,7 @@ export default function Requirements() {
                   <Link to={`/business/requirements/${r.id}`} className="font-semibold text-ink hover:underline" onClick={(e) => e.stopPropagation()}>
                     {reqTitle(r)}
                   </Link>
-                  <p className="text-[13px] text-muted">{isMilk(r) ? qualityLabel[r.quality] : `${productLabel[r.product]}, ${qualityLabel[r.quality].toLowerCase()}`}{coveredL(r) > 0 ? ` · ${qtyText(coveredL(r), r.unit)} ordered` : ''}</p>
+                  <p className="text-[13px] text-muted">{isMilk(r) ? qualityLabel[r.quality] : productLabel[r.product]}{coveredL(r) > 0 ? ` · ${qtyText(coveredL(r), r.unit)} ordered` : ''}</p>
                 </td>
                 <td className="num">{date(r.required_date)}<p className="text-[13px] text-muted">{r.delivery_city}</p></td>
                 <td className="num text-right">{r.target_price ? rs(r.target_price) : <span className="text-muted">Open</span>}</td>

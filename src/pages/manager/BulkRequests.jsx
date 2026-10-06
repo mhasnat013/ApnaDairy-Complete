@@ -61,7 +61,7 @@ export default function BulkRequests() {
                         {reqTitle(r)}
                       </Link>
                       {r.remaining_l != null && Number(r.remaining_l) < Number(r.quantity_l) && <p className="num text-[12.5px] font-semibold text-amber">{qtyText(r.remaining_l, r.unit)} still needed</p>}
-                      <span className={`mt-1 inline-block rounded-full px-2 py-0.5 text-[12px] font-semibold ${r.quality === 'fresh' ? 'bg-mint-soft text-forest' : r.quality === 'premium' ? 'bg-haldi-soft text-amber' : 'bg-cream-2 text-muted'}`}>{qualityLabel[r.quality]}</span>
+                      {isMilk(r) && <span className={`mt-1 inline-block rounded-full px-2 py-0.5 text-[12px] font-semibold ${r.quality === 'fresh' ? 'bg-mint-soft text-forest' : r.quality === 'premium' ? 'bg-haldi-soft text-amber' : 'bg-cream-2 text-muted'}`}>{qualityLabel[r.quality]}</span>}
                     </td>
                     <td className="num">{date(r.required_date)}<p className="text-[13px] text-muted">{r.delivery_city}</p></td>
                     <td className="num text-right">{r.target_price ? <>{rs(r.target_price)}<span className="text-[12px] text-muted"> / {perUnit(r.unit)}</span></> : <span className="text-muted">Open</span>}</td>

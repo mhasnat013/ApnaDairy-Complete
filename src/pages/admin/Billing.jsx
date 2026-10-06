@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useLoad } from '../../lib/useLoad'
 import { useUi } from '../../context/UiContext'
 import {
-  adminInvoices, platformSettings, billingTiers, savePlatformSettings, saveTier, generateInvoices, voidInvoice, payInvoice,
+  adminInvoices, platformSettings, savePlatformSettings, adminCenterFees, setFeeDiscount, generateInvoices, voidInvoice, payInvoice,
   paymentLabel, monthLabel, rsShort, todayKey,
 } from '../../lib/center'
 import { rs, date } from '../../lib/format'
@@ -26,12 +26,11 @@ const GROUPS = [
 export default function AdminBilling() {
   const { toast, confirm } = useUi()
   const { data, error, reload } = useLoad(async () => {
-    const [invoices, settings, tiers] = await Promise.all([adminInvoices(), platformSettings(), billingTiers()])
-    return { invoices, settings, tiers }
+    const [invoices, settings] = await Promise.all([adminInvoices(), platformSettings()])
+    return { invoices, settings }
   })
   const [view, setView] = useState('due')
   const [form, setForm] = useState(null)
-  const [tierEdits, setTierEdits] = useState({})
   const [busy, setBusy] = useState(false)
 
   const inv = data?.invoices ?? []
@@ -51,14 +50,9 @@ export default function AdminBilling() {
     try { await savePlatformSettings(s); toast('Settings saved. They apply to new offers, prices and bills.'); setForm(null); await reload() } catch (e) { toast(e.message, 'error') }
     setBusy(false)
   }
-  const saveTiers = async () => {
-    setBusy(true)
-    try { for (const t of Object.values(tierEdits)) await saveTier(t); toast('Discount tiers saved.'); setTierEdits({}); await reload() } catch (e) { toast(e.message, 'error') }
-    setBusy(false)
-  }
   const bill = async () => {
     const label = monthLabel(`${month}-01`)
-    if (!(await confirm({ title: `Create ${label} bills?`, body: 'Every approved center without a bill for this month gets one: the monthly platform fee after its discount. ApnaDairy takes nothing from milk sales.', confirmLabel: 'Create bills' }))) return
+    if (!(await confirm({ title: `Create ${label} bills?`, body: 'Every approved seller without a bill for this month gets one: the monthly fee minus the discount you gave them. ApnaDairy takes nothing from sales.', confirmLabel: 'Create bills' }))) return
     try { const n = await generateInvoices(); toast(n ? `${n} bills created.` : 'Every center already has a bill for this month.'); await reload() } catch (e) { toast(e.message, 'error') }
   }
   const cash = async (i) => {
@@ -105,7 +99,7 @@ export default function AdminBilling() {
                 <tr key={i.id}>
                   <td><p className="font-semibold">{i.center_name}</p><p className="text-[12.5px] text-muted">{i.city}</p></td>
                   <td><p className="font-medium">{i.kind === 'device' ? 'IoT device' : monthLabel(i.period_month)}</p>
-                    <p className="text-[12.5px] text-muted">{i.kind === 'monthly' ? `${i.tier}${i.discount_pct ? ` ${i.discount_pct}% off` : ''}` : 'one-time'}</p></td>
+                    <p className="text-[12.5px] text-muted">{i.kind === 'monthly' ? (i.discount_pct ? `${i.discount_pct}% discount` : 'monthly fee') : 'one-time'}</p></td>
                   <td className="num text-right font-semibold">{rs(i.amount)}</td>
                   <td className={`num ${overdue(i) ? 'font-semibold text-danger' : ''}`}>{date(i.due_date)}</td>
                   <td>{i.status === 'paid' ? <><Badge tone="green">Paid</Badge><p className="mt-1 text-[12px] text-muted">{paymentLabel[i.payment_method]} · {date(i.paid_at)}</p></>
@@ -150,27 +144,55 @@ export default function AdminBilling() {
           <button className="btn-primary mt-5 w-full" disabled={!dirty || busy} onClick={saveSettings}>Save rules</button>
         </Card>
 
-        <Card title="Discount tiers" subtitle="The monthly fee gets cheaper for centers that sold more last month through delivered app and bulk orders.">
-          <div className="grid gap-2">
-            {(data?.tiers ?? []).map((t) => {
-              const e = tierEdits[t.name] ?? t
-              const set = (k) => (ev) => setTierEdits({ ...tierEdits, [t.name]: { ...e, [k]: ev.target.value } })
-              return (
-                <div key={t.name} className="grid grid-cols-[1fr_auto_auto] items-center gap-2 rounded-2xl bg-cream px-4 py-2.5">
-                  <span className="font-semibold">{t.name}</span>
-                  <label className="flex items-center gap-1 text-[12px] text-muted">from Rs
-                    <input className="input num h-9 w-28 text-right" type="number" min="0" value={e.min_monthly_sales} onChange={set('min_monthly_sales')} disabled={t.name === 'Standard'} aria-label={`${t.name} sales`} /></label>
-                  <label className="flex items-center gap-1 text-[12px] text-muted">
-                    <input className="input num h-9 w-16 text-right" type="number" min="0" max="100" value={e.discount_pct} onChange={set('discount_pct')} aria-label={`${t.name} discount`} />% off</label>
-                </div>
-              )
-            })}
-          </div>
-          <p className="mt-3 text-[12.5px] text-muted">Example: a center with {rsShort(2500000)} of delivered orders last month pays the Gold fee this month.</p>
-          <button className="btn-primary mt-4 w-full" disabled={!Object.keys(tierEdits).length || busy} onClick={saveTiers}>Save tiers</button>
-        </Card>
+        <Discounts />
       </div>
     </>
   )
 }
 
+// one plan for every seller; the admin rewards high sales with a discount on the monthly fee
+function Discounts() {
+  const { toast } = useUi()
+  const { data, error, reload } = useLoad(adminCenterFees)
+  const [edits, setEdits] = useState({})
+  const [busy, setBusy] = useState(null)
+  const save = async (c) => {
+    const v = Number(edits[c.id])
+    if (!(v >= 0 && v <= 90) || !Number.isInteger(v)) return toast('Discount must be a whole number from 0 to 90.', 'error')
+    setBusy(c.id)
+    try { await setFeeDiscount(c.id, v); toast(v ? `${c.center_name} gets ${v}% off from the next bill.` : `${c.center_name} pays the full fee from the next bill.`); setEdits((e) => { const n = { ...e }; delete n[c.id]; return n }); await reload() } catch (e) { toast(e.message, 'error') }
+    setBusy(null)
+  }
+  return (
+    <Card title="Discounts" subtitle="Every seller pays the same monthly fee. Give a discount to sellers with high sales; it applies from their next bill." bodyClass="pt-3">
+      <Alert>{error}</Alert>
+      <div className="overflow-x-auto">
+        <table className="table min-w-[460px]">
+          <thead><tr><th>Seller</th><th className="text-right">Sales last month</th><th className="text-right">Discount</th></tr></thead>
+          <tbody>
+            {!data && <tr><td colSpan={3}><div className="skeleton h-16" /></td></tr>}
+            {data?.length === 0 && <tr><td colSpan={3} className="py-6 text-center text-muted">No approved sellers yet.</td></tr>}
+            {(data ?? []).map((c) => {
+              const v = edits[c.id] ?? String(c.fee_discount_pct)
+              const changed = String(v) !== String(c.fee_discount_pct)
+              return (
+                <tr key={c.id}>
+                  <td><p className="font-semibold">{c.center_name}</p><p className="text-[12.5px] text-muted">{c.type === 'byproduct' ? 'Dairy products' : 'Milk center'} · {c.city}</p></td>
+                  <td className="num text-right">{rs(Math.round(c.last_month_sales ?? 0))}<p className="text-[12px] text-muted">this month {rs(Math.round(c.this_month_sales ?? 0))}</p></td>
+                  <td className="text-right">
+                    <div className="flex items-center justify-end gap-1.5">
+                      <input className="input num h-9 w-16 text-right" type="number" min="0" max="90" value={v} aria-label={`Discount for ${c.center_name}`}
+                        onChange={(e) => setEdits({ ...edits, [c.id]: e.target.value })} />
+                      <span className="text-[12px] text-muted">%</span>
+                      {changed && <button className="btn-primary btn-sm" disabled={busy === c.id} onClick={() => save(c)}>Save</button>}
+                    </div>
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+    </Card>
+  )
+}

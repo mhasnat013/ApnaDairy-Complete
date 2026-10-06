@@ -125,13 +125,13 @@ export default function RequirementDetail() {
     <>
       <PageHeader back={{ to: '/business/requirements', label: 'My requirements' }}
         title={reqTitle(req)}
-        description={`${isMilk(req) ? `${qualityLabel[req.quality]} milk` : `${qualityLabel[req.quality]} ${productLabel[req.product].toLowerCase()}`} for ${req.delivery_city}, needed on ${date(req.required_date)}.`}>
+        description={`${isMilk(req) ? `${qualityLabel[req.quality]} milk` : productLabel[req.product]} for ${req.delivery_city}, needed on ${date(req.required_date)}.`}>
         {isOpen && <button className="btn-danger" onClick={onCancel} disabled={busy}>{covered > 0 ? 'Stop taking bids' : 'Cancel requirement'}</button>}
       </PageHeader>
 
       <div className="mb-8 flex flex-wrap gap-2">
         <Badge status={expired ? 'closed' : req.status} tone={expired ? 'grey' : undefined}>{expired ? 'Date passed' : biddingLive ? 'Taking bids' : isOpen ? 'Bidding closed, pick a bid' : req.status === 'closed' ? 'Stopped' : req.status === 'awarded' ? 'Covered' : undefined}</Badge>
-        <span className="rounded-full bg-cream-2 px-3 py-1 text-[13px] font-medium">{qualityLabel[req.quality]}</span>
+        {isMilk(req) && <span className="rounded-full bg-cream-2 px-3 py-1 text-[13px] font-medium">{qualityLabel[req.quality]}</span>}
         <span className="num rounded-full bg-cream-2 px-3 py-1 text-[13px] font-medium">Target {req.target_price ? `${rs(req.target_price)} / ${per}` : 'best offer'}</span>
         <span className="num rounded-full bg-cream-2 px-3 py-1 text-[13px] font-medium">
           {isOpen ? `Bids close ${relative(req.bid_deadline)}` : `Closed ${dateTime(req.bid_deadline)}`}

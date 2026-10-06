@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useUi } from '../../context/UiContext'
-import { milkLabel, qualityLabel, qualityHint, productQualityHint, productLabel, PRODUCTS, defaultUnit, qtyText, perUnit } from '../../lib/b2b'
+import { milkLabel, qualityLabel, qualityHint, productLabel, PRODUCTS, defaultUnit, qtyText, perUnit } from '../../lib/b2b'
 import { rs, date } from '../../lib/format'
 import PageHeader from '../../components/PageHeader'
 import ChoiceCards from '../../components/ChoiceCards'
@@ -46,7 +46,7 @@ export default function NewRequirement() {
       milk_type: f.milk_type,
       quantity_l: Number(f.quantity_l),
       required_date: f.required_date,
-      quality: f.quality,
+      quality: f.product === 'milk' ? f.quality : 'standard',
       target_price: f.target_price ? Number(f.target_price) : null,
       bid_deadline: deadline.toISOString(),
       delivery_city: f.delivery_city.trim(),
@@ -72,7 +72,7 @@ export default function NewRequirement() {
             <span className="label">What do you need?</span>
             <div className="flex flex-wrap gap-1.5">
               {['milk', ...PRODUCTS].map((v) => (
-                <button key={v} type="button" onClick={() => setF((p) => ({ ...p, product: v, unit: v === 'milk' ? 'litre' : defaultUnit[v], quality: v === 'milk' ? p.quality : p.quality === 'fresh' ? 'standard' : p.quality, quantity_l: '' }))}
+                <button key={v} type="button" onClick={() => setF((p) => ({ ...p, product: v, unit: v === 'milk' ? 'litre' : defaultUnit[v], quality: v === 'milk' ? (p.quality || 'fresh') : 'standard', quantity_l: '' }))}
                   className={`rounded-full border-[1.5px] px-3.5 py-1.5 text-[14px] font-medium transition-all ${f.product === v ? 'border-forest bg-mint-soft text-forest' : 'border-line bg-white hover:border-[#cdbd98]'}`}>
                   {productLabel[v]}
                 </button>
@@ -87,11 +87,14 @@ export default function NewRequirement() {
               options={Object.keys(milkLabel).map((v) => ({ value: v, label: milkLabel[v], hint: milkHint[v] }))} />
           </div>
 
-          <div className="field">
-            <span className="label">Quality</span>
-            <ChoiceCards name="Quality" value={f.quality} onChange={set('quality')}
-              options={(f.product === 'milk' ? ['fresh', 'standard', 'premium'] : ['standard', 'premium']).map((v) => ({ value: v, label: qualityLabel[v], hint: f.product === 'milk' ? qualityHint[v] : productQualityHint[v] }))} />
-          </div>
+          {f.product === 'milk' && (
+            <div className="field">
+              <span className="label">Quality</span>
+              <ChoiceCards name="Quality" value={f.quality} onChange={set('quality')}
+                options={['fresh', 'standard', 'premium'].map((v) => ({ value: v, label: qualityLabel[v], hint: qualityHint[v] }))} />
+              <p className="hint">Milk quality is tested by the center's IoT device and graded by the AI.</p>
+            </div>
+          )}
 
           <div className="grid gap-5 sm:grid-cols-2">
             <div className="field">
@@ -170,7 +173,7 @@ export default function NewRequirement() {
               </div>
               <MilkChurn size={52} stroke="#fffcf4" />
             </div>
-            <div className="mx-6 mb-5 inline-flex rounded-full bg-haldi px-3 py-1 text-[13px] font-semibold text-forest-deep">{qualityLabel[f.quality]}</div>
+            {f.product === 'milk' ? <div className="mx-6 mb-5 inline-flex rounded-full bg-haldi px-3 py-1 text-[13px] font-semibold text-forest-deep">{qualityLabel[f.quality]}</div> : <div className="mb-5" />}
             <dl className="space-y-2.5 bg-cream/5 px-6 py-5 text-[14px]">
               <div className="flex justify-between gap-4"><dt className="text-cream/65">Needed on</dt><dd className="num">{date(f.required_date)}</dd></div>
               <div className="flex justify-between gap-4"><dt className="text-cream/65">Deliver to</dt><dd>{f.delivery_city || '—'}</dd></div>

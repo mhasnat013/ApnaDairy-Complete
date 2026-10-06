@@ -183,7 +183,8 @@ export const savePlatformSettings = async (s) => {
   const row = Object.fromEntries(keys.map((k) => [k, Number(s[k])]))
   return must(await supabase.from('platform_settings').update({ ...row, updated_at: new Date().toISOString() }).eq('id', true))
 }
-export const saveTier = async (t) => must(await supabase.from('billing_tiers').upsert({ name: t.name, min_monthly_sales: Number(t.min_monthly_sales), discount_pct: Number(t.discount_pct) }))
+export const adminCenterFees = () => rpc('admin_center_fees')
+export const setFeeDiscount = (centerId, pct) => rpc('set_fee_discount', { p_center: centerId, p_pct: pct })
 export const paymentLabel = { jazzcash: 'JazzCash', easypaisa: 'EasyPaisa', bank: 'Bank transfer', cash: 'Cash' }
 export const monthLabel = (d) => (d ? new Date(`${d.slice(0, 10)}T12:00:00`).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }) : '')
 
