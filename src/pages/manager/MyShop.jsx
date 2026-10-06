@@ -15,6 +15,7 @@ import Alert from '../../components/Alert'
 import Icon from '../../components/Icon'
 import EmptyState from '../../components/EmptyState'
 import Sheet from '../../components/Sheet'
+import RetestSheet from '../../components/RetestSheet'
 import { HillsStrip } from '../../components/Farm'
 import { qtyText, perUnit } from '../../lib/b2b'
 import { phoneError, numberError, firstError, prettyPhone } from '../../lib/validate'
@@ -150,6 +151,7 @@ function Stat({ label, value, hint }) {
 function ListingCard({ listing, pub, fresh, grade, reload, onEdit }) {
   const { toast } = useUi()
   const [busy, setBusy] = useState(false)
+  const [retesting, setRetesting] = useState(false)
   const onApp = pub ? Number(pub.available_l) : 0
   const price = Math.round(Number(listing.price) * (100 - (Number(listing.discount_pct) || 0)) / 100)
   const toggle = async () => {
@@ -168,6 +170,7 @@ function ListingCard({ listing, pub, fresh, grade, reload, onEdit }) {
           {listing.description && <p className="mt-1 truncate text-[13px] text-muted">“{listing.description}”</p>}
         </div>
         <div className="flex items-center gap-3">
+          {Number(listing.listed_l) > 0 && <button className="btn-secondary btn-sm" onClick={() => setRetesting(true)}><Icon name="chip" size={14} />Retest</button>}
           <button className="btn-secondary btn-sm" onClick={onEdit}><Icon name="edit" size={14} />Edit</button>
           <button role="switch" aria-checked={listing.is_available} aria-label="Show on the app" disabled={busy} onClick={toggle}
             className={`relative h-7 w-[52px] shrink-0 rounded-full transition-colors ${listing.is_available ? 'bg-forest' : 'bg-line'}`}>
@@ -183,6 +186,7 @@ function ListingCard({ listing, pub, fresh, grade, reload, onEdit }) {
       {onApp <= 0 && listing.is_available && fresh > 0 && (
         <button className="mt-3 text-[13.5px] font-semibold text-forest underline" onClick={onEdit}>Add litres: {litres(fresh)} of fresh milk is in stock</button>
       )}
+      {retesting && <RetestSheet listing={listing} onClose={() => setRetesting(false)} onDone={reload} />}
     </section>
   )
 }
@@ -212,11 +216,10 @@ function ListingSheet({ open, listing, startType, taken, fresh, grades, guide, p
     if (l > max) return setErr(`You have ${litres(max)} of fresh ${milkLabel[type].toLowerCase()} milk. List that much or less.`)
     if (!(Number(f.price) > 0)) return setErr('Enter your price per litre.')
     if (g && Number(f.price) > g.max) return setErr(`The most you can charge is ${rs(g.max)} a litre (${g.maxPct}% above what you pay farmers).`)
-    if (!Number.isInteger(Number(f.discount || 0)) || Number(f.discount) < 0 || Number(f.discount) > 90) return setErr('Discount is a whole number from 0 to 90%.')
     setBusy(true)
     try {
       if (listing) {
-        await saveListing({ ...listing, listed_l: l, price: f.price, discount_pct: f.discount, description: f.description.trim() })
+        await saveListing({ ...listing, listed_l: l, price: f.price, description: f.description.trim() })
         toast('Listing saved.')
       } else {
         await createListing(type, f.price, l, f.description.trim())
@@ -270,8 +273,9 @@ function ListingSheet({ open, listing, startType, taken, fresh, grades, guide, p
                 {g && <span className="hint">You pay farmers {rs(Math.round(g.cost))}. Fair price {rs(g.suggest)}, at most {rs(g.max)}.
                   {Number(f.price) !== g.suggest && <button type="button" className="ml-1 font-semibold text-forest underline" onClick={() => setF({ ...f, price: String(g.suggest) })}>Use {rs(g.suggest)}</button>}</span>}
               </div>
-              <div className="field"><label htmlFor="ld">Discount</label>
-                <div className="flex items-center gap-2"><input id="ld" className="input num w-full" type="number" inputMode="decimal" min="0" max="90" value={f.discount} onChange={set('discount')} /><span className="text-muted">%</span></div></div>
+              <div className="field"><span className="label">Discount</span>
+                <p className="num flex h-11 items-center text-[15px] font-semibold">{Number(f.discount) > 0 ? `${f.discount}% off` : 'None'}</p>
+                <span className="hint">{listing ? 'Retest the milk to change it.' : 'Set after a retest.'}</span></div>
             </div>
 
             <div className="field"><label htmlFor="lx">Description <span className="font-normal text-muted">(optional)</span></label>

@@ -226,10 +226,14 @@ export const createListing = async (type, price, litres, description) => must(aw
   name: `Fresh ${({ cow: 'cow', buffalo: 'buffalo', mixed: 'mixed' })[type]} milk`, category: 'milk', milk_type: type, unit: 'litre',
   price: Number(price), listed_l: Number(litres), description: description || null, is_available: true,
 }).select().single())
+// the discount is not set here: it changes only after a retest (retestListing, then setListingDiscount)
 export const saveListing = async (l) => must(await supabase.from('products').update({
-  price: Number(l.price), discount_pct: Number(l.discount_pct) || 0, is_available: !!l.is_available,
+  price: Number(l.price), is_available: !!l.is_available,
   listed_l: Number(l.listed_l) || 0, description: l.description || null,
 }).eq('id', l.id))
+// retest milk still on the app; returns the ai's suggested discount, or takes failed milk off the app
+export const retestListing = (productId, readingId) => rpc('retest_listing', { p_product: productId, p_reading: readingId })
+export const setListingDiscount = (retestId, pct) => rpc('set_listing_discount', { p_retest: retestId, p_pct: Number(pct) })
 export const stockGrade = (centerId, type) => rpc('listing_grade', { p_center: centerId, p_type: type })
 
 // ---------- market rates (set by the super admin per city) ----------
