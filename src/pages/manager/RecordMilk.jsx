@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useLoad } from '../../lib/useLoad'
 import { useAuth } from '../../context/AuthContext'
 import { useUi } from '../../context/UiContext'
 import {
-  farmersWithStats, settings, assessMilk, recordCollection, demoFarmerAnswer, collectionById, myCenter, myDevice, takeDeviceReading, OFFER_HOURS, simulateReading, currentShift, billingOverview, milkListings, createListing,
+  farmersWithStats, settings, assessMilk, recordCollection, demoFarmerAnswer, collectionById, myCenter, myDevice, startDeviceTest, takeDeviceSample, finishDeviceTest, OFFER_HOURS, simulateReading, currentShift, billingOverview, milkListings, createListing,
   milkLabel, gradeLabel, riskLabel, PARAMS, inRange,
 } from '../../lib/center'
 import { rs, litres } from '../../lib/format'
@@ -54,19 +54,49 @@ export default function RecordMilk() {
   const device = data?.device
   const demo = !!data?.center?.is_demo
   const badReading = reading?.status === 'check'
-  // the real device: the edge function fetches its latest reading from firebase and stores it,
-  // so the collection is recorded from what the device sent, not from numbers in the browser
+  // the real device: a test runs about a minute. the edge function reads the device every few seconds and
+  // stores each sample; at the end the server averages them and only that final reading goes to the ai.
+  const [test, setTest] = useState(null)
+  const [, setTick] = useState(0)
+  const cancelTest = useRef(false)
+  useEffect(() => () => { cancelTest.current = true }, [])
+  useEffect(() => {
+    if (!test) return
+    const i = setInterval(() => setTick((n) => n + 1), 250)
+    return () => clearInterval(i)
+  }, [test])
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
   const scan = async () => {
-    setScanning(true); setAi(null); setManual(false); setErr('')
-    const minWait = new Promise((r) => setTimeout(r, 1200))
+    setAi(null); setManual(false); setErr(''); setReading(null)
+    cancelTest.current = false
+    let t
+    try { t = await startDeviceTest() } catch (e) { return setErr(e.message) }
+    const started = Date.now(), end = started + t.seconds * 1000, samples = []
+    let fails = 0
+    setTest({ seconds: t.seconds, every: t.every, started, samples: [] })
+    while (Date.now() < end) {
+      if (cancelTest.current) { setTest(null); return }
+      const t0 = Date.now()
+      try { samples.push(await takeDeviceSample(t.session)); fails = 0 } catch (e) {
+        if (++fails >= 3) { setTest(null); return setErr(e.message) }
+      }
+      setTest({ seconds: t.seconds, every: t.every, started, samples: [...samples] })
+      await sleep(Math.max(0, Math.min(t.every * 1000 - (Date.now() - t0), end - Date.now())))
+    }
+    if (cancelTest.current) { setTest(null); return }
+    setTest((x) => x && { ...x, finishing: true })
     try {
-      const r = await takeDeviceReading()
-      await minWait
-      setReading({ id: r.id, temperature_c: r.temperature_c, ph: r.ph, ec_ms: r.ec_ms, tds_ppm: r.tds_ppm, reading_at: r.reading_at, status: r.status, problems: r.problems ?? [] })
+      const r = await finishDeviceTest(t.session)
+      setReading({ id: r.id, temperature_c: r.temperature_c, ph: r.ph, ec_ms: r.ec_ms, tds_ppm: r.tds_ppm, reading_at: r.reading_at,
+        status: r.status, problems: r.problems ?? [], notes: r.notes ?? [], used: r.samples_used, total: r.samples_total, seconds: t.seconds })
       setSource('device')
-    } catch (e) { await minWait; setErr(e.message) }
-    setScanning(false)
+    } catch (e) { setErr(e.message) }
+    setTest(null)
   }
+  const testing = !!test
+  const left = test ? Math.max(0, Math.ceil((test.started + test.seconds * 1000 - Date.now()) / 1000)) : 0
+  const lastGood = test ? [...test.samples].reverse().find((x) => x.valid) : null
+  const live = lastGood ? { temperature_c: Number(lastGood.temperature_c), ph: Number(lastGood.ph), tds_ppm: Number(lastGood.tds_ppm), ec_ms: Number(lastGood.tds_ppm) / 640 } : null
   // demo accounts can also simulate a reading when the device is not at hand
   const simulate = () => {
     setScanning(true); setAi(null); setManual(false); setErr('')
@@ -243,16 +273,29 @@ export default function RecordMilk() {
             </div>
             <p className="display mt-6 text-[26px]">{farmer.full_name}</p>
             <p className="text-cream/70">{litres(qty)} of {milkLabel[farmer.milk_type].toLowerCase()} milk · {shift}</p>
+            {testing ? (
+              <div className="relative mx-auto mt-8 grid h-40 w-40 place-items-center">
+                <svg viewBox="0 0 160 160" className="absolute inset-0 -rotate-90">
+                  <circle cx="80" cy="80" r="70" fill="none" stroke="rgb(247 241 227 / .12)" strokeWidth="8" />
+                  <circle cx="80" cy="80" r="70" fill="none" stroke="#e2a93b" strokeWidth="8" strokeLinecap="round"
+                    strokeDasharray={2 * Math.PI * 70} strokeDashoffset={2 * Math.PI * 70 * (left / test.seconds)} style={{ transition: 'stroke-dashoffset .25s linear' }} />
+                </svg>
+                <div className="text-center"><p className="display num text-[44px] leading-none">{test.finishing ? '…' : left}</p><p className="mt-1 text-[12px] text-cream/70">{test.finishing ? 'averaging' : 'seconds'}</p></div>
+              </div>
+            ) : (
             <div className="relative mx-auto mt-8 grid h-40 w-40 place-items-center">
               <span className={`absolute inset-0 rounded-full border-2 border-cream/15 ${scanning ? 'animate-ping' : ''}`} />
               <span className={`absolute inset-3 rounded-full border-2 border-haldi/40 ${scanning ? 'animate-spin border-t-haldi' : ''}`} />
               <span className={`grid h-24 w-24 place-items-center rounded-full bg-cream/10 ${badReading && !scanning ? 'text-[#f3a08c]' : 'text-haldi'}`}><Icon name={reading && !scanning ? (badReading ? 'alert' : 'check') : 'chip'} size={40} /></span>
             </div>
-            <p className="mt-6 text-center text-[14px] text-cream/80">{scanning ? (device ? 'Getting the reading from the device…' : 'Reading the sample…') : reading ? `${source === 'device' ? 'From the device' : source === 'simulated' ? 'Simulated' : 'Typed by hand'}, ${new Date(reading.reading_at ?? Date.now()).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}` : 'Dip the probes in the sample, then take a reading.'}</p>
+            )}
+            <p className="mt-6 text-center text-[14px] text-cream/80">{testing ? (test.finishing ? 'Averaging the readings…' : `Keep the probes in the milk · ${test.samples.length} readings so far`) : scanning ? 'Reading the sample…' : reading ? `${source === 'device' ? 'From the device' : source === 'simulated' ? 'Simulated' : 'Typed by hand'}, ${new Date(reading.reading_at ?? Date.now()).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}` : 'Dip the probes in the sample, then take a reading.'}</p>
             <div className="mt-5 flex flex-wrap justify-center gap-2">
-              {device && <button className="btn-haldi" onClick={scan} disabled={scanning || deviceOff}>{reading ? 'Read again' : 'Take reading'}</button>}
-              {demo && <button className={device ? 'btn-on-dark' : 'btn-haldi'} onClick={simulate} disabled={scanning || deviceOff}>{device ? 'Simulate (demo)' : reading ? 'Read again' : 'Simulate a reading'}</button>}
-              <button className="btn-on-dark" onClick={() => { setManual(true); setSource('manual'); setAi(null); setReading(reading && !badReading ? { ...reading, id: undefined, status: undefined, problems: undefined } : { temperature_c: 34, ph: 6.7, ec_ms: 4.5, tds_ppm: 2880, reading_at: new Date().toISOString() }) }}>Enter by hand</button>
+              {device && (testing
+                ? <button className="btn-on-dark" onClick={() => { cancelTest.current = true }} disabled={test.finishing}>Cancel test</button>
+                : <button className="btn-haldi" onClick={scan} disabled={scanning || deviceOff}>{reading ? 'Test again' : 'Take reading'}</button>)}
+              {demo && !testing && <button className={device ? 'btn-on-dark' : 'btn-haldi'} onClick={simulate} disabled={scanning || deviceOff}>{device ? 'Simulate (demo)' : reading ? 'Read again' : 'Simulate a reading'}</button>}
+              {!testing && <button className="btn-on-dark" onClick={() => { setManual(true); setSource('manual'); setAi(null); setReading(reading && !badReading ? { ...reading, id: undefined, status: undefined, problems: undefined } : { temperature_c: 34, ph: 6.7, ec_ms: 4.5, tds_ppm: 2880, reading_at: new Date().toISOString() }) }}>Enter by hand</button>}
             </div>
             {!device && !demo && !deviceOff && (
               <p className="mt-4 rounded-2xl bg-cream/10 px-4 py-3 text-center text-[13px] text-cream/80">No IoT device is linked to your center yet. ApnaDairy assigns it once the device is paid. You can enter readings by hand meanwhile.</p>
@@ -269,7 +312,41 @@ export default function RecordMilk() {
 
           <section className="panel p-5 sm:p-6">
             <h2 className="display text-[19px] text-forest-deep">Readings</h2>
-            {!reading && !scanning && <p className="mt-3 text-muted">The four sensor values appear here with their normal range.</p>}
+            {!reading && !scanning && !testing && <p className="mt-3 text-muted">{device ? 'Press Take reading. The device is read every few seconds for a minute and the values are averaged, so one bad reading cannot decide the price.' : 'The four sensor values appear here with their normal range.'}</p>}
+            {testing && (
+              <div className="mt-4">
+                <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-cream px-4 py-2.5 text-[13px]">
+                  <span className="flex items-center gap-2 font-semibold"><span className="relative flex h-2.5 w-2.5"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-forest opacity-50" /><span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-forest" /></span>Live from the device</span>
+                  <span className="text-muted">{test.samples.length} readings{test.samples.some((x) => !x.valid) ? ` · ${test.samples.filter((x) => !x.valid).length} impossible` : ''}</span>
+                </div>
+                <div className="mt-3 flex h-8 items-end gap-1" aria-hidden="true">
+                  {Array.from({ length: Math.max(test.samples.length, Math.ceil(test.seconds / (test.every || 3))) }, (_, i) => {
+                    const x = test.samples[i]
+                    return <span key={i} className={`flex-1 rounded-sm transition-all ${!x ? 'h-2 bg-cream-2' : x.valid ? 'h-8 bg-forest-2' : 'h-8 bg-danger/70'}`} />
+                  })}
+                </div>
+                {!live && <p className="mt-4 text-[13.5px] text-muted">Waiting for the first good reading…</p>}
+                {live && (
+                  <div className="mt-4 grid gap-4">
+                    {PARAMS.map((p) => (
+                      <div key={p.key}>
+                        <div className="flex items-baseline justify-between gap-3">
+                          <span className="text-[14px] font-semibold">{p.label}</span>
+                          <span className="num text-[18px] font-bold text-ink">{Number(live[p.key]).toFixed(p.digits)} <span className="text-[12px] font-medium text-muted">{p.unit}</span></span>
+                        </div>
+                        <RangeBar param={p} value={Number(live[p.key])} />
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+            {reading && !scanning && reading.total != null && (
+              <div className="mt-4 rounded-2xl bg-mint-soft px-4 py-3 text-[13px] text-forest">
+                <p className="font-semibold">Average of {reading.used} of {reading.total} readings over {reading.seconds} seconds</p>
+                {reading.notes?.map((n) => <p key={n} className="mt-1 text-amber">{n}</p>)}
+              </div>
+            )}
             {scanning && <div className="mt-4 grid gap-4">{PARAMS.map((p) => <div key={p.key} className="skeleton h-14" />)}</div>}
             {badReading && !scanning && (
               <div className="mt-4 rounded-2xl bg-[#f8e2dc] px-4 py-3 text-[13.5px] text-danger">
@@ -304,8 +381,8 @@ export default function RecordMilk() {
               </div>
             )}
             <div className="mt-6 flex justify-between gap-2">
-              <button className="btn-ghost" onClick={() => setStep(0)}>Back</button>
-              <button className="btn-primary" disabled={!reading || scanning || !ai || needReason || badReading} onClick={() => setStep(2)}>See AI result <Icon name="arrow" size={17} /></button>
+              <button className="btn-ghost" onClick={() => setStep(0)} disabled={testing}>Back</button>
+              <button className="btn-primary" disabled={!reading || scanning || testing || !ai || needReason || badReading} onClick={() => setStep(2)}>See AI result <Icon name="arrow" size={17} /></button>
             </div>
           </section>
         </div>

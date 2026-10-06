@@ -113,12 +113,12 @@ export default function IotReadings() {
       </div>
 
       {data?.device && (
-        <Card className="mt-4 sm:mt-5" title="Device log" subtitle="Every reading fetched from the tester, including ones that failed the sensor check" bodyClass="pt-3">
+        <Card className="mt-4 sm:mt-5" title="Device log" subtitle="Each test reads the tester for a minute and averages the readings. Failed tests are kept too." bodyClass="pt-3">
           <div className="overflow-x-auto">
-            <table className="table min-w-[760px]">
-              <thead><tr><th>Time</th><th className="text-right">Temp</th><th className="text-right">pH</th><th className="text-right">TDS</th><th className="text-right">EC</th><th>Check</th><th>Used for</th></tr></thead>
+            <table className="table min-w-[860px]">
+              <thead><tr><th>Time</th><th className="text-right">Temp</th><th className="text-right">pH</th><th className="text-right">TDS</th><th className="text-right">EC</th><th>Averaged</th><th>Check</th><th>Used for</th></tr></thead>
               <tbody>
-                {data.log.length === 0 && <tr><td colSpan={7}><EmptyState title="No device readings yet">Press Take reading when recording milk.</EmptyState></td></tr>}
+                {data.log.length === 0 && <tr><td colSpan={8}><EmptyState title="No device readings yet">Press Take reading when recording milk.</EmptyState></td></tr>}
                 {data.log.map((r) => (
                   <tr key={r.id}>
                     <td className="num">{date(r.received_at)}<p className="text-[12.5px] text-muted">{timeOf(r.received_at)}</p></td>
@@ -126,6 +126,7 @@ export default function IotReadings() {
                     <td className="num text-right">{r.ph ?? '—'}</td>
                     <td className="num text-right">{r.tds_ppm != null ? Math.round(r.tds_ppm) : '—'} ppm</td>
                     <td className="num text-right">{r.ec_ms != null ? Number(r.ec_ms).toFixed(2) : '—'} mS/cm</td>
+                    <td className="num text-[13px] text-muted">{r.samples_total != null ? `${r.samples_used} of ${r.samples_total}` : 'single'}</td>
                     <td>{r.status === 'ok' ? <Badge tone="green">Passed</Badge> : <><Badge tone="red">Sensor check</Badge><p className="mt-1 max-w-[260px] text-[12px] text-muted">{r.problems?.[0]}</p></>}</td>
                     <td className="text-[13px] text-muted">{r.collection_id ? 'A collection' : 'Not used'}</td>
                   </tr>

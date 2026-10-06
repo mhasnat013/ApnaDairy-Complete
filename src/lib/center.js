@@ -283,15 +283,19 @@ export const demoDeliveryCode = (kind, id) => rpc('demo_delivery_code', { p_kind
 // ---------- the real iot device (esp32 → firebase → edge function → device_readings) ----------
 export const myDevice = async () => must(await supabase.from('iot_devices').select('*').maybeSingle())
 export const deviceLog = async (limit = 12) => must(await supabase.from('device_readings').select('*').order('received_at', { ascending: false }).limit(limit))
-export async function takeDeviceReading() {
-  const { data, error } = await supabase.functions.invoke('iot-reading', { body: {} })
+// a device test runs about a minute: start, a sample every few seconds, then the server averages them
+async function iot(body) {
+  const { data, error } = await supabase.functions.invoke('iot-reading', { body })
   if (error) {
     let msg = 'Could not reach the device service. Check your internet and try again.'
     try { const b = await error.context?.json?.(); if (b?.error) msg = b.error } catch { /* keep the general message */ }
     throw new Error(msg)
   }
   if (data?.error) throw new Error(data.error)
-  return data.reading
+  return data
 }
+export const startDeviceTest = () => iot({ action: 'start' })
+export const takeDeviceSample = (session) => iot({ action: 'sample', session }).then((d) => d.sample)
+export const finishDeviceTest = (session) => iot({ action: 'finish', session }).then((d) => d.reading)
 export const payoutStatusLabel = { sent: 'Waiting for farmer', confirmed: 'Confirmed', disputed: 'Disputed by farmer' }
 export const payoutTone = { sent: 'amber', confirmed: 'green', disputed: 'red' }
