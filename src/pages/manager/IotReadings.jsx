@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useLoad } from '../../lib/useLoad'
-import { readingsSince, settings, dayKey, shortDay, weekday, timeOf, milkLabel, gradeLabel, gradeTone, riskLabel, PARAMS, MODELS, inRange } from '../../lib/center'
+import { readingsSince, settings, myDevice, deviceLog, dayKey, shortDay, weekday, timeOf, milkLabel, gradeLabel, gradeTone, riskLabel, PARAMS, MODELS, inRange } from '../../lib/center'
 import { litres, date, relative } from '../../lib/format'
 import PageHeader from '../../components/PageHeader'
 import Segmented from '../../components/Segmented'
@@ -18,8 +18,8 @@ const avg = (rows, k) => (rows.length ? rows.reduce((n, r) => n + Number(r[k]), 
 
 export default function IotReadings() {
   const { data, error } = useLoad(async () => {
-    const [rows, s] = await Promise.all([readingsSince(14), settings()])
-    return { rows, settings: s }
+    const [rows, s, device, log] = await Promise.all([readingsSince(14), settings(), myDevice().catch(() => null), deviceLog().catch(() => [])])
+    return { rows, settings: s, device, log }
   })
   const [view, setView] = useState('flagged')
   const [shown, setShown] = useState(20)
@@ -47,10 +47,11 @@ export default function IotReadings() {
       <div className="grid gap-4 sm:gap-5 lg:grid-cols-[320px_minmax(0,1fr)]">
         <section className="furrows relative overflow-hidden rounded-[24px] bg-forest-deep p-6 text-cream">
           <p className="text-[13px] text-cream/70">Milk tester</p>
-          <p className="display mt-1 text-[26px]">{data?.settings?.device_serial ?? 'AD-IOT-0001'}</p>
+          <p className="display mt-1 text-[26px]">{data?.device?.serial ?? data?.settings?.device_serial ?? 'No device yet'}</p>
           <span className="mt-3 inline-flex items-center gap-2 rounded-full bg-cream/10 px-3 py-1 text-[12.5px] font-semibold">
-            <span className="relative flex h-2.5 w-2.5"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#7fd39b] opacity-60" /><span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-[#7fd39b]" /></span>
-            Online · simulated readings
+            {data?.device
+              ? <><span className="relative flex h-2.5 w-2.5"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#7fd39b] opacity-60" /><span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-[#7fd39b]" /></span>Connected · live readings</>
+              : <><span className="h-2.5 w-2.5 rounded-full bg-cream/40" />Not linked · simulated readings</>}
           </span>
           <dl className="mt-6 grid grid-cols-2 gap-3">
             <div className="rounded-2xl bg-cream/10 p-3"><dt className="text-[12px] text-cream/65">Tests today</dt><dd className="display num text-[26px]">{data ? today.length : '—'}</dd></div>
@@ -58,9 +59,11 @@ export default function IotReadings() {
           </dl>
           <p className="mt-5 text-[13px] text-cream/70">{latest ? `Last reading ${relative(latest.collected_at)}` : 'No readings yet'}</p>
           <ul className="mt-4 flex flex-wrap gap-1.5 text-[11.5px] text-cream/70">
-            {PARAMS.map((p) => <li key={p.key} className="rounded-full bg-cream/10 px-2.5 py-1">{p.sensor}</li>)}
+            {PARAMS.filter((p) => p.sensor !== 'from TDS').map((p) => <li key={p.key} className="rounded-full bg-cream/10 px-2.5 py-1">{p.sensor}</li>)}
           </ul>
-          <p className="mt-3 rounded-2xl bg-cream/5 p-3 text-[12.5px] leading-relaxed text-cream/70">The hardware is still being built. Until it is connected, the portal uses realistic simulated readings so the full flow can be tested.</p>
+          <p className="mt-3 rounded-2xl bg-cream/5 p-3 text-[12.5px] leading-relaxed text-cream/70">{data?.device
+            ? 'The ESP32 tester sends temperature, pH and TDS to the cloud. EC is worked out from TDS (TDS ÷ 640), then both AI models score the sample.'
+            : 'ApnaDairy links your tester once it is paid for. Until then readings are simulated or typed by hand.'}</p>
         </section>
 
         <Card title="Latest sample" subtitle={latest ? `${latest.farmer?.full_name}, ${litres(latest.quantity_l)} ${milkLabel[latest.milk_type].toLowerCase()} milk at ${timeOf(latest.collected_at)}` : 'No samples yet'}>
@@ -103,11 +106,35 @@ export default function IotReadings() {
           <TrendChart data={trend} height={190} yDomain={[6.3, 7.0]} band={[6.6, 6.8]} ariaLabel="Average pH per day"
             series={[{ key: 'ph', label: 'pH', color: C.green, type: 'line' }]} xFormat={fmtDay} yFormat={(v) => Number(v).toFixed(2)} />
         </Card>
-        <Card title="Average TDS" subtitle="Green band is normal, 1900 to 2750 ppm. Lower suggests added water">
-          <TrendChart data={trend} height={190} yDomain={[1400, 3200]} band={[1900, 2750]} ariaLabel="Average TDS per day"
+        <Card title="Average TDS" subtitle="Green band is normal, 2,500 to 3,520 ppm. Lower suggests added water">
+          <TrendChart data={trend} height={190} yDomain={[1800, 4200]} band={[2500, 3520]} ariaLabel="Average TDS per day"
             series={[{ key: 'tds', label: 'TDS', color: C.gold, type: 'line' }]} xFormat={fmtDay} yFormat={(v, full) => (full ? `${Math.round(v)} ppm` : Math.round(v))} />
         </Card>
       </div>
+
+      {data?.device && (
+        <Card className="mt-4 sm:mt-5" title="Device log" subtitle="Every reading fetched from the tester, including ones that failed the sensor check" bodyClass="pt-3">
+          <div className="overflow-x-auto">
+            <table className="table min-w-[760px]">
+              <thead><tr><th>Time</th><th className="text-right">Temp</th><th className="text-right">pH</th><th className="text-right">TDS</th><th className="text-right">EC</th><th>Check</th><th>Used for</th></tr></thead>
+              <tbody>
+                {data.log.length === 0 && <tr><td colSpan={7}><EmptyState title="No device readings yet">Press Take reading when recording milk.</EmptyState></td></tr>}
+                {data.log.map((r) => (
+                  <tr key={r.id}>
+                    <td className="num">{date(r.received_at)}<p className="text-[12.5px] text-muted">{timeOf(r.received_at)}</p></td>
+                    <td className="num text-right">{r.temperature_c ?? '—'} °C</td>
+                    <td className="num text-right">{r.ph ?? '—'}</td>
+                    <td className="num text-right">{r.tds_ppm != null ? Math.round(r.tds_ppm) : '—'} ppm</td>
+                    <td className="num text-right">{r.ec_ms != null ? Number(r.ec_ms).toFixed(2) : '—'} mS/cm</td>
+                    <td>{r.status === 'ok' ? <Badge tone="green">Passed</Badge> : <><Badge tone="red">Sensor check</Badge><p className="mt-1 max-w-[260px] text-[12px] text-muted">{r.problems?.[0]}</p></>}</td>
+                    <td className="text-[13px] text-muted">{r.collection_id ? 'A collection' : 'Not used'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      )}
 
       <Card className="mt-4 sm:mt-5" title="Readings" subtitle="Last 14 days" bodyClass="pt-3"
         action={<Segmented size="sm" value={view} onChange={(v) => { setView(v); setShown(20) }} options={[{ value: 'flagged', label: 'Problems', count: data ? problems.length : null }, { value: 'all', label: 'All', count: data ? rows.length : null }]} />}>

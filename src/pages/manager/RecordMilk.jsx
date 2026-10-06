@@ -4,7 +4,7 @@ import { useLoad } from '../../lib/useLoad'
 import { useAuth } from '../../context/AuthContext'
 import { useUi } from '../../context/UiContext'
 import {
-  farmersWithStats, settings, assessMilk, recordCollection, demoFarmerAnswer, collectionById, myCenter, OFFER_HOURS, simulateReading, currentShift, billingOverview, milkListings, createListing,
+  farmersWithStats, settings, assessMilk, recordCollection, demoFarmerAnswer, collectionById, myCenter, myDevice, takeDeviceReading, OFFER_HOURS, simulateReading, currentShift, billingOverview, milkListings, createListing,
   milkLabel, gradeLabel, riskLabel, PARAMS, inRange,
 } from '../../lib/center'
 import { rs, litres } from '../../lib/format'
@@ -23,8 +23,8 @@ export default function RecordMilk() {
   const { toast } = useUi()
   const { profile } = useAuth()
   const { data } = useLoad(async () => {
-    const [farmers, s, billing, listings, center] = await Promise.all([farmersWithStats(), settings(), billingOverview().catch(() => null), milkListings().catch(() => []), myCenter(profile.id).catch(() => null)])
-    return { farmers: farmers.filter((f) => f.is_active), settings: s, billing, listings, center }
+    const [farmers, s, billing, listings, center, device] = await Promise.all([farmersWithStats(), settings(), billingOverview().catch(() => null), milkListings().catch(() => []), myCenter(profile.id).catch(() => null), myDevice().catch(() => null)])
+    return { farmers: farmers.filter((f) => f.is_active), settings: s, billing, listings, center, device }
   })
   const [step, setStep] = useState(0)
   const [q, setQ] = useState('')
@@ -51,14 +51,30 @@ export default function RecordMilk() {
   const list = useMemo(() => (data?.farmers ?? []).filter((f) => `${f.full_name} ${f.village ?? ''}`.toLowerCase().includes(q.toLowerCase())), [data, q])
   const qty = Number(quantity)
 
-  // the "device" takes a couple of seconds to read, like the real sensor will
-  const scan = () => {
-    setScanning(true); setAi(null); setManual(false)
-    setTimeout(() => { setReading(simulateReading(farmer?.milk_type)); setSource('simulated'); setScanning(false) }, 2200)
+  const device = data?.device
+  const demo = !!data?.center?.is_demo
+  const badReading = reading?.status === 'check'
+  // the real device: the edge function fetches its latest reading from firebase and stores it,
+  // so the collection is recorded from what the device sent, not from numbers in the browser
+  const scan = async () => {
+    setScanning(true); setAi(null); setManual(false); setErr('')
+    const minWait = new Promise((r) => setTimeout(r, 1200))
+    try {
+      const r = await takeDeviceReading()
+      await minWait
+      setReading({ id: r.id, temperature_c: r.temperature_c, ph: r.ph, ec_ms: r.ec_ms, tds_ppm: r.tds_ppm, reading_at: r.reading_at, status: r.status, problems: r.problems ?? [] })
+      setSource('device')
+    } catch (e) { await minWait; setErr(e.message) }
+    setScanning(false)
+  }
+  // demo accounts can also simulate a reading when the device is not at hand
+  const simulate = () => {
+    setScanning(true); setAi(null); setManual(false); setErr('')
+    setTimeout(() => { setReading(simulateReading(farmer?.milk_type)); setSource('simulated'); setScanning(false) }, 1800)
   }
 
   useEffect(() => {
-    if (!reading || !farmer) return
+    if (!reading || !farmer || reading.status === 'check') return
     let live = true
     assessMilk(farmer.milk_type, reading).then((r) => { if (live) { setAi(r); setPrice(r.offer_price ?? '') } }).catch((e) => setErr(e.message))
     return () => { live = false }
@@ -67,7 +83,7 @@ export default function RecordMilk() {
   const save = async () => {
     setSaving(true); setErr('')
     try {
-      const id = await recordCollection({ farmer: farmerId, quantity: qty, shift, reading, source, price: ai?.accept ? Number(price) : null, manualReason: source === 'manual' ? manualReason.trim() : null })
+      const id = await recordCollection({ farmer: farmerId, quantity: qty, shift, reading, source, price: ai?.accept ? Number(price) : null, manualReason: source === 'manual' ? manualReason.trim() : null, readingId: source === 'device' ? reading.id : null })
       setDone({ id, accepted: ai?.accept, until: Date.now() + OFFER_HOURS * 36e5 })
     } catch (e) { setErr(e.message) }
     setSaving(false)
@@ -223,27 +239,31 @@ export default function RecordMilk() {
           <section className="furrows relative overflow-hidden rounded-[24px] bg-forest-deep p-6 text-cream">
             <div className="flex items-center justify-between">
               <p className="text-[13px] text-cream/70">IoT milk tester</p>
-              <span className="flex items-center gap-1.5 rounded-full bg-cream/10 px-3 py-1 text-[12px] font-semibold"><span className="h-2 w-2 rounded-full bg-[#7fd39b]" />{data.settings?.device_serial ?? 'AD-IOT-0001'} · simulated</span>
+              <span className="flex items-center gap-1.5 rounded-full bg-cream/10 px-3 py-1 text-[12px] font-semibold"><span className={`h-2 w-2 rounded-full ${device ? 'bg-[#7fd39b]' : 'bg-cream/40'}`} />{device ? `${device.serial} · live` : 'No device linked'}</span>
             </div>
             <p className="display mt-6 text-[26px]">{farmer.full_name}</p>
             <p className="text-cream/70">{litres(qty)} of {milkLabel[farmer.milk_type].toLowerCase()} milk · {shift}</p>
             <div className="relative mx-auto mt-8 grid h-40 w-40 place-items-center">
               <span className={`absolute inset-0 rounded-full border-2 border-cream/15 ${scanning ? 'animate-ping' : ''}`} />
               <span className={`absolute inset-3 rounded-full border-2 border-haldi/40 ${scanning ? 'animate-spin border-t-haldi' : ''}`} />
-              <span className="grid h-24 w-24 place-items-center rounded-full bg-cream/10 text-haldi"><Icon name={reading && !scanning ? 'check' : 'chip'} size={40} /></span>
+              <span className={`grid h-24 w-24 place-items-center rounded-full bg-cream/10 ${badReading && !scanning ? 'text-[#f3a08c]' : 'text-haldi'}`}><Icon name={reading && !scanning ? (badReading ? 'alert' : 'check') : 'chip'} size={40} /></span>
             </div>
-            <p className="mt-6 text-center text-[14px] text-cream/80">{scanning ? 'Reading the sample…' : reading ? `Read at ${new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}` : 'Dip the probe in the sample, then take a reading.'}</p>
+            <p className="mt-6 text-center text-[14px] text-cream/80">{scanning ? (device ? 'Getting the reading from the device…' : 'Reading the sample…') : reading ? `${source === 'device' ? 'From the device' : source === 'simulated' ? 'Simulated' : 'Typed by hand'}, ${new Date(reading.reading_at ?? Date.now()).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}` : 'Dip the probes in the sample, then take a reading.'}</p>
             <div className="mt-5 flex flex-wrap justify-center gap-2">
-              <button className="btn-haldi" onClick={scan} disabled={scanning || deviceOff}>{reading ? 'Read again' : 'Take reading'}</button>
-              <button className="btn-on-dark" onClick={() => { setManual(true); setSource('manual'); setReading(reading ?? { temperature_c: 34, ph: 6.7, ec_ms: 4.5, tds_ppm: 2250, reading_at: new Date().toISOString() }) }}>Enter by hand</button>
+              {device && <button className="btn-haldi" onClick={scan} disabled={scanning || deviceOff}>{reading ? 'Read again' : 'Take reading'}</button>}
+              {demo && <button className={device ? 'btn-on-dark' : 'btn-haldi'} onClick={simulate} disabled={scanning || deviceOff}>{device ? 'Simulate (demo)' : reading ? 'Read again' : 'Simulate a reading'}</button>}
+              <button className="btn-on-dark" onClick={() => { setManual(true); setSource('manual'); setAi(null); setReading(reading && !badReading ? { ...reading, id: undefined, status: undefined, problems: undefined } : { temperature_c: 34, ph: 6.7, ec_ms: 4.5, tds_ppm: 2880, reading_at: new Date().toISOString() }) }}>Enter by hand</button>
             </div>
+            {!device && !demo && !deviceOff && (
+              <p className="mt-4 rounded-2xl bg-cream/10 px-4 py-3 text-center text-[13px] text-cream/80">No IoT device is linked to your center yet. ApnaDairy assigns it once the device is paid. You can enter readings by hand meanwhile.</p>
+            )}
             {deviceOff && (
               <p className="mt-4 rounded-2xl bg-cream/10 px-4 py-3 text-center text-[13px] text-cream/80">
                 Your device activates once its invoice is paid. <Link to="/manager/billing" className="font-semibold text-haldi underline">Go to billing</Link>. You can enter readings by hand meanwhile.
               </p>
             )}
             <ul className="mt-5 flex flex-wrap justify-center gap-1.5 text-[11.5px] text-cream/60">
-              {PARAMS.map((p) => <li key={p.key} className="rounded-full bg-cream/5 px-2.5 py-1">{p.sensor}</li>)}
+              {PARAMS.filter((p) => p.sensor !== 'from TDS').map((p) => <li key={p.key} className="rounded-full bg-cream/5 px-2.5 py-1">{p.sensor}</li>)}
             </ul>
           </section>
 
@@ -251,6 +271,13 @@ export default function RecordMilk() {
             <h2 className="display text-[19px] text-forest-deep">Readings</h2>
             {!reading && !scanning && <p className="mt-3 text-muted">The four sensor values appear here with their normal range.</p>}
             {scanning && <div className="mt-4 grid gap-4">{PARAMS.map((p) => <div key={p.key} className="skeleton h-14" />)}</div>}
+            {badReading && !scanning && (
+              <div className="mt-4 rounded-2xl bg-[#f8e2dc] px-4 py-3 text-[13.5px] text-danger">
+                <p className="flex items-center gap-2 font-semibold"><Icon name="alert" size={16} />The device reading failed the sensor check</p>
+                <ul className="mt-1.5 grid gap-1 pl-6">{reading.problems.map((m) => <li key={m} className="list-disc">{m}</li>)}</ul>
+                <p className="mt-2 text-[12.5px]">Fix it and take the reading again. It is saved in the IoT log either way.</p>
+              </div>
+            )}
             {reading && !scanning && (
               <div className="mt-4 grid gap-4">
                 {PARAMS.map((p) => (
@@ -261,7 +288,7 @@ export default function RecordMilk() {
                         <input className="input num h-9 w-28 text-right" type="number" step={{ ph: 0.01, ec_ms: 0.05, tds_ppm: 10, temperature_c: 0.1 }[p.key]} value={reading[p.key]}
                           onChange={(e) => setReading({ ...reading, [p.key]: Number(e.target.value) })} aria-label={p.label} />
                       ) : (
-                        <span className={`num text-[18px] font-bold ${inRange(p, reading[p.key]) ? 'text-ink' : 'text-danger'}`}>{Number(reading[p.key]).toFixed(p.digits)} <span className="text-[12px] font-medium text-muted">{p.unit}</span></span>
+                        <span className={`num text-[18px] font-bold ${reading[p.key] != null && inRange(p, reading[p.key]) ? 'text-ink' : 'text-danger'}`}>{reading[p.key] == null ? '—' : Number(reading[p.key]).toFixed(p.digits)} <span className="text-[12px] font-medium text-muted">{p.unit}</span></span>
                       )}
                     </div>
                     <RangeBar param={p} value={Number(reading[p.key])} />
@@ -278,7 +305,7 @@ export default function RecordMilk() {
             )}
             <div className="mt-6 flex justify-between gap-2">
               <button className="btn-ghost" onClick={() => setStep(0)}>Back</button>
-              <button className="btn-primary" disabled={!reading || scanning || !ai || needReason} onClick={() => setStep(2)}>See AI result <Icon name="arrow" size={17} /></button>
+              <button className="btn-primary" disabled={!reading || scanning || !ai || needReason || badReading} onClick={() => setStep(2)}>See AI result <Icon name="arrow" size={17} /></button>
             </div>
           </section>
         </div>

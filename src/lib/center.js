@@ -23,10 +23,10 @@ export const PARAMS = [
     help: 'Fresh milk arrives warm, around 33 to 37 °C. Chill it soon after.' },
   { key: 'ph', label: 'pH', abbr: 'pH', sensor: 'pH probe', unit: '', min: 6.0, max: 7.2, low: 6.6, high: 6.8, digits: 2,
     help: 'Acidity. Fresh milk is 6.6 to 6.8. Below 6.4 it is turning sour, above 6.9 soda may be added.' },
-  { key: 'ec_ms', label: 'Conductivity (EC)', abbr: 'EC', sensor: 'EC sensor', unit: 'mS/cm', min: 2.5, max: 8, low: 3.8, high: 5.5, digits: 2,
-    help: 'Low EC suggests added water. High EC points to salt or an udder infection.' },
-  { key: 'tds_ppm', label: 'Dissolved solids (TDS)', abbr: 'TDS', sensor: 'TDS sensor', unit: 'ppm', min: 1000, max: 4000, low: 1900, high: 2750, digits: 0,
-    help: 'About half the EC reading. Low TDS means watered milk, high TDS means something was dissolved in it.' },
+  { key: 'ec_ms', label: 'Conductivity (EC)', abbr: 'EC', sensor: 'from TDS', unit: 'mS/cm', min: 2.5, max: 8, low: 3.9, high: 5.5, digits: 2,
+    help: 'Worked out from TDS (EC = TDS ÷ 640). Low EC suggests added water, high EC points to salt or an udder infection.' },
+  { key: 'tds_ppm', label: 'Dissolved solids (TDS)', abbr: 'TDS', sensor: 'TDS sensor', unit: 'ppm', min: 1500, max: 5000, low: 2500, high: 3520, digits: 0,
+    help: 'Total dissolved solids. Low TDS means watered milk, high TDS means something was dissolved in it.' },
 ]
 // which sensor feeds which model (matches the device firmware)
 export const MODELS = [
@@ -118,7 +118,7 @@ export const assessMilk = (milkType, r) =>
 export const recordCollection = (a) => rpc('record_collection', {
   p_farmer: a.farmer, p_quantity: a.quantity, p_shift: a.shift, p_temperature: a.reading.temperature_c,
   p_ph: a.reading.ph, p_ec: a.reading.ec_ms, p_tds: a.reading.tds_ppm,
-  p_source: a.source, p_price: a.price ?? null, p_manual_reason: a.manualReason || null,
+  p_source: a.source, p_price: a.price ?? null, p_manual_reason: a.manualReason || null, p_reading: a.readingId || null,
 })
 export const recordSale = (items, name) => rpc('record_sale', { p_items: items, p_customer_name: name || null })
 // returns null when done, or a message when the customer's delivery code was wrong
@@ -164,7 +164,7 @@ export function simulateReading(milkType = 'mixed') {
   else if (roll < 0.15) r.ec_ms = +rnd(6.7, 7.3).toFixed(2)     // salt
   else if (roll < 0.17) r.ph = +rnd(6.95, 7.03).toFixed(2)      // soda
   else if (roll < 0.27) r.ph = +rnd(6.47, 6.54).toFixed(2)      // slightly acidic
-  r.tds_ppm = Math.round(r.ec_ms * 1000 * rnd(0.49, 0.52))       // the tds sensor reads about half the ec
+  r.tds_ppm = Math.round(r.ec_ms * 640 * rnd(0.98, 1.02))        // the device works out ec = tds / 640
   r.reading_at = new Date().toISOString()                        // firmware timestamp
   return r
 }
@@ -280,5 +280,18 @@ export const auditLabel = { cancelled: 'Cancelled', corrected: 'Corrected', expi
 export const myMilkShelf = () => rpc('my_milk_shelf')
 export const myBidCapacity = (type) => rpc('my_bid_capacity', { p_type: type }).then((r) => (Array.isArray(r) ? r[0] : r))
 export const demoDeliveryCode = (kind, id) => rpc('demo_delivery_code', { p_kind: kind, p_order: id })
+// ---------- the real iot device (esp32 → firebase → edge function → device_readings) ----------
+export const myDevice = async () => must(await supabase.from('iot_devices').select('*').maybeSingle())
+export const deviceLog = async (limit = 12) => must(await supabase.from('device_readings').select('*').order('received_at', { ascending: false }).limit(limit))
+export async function takeDeviceReading() {
+  const { data, error } = await supabase.functions.invoke('iot-reading', { body: {} })
+  if (error) {
+    let msg = 'Could not reach the device service. Check your internet and try again.'
+    try { const b = await error.context?.json?.(); if (b?.error) msg = b.error } catch { /* keep the general message */ }
+    throw new Error(msg)
+  }
+  if (data?.error) throw new Error(data.error)
+  return data.reading
+}
 export const payoutStatusLabel = { sent: 'Waiting for farmer', confirmed: 'Confirmed', disputed: 'Disputed by farmer' }
 export const payoutTone = { sent: 'amber', confirmed: 'green', disputed: 'red' }

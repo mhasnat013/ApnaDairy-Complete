@@ -23,6 +23,7 @@ export default function Users() {
   const [search, setSearch] = useState('')
   const [role, setRole] = useState('all')
   const [busy, setBusy] = useState(null)
+  const [devices, setDevices] = useState([])
   const { toast, confirm } = useUi()
 
   const load = useCallback(async () => {
@@ -31,9 +32,11 @@ export default function Users() {
       .from('profiles')
       .select('id, full_name, email, phone, role, status, created_at')
       .order('created_at', { ascending: false })
-    const { data: centers } = await supabase.from('area_managers').select('user_id, is_demo, center_name')
-    const byUser = Object.fromEntries((centers ?? []).map((c) => [c.user_id, c]))
+    const { data: centers } = await supabase.from('area_managers').select('id, user_id, is_demo, center_name, type')
+    const { data: devs } = await supabase.from('iot_devices').select('serial, area_manager_id')
+    const byUser = Object.fromEntries((centers ?? []).map((c) => [c.user_id, { ...c, device: (devs ?? []).find((d) => d.area_manager_id === c.id)?.serial }]))
     setError(error?.message ?? '')
+    setDevices(devs ?? [])
     setUsers((data ?? []).map((u) => ({ ...u, center: byUser[u.id] })))
     setLoading(false)
   }, [])
@@ -98,7 +101,7 @@ export default function Users() {
                   <td>
                     <p className="font-semibold text-ink">{u.full_name}{isMe && <span className="ml-2 text-xs font-normal text-muted">(you)</span>}</p>
                     <p className="text-[13px] text-muted">{u.email}</p>
-                    {u.center && <p className="text-[12.5px] text-muted">{u.center.center_name}{u.center.is_demo && <span className="ml-2 rounded-full bg-haldi-soft px-2 py-0.5 text-[11.5px] font-semibold text-amber">Demo</span>}</p>}
+                    {u.center && <p className="text-[12.5px] text-muted">{u.center.center_name}{u.center.is_demo && <span className="ml-2 rounded-full bg-haldi-soft px-2 py-0.5 text-[11.5px] font-semibold text-amber">Demo</span>}{u.center.device && <span className="ml-2 rounded-full bg-mint-soft px-2 py-0.5 text-[11.5px] font-semibold text-forest">Device {u.center.device}</span>}</p>}
                   </td>
                   <td>{roleLabel[u.role]}</td>
                   <td>
@@ -126,6 +129,22 @@ export default function Users() {
                           try { await setDemoCenter(u.id, demo); toast(demo ? 'Marked as a demo account.' : 'Demo turned off.'); load() } catch (e) { toast(e.message, 'error') }
                           setBusy(null)
                         }}>{u.center.is_demo ? 'Demo off' : 'Make demo'}</button>
+                      )}
+                      {u.center && u.center.type === 'milk_center' && u.status === 'active' && (u.center.device || devices.some((d) => !d.area_manager_id)) && (
+                        <button className="btn-secondary btn-sm" onClick={async () => {
+                          const free = devices.find((d) => !d.area_manager_id)
+                          const give = !u.center.device
+                          if (!(await confirm(give
+                            ? { title: `Give device ${free.serial} to ${u.center.center_name}?`, body: 'Their Take reading button will read this ESP32 tester. Their device invoice must be paid for it to work.', confirmLabel: 'Give device' }
+                            : { title: `Take device ${u.center.device} back?`, body: `${u.center.center_name} can then only enter readings by hand.`, confirmLabel: 'Take back', danger: true }))) return
+                          setBusy(u.id)
+                          try {
+                            const { error: e } = await supabase.rpc('assign_device', { p_serial: give ? free.serial : u.center.device, p_center: give ? u.center.id : null })
+                            if (e) throw e
+                            toast(give ? `Device ${free.serial} given to ${u.center.center_name}.` : 'Device taken back.'); load()
+                          } catch (e) { toast(e.message, 'error') }
+                          setBusy(null)
+                        }}>{u.center.device ? 'Take device back' : 'Give device'}</button>
                       )}
                       {canToggle && (u.status === 'active' ? (
                         <button onClick={() => run(u, 'set_user_status', { p_status: 'suspended' }, { title: `Suspend ${u.full_name}?`, body: 'They are signed out of the portal until you reactivate them.', confirmLabel: 'Suspend', danger: true })}
