@@ -194,7 +194,7 @@ function LinkRequest({ f, onDone }) {
   const { toast, confirm } = useUi()
   const [busy, setBusy] = useState(false)
   const answer = async (yes) => {
-    if (yes && !(await confirm({ title: `Is this really ${f.full_name}?`, body: `Ask ${f.full_name.split(' ')[0]} to show you the farmer app on their phone (${f.phone}). Once linked, they see their milk, receipts and payments, and confirm payments in the app.`, confirmLabel: 'Yes, link it' }))) return
+    if (yes && !(await confirm({ title: `Is this really ${f.full_name}?`, body: `Ask ${f.full_name} to show you the farmer app on their phone (${f.phone}). Once linked, they see their milk, receipts and payments, and confirm payments in the app.`, confirmLabel: 'Yes, link it' }))) return
     setBusy(true)
     try { await confirmFarmerLink(f.id, yes); toast(yes ? `${f.full_name}'s app account is linked.` : 'Request declined. Nothing was shared.'); await onDone() } catch (e) { toast(e.message, 'error') }
     setBusy(false)
