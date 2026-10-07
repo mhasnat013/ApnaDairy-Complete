@@ -204,7 +204,10 @@ export async function uploadShopPhoto(centerId, file, sort = 0) {
   const path = `${centerId}/${Date.now()}-${Math.random().toString(36).slice(2, 7)}.${ext}`
   const { error } = await supabase.storage.from('shop-photos').upload(path, file, { contentType: file.type, upsert: false })
   if (error) throw error
-  return must(await supabase.from('shop_photos').insert({ path, sort }).select().single())
+  const res = await supabase.from('shop_photos').insert({ area_manager_id: centerId, path, sort }).select().single()
+  // no row, no file: do not leave an unused picture in storage
+  if (res.error) await supabase.storage.from('shop-photos').remove([path])
+  return must(res)
 }
 export async function deleteShopPhoto(photo) {
   await supabase.storage.from('shop-photos').remove([photo.path])
@@ -262,8 +265,10 @@ export const undoUsage = (id) => rpc('undo_usage', { p_id: id })
 export const adminAudit = async () => must(await supabase.from('collection_audit')
   .select('*, center:area_managers(center_name, city), collection:milk_collections(quantity_l, milk_type, farmer:farmers(full_name))')
   .order('created_at', { ascending: false }).limit(200))
+// disputed payments, open ones and the ones apnadairy already settled
 export const adminDisputes = async () => must(await supabase.from('farmer_payouts')
-  .select('*, center:area_managers(center_name, city), farmer:farmers(full_name, phone)').eq('status', 'disputed').order('answered_at', { ascending: false }).limit(100))
+  .select('*, center:area_managers(center_name, city), farmer:farmers(full_name, phone)').or('status.eq.disputed,settled_outcome.not.is.null').order('answered_at', { ascending: false }).limit(100))
+export const settleDispute = (id, paid, note) => rpc('settle_payout_dispute', { p_id: id, p_paid: paid, p_note: note })
 export const adminUsageAudit = async () => must(await supabase.from('usage_audit')
   .select('*, center:area_managers(center_name, city)').order('created_at', { ascending: false }).limit(100))
 export const auditLabel = { cancelled: 'Cancelled', corrected: 'Corrected', expired: 'Offer expired', usage_undone: 'Stock entry undone' }

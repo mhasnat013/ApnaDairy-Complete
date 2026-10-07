@@ -105,6 +105,8 @@ export default function FarmerDetail() {
               <div className="min-w-0">
                 <p className="font-semibold"><span className="num">{rs(Math.round(p.amount))}</span> <span className="text-[13px] font-normal text-muted">by {paymentLabel[p.method]}{p.reference ? ` · ${p.reference}` : ''}</span></p>
                 <p className="text-[12.5px] text-muted">{p.collections} {p.collections === 1 ? 'drop-off' : 'drop-offs'}, {litres(p.litres)} · sent {dateTime(p.created_at)}{p.farmer_note ? ` · “${p.farmer_note}”` : ''}</p>
+                {p.settled_at && <p className={`mt-1 text-[12.5px] font-semibold ${p.settled_outcome === 'paid' ? 'text-forest' : 'text-danger'}`}>
+                  ApnaDairy checked: {p.settled_outcome === 'paid' ? 'the farmer was paid.' : 'the farmer was not paid. Pay this milk again.'} <span className="font-normal text-muted">{p.settled_note}</span></p>}
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <Badge tone={payoutTone[p.status]}>{payoutStatusLabel[p.status]}</Badge>

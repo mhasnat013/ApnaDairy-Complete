@@ -5,7 +5,7 @@ import { useUi } from '../../context/UiContext'
 import { useLoad } from '../../lib/useLoad'
 import { centerOrders } from '../../lib/b2b'
 import {
-  myCenter, centerDaily, milkStock, stockBatches, activeOrders, farmersWithStats, shelfBatches, stockLeft, seedSample, myInvoices,
+  myCenter, centerDaily, milkStock, stockBatches, activeOrders, farmersWithStats, shelfBatches, stockLeft, seedSample, clearSample, myInvoices,
   shortDay, weekday, rsShort, todayKey, orderStatusLabel, orderTone, timeOf, milkLabel,
 } from '../../lib/center'
 import { rs, litres, relative, plural } from '../../lib/format'
@@ -45,8 +45,27 @@ export default function ManagerHome() {
       </WelcomeBanner>
       {error && <div className="mt-4"><Alert>{error}</Alert></div>}
       <BillReminder invoices={data?.invoices} />
+      {c?.is_demo && data?.farmers?.some((f) => f.is_sample) && <SampleBanner onDone={reload} />}
       {empty ? <Onboarding demo={c?.is_demo} onDone={reload} /> : <Dashboard data={data} />}
     </>
+  )
+}
+
+// demo centers: sample data stays until the center clears it. anything recorded for real is kept.
+function SampleBanner({ onDone }) {
+  const { toast, confirm } = useUi()
+  const [busy, setBusy] = useState(false)
+  const clear = async () => {
+    if (!(await confirm({ title: 'Clear the sample data?', body: 'Sample farmers, milk, orders, bills and reviews are removed. Everything you recorded yourself stays, including farmers you bought real milk from.', confirmLabel: 'Clear sample data', danger: true }))) return
+    setBusy(true)
+    try { await clearSample(); toast('Sample data cleared.'); onDone() } catch (e) { toast(e.message, 'error') }
+    setBusy(false)
+  }
+  return (
+    <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-cream-2 px-4 py-3 text-[14px]">
+      <p><span className="font-semibold">Sample data is loaded.</span> <span className="text-muted">It is mixed in with what you record. Clear it before going live.</span></p>
+      <button className="btn-secondary btn-sm" onClick={clear} disabled={busy}>{busy ? 'Clearing…' : 'Clear sample data'}</button>
+    </div>
   )
 }
 
