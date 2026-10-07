@@ -3,13 +3,15 @@ import { Link, Navigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { homeFor, roleLabel } from '../../lib/roles'
 import { mySubmission } from '../../lib/docs'
-import { dateTime } from '../../lib/format'
+import { dateTime, rs, date } from '../../lib/format'
 import AuthShell from '../../components/AuthShell'
 import Loader from '../../components/Loader'
 import Badge from '../../components/Badge'
 import Icon from '../../components/Icon'
 import DocumentUpload from '../../components/DocumentUpload'
 import ProfileProblem from '../../components/ProfileProblem'
+import { PaySheet } from '../../components/BillPay'
+import { myUnpaidBills, paymentLabel, todayKey } from '../../lib/center'
 
 const needsDocs = (role) => ['area_manager', 'business'].includes(role)
 
@@ -48,6 +50,7 @@ export default function Pending() {
             ? <p className="mt-3 rounded-2xl bg-cream px-4 py-3 text-[14px] text-ink"><span className="font-semibold">Reason: </span>{sub?.rejection_reason || 'No reason was given.'} If you think this is a mistake, reply to the email we sent you.</p>
             : null}
         </div>
+        {!rejected && profile.role === 'area_manager' && <UnpaidBills />}
         {actions}
       </AuthShell>
     )
@@ -93,5 +96,37 @@ export default function Pending() {
         <button onClick={signOut} className="btn-secondary">Sign out</button>
       </div>
     </AuthShell>
+  )
+}
+
+// a seller suspended over unpaid bills can still pay them; ApnaDairy restores the account once it is paid
+function UnpaidBills() {
+  const [bills, setBills] = useState(null)
+  const [paying, setPaying] = useState(null)
+  const load = useCallback(() => { myUnpaidBills().then(setBills).catch(() => setBills([])) }, [])
+  useEffect(() => { load() }, [load])
+  if (!bills?.length) return null
+  const total = bills.reduce((n, i) => n + Number(i.amount), 0)
+  return (
+    <div className="panel mt-4 p-5">
+      <div className="flex items-baseline justify-between gap-3">
+        <p className="font-semibold text-ink">Unpaid bills</p>
+        <p className="display num text-[22px]">{rs(total)}</p>
+      </div>
+      <p className="mt-1 text-[13px] text-muted">Pay them and send the transaction ID. ApnaDairy checks the payment and can then restore your account.</p>
+      <ul className="mt-3 grid gap-2">
+        {bills.map((i) => (
+          <li key={i.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-cream px-4 py-3">
+            <div className="min-w-0">
+              <p className="text-[14px] font-medium">{i.description}</p>
+              <p className={`text-[12.5px] ${i.due_date < todayKey() ? 'font-semibold text-danger' : 'text-muted'}`}>{rs(i.amount)}, due {date(i.due_date)}</p>
+              {i.submitted_at && <p className="text-[12.5px] text-amber">Payment sent by {paymentLabel[i.payment_method]} ({i.payment_ref}). ApnaDairy is checking it.</p>}
+            </div>
+            <button className={i.submitted_at ? 'btn-secondary btn-sm' : 'btn-primary btn-sm'} onClick={() => setPaying(i)}>{i.submitted_at ? 'Change' : `Pay ${rs(i.amount)}`}</button>
+          </li>
+        ))}
+      </ul>
+      <PaySheet key={paying?.id ?? 'closed'} invoice={paying} onClose={() => setPaying(null)} onPaid={load} />
+    </div>
   )
 }

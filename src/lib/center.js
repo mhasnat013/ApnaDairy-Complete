@@ -186,10 +186,25 @@ export const adminInvoices = async () => must(await supabase.from('admin_billing
 export const generateInvoices = (month) => rpc('generate_monthly_invoices', { p_month: month ?? null })
 export const voidInvoice = (id) => rpc('void_invoice', { p_invoice: id })
 export const savePlatformSettings = async (s) => {
-  const keys = ['device_price', 'monthly_fee', 'discount_min_sales', 'discount_pct', 'order_min_l', 'order_max_l', 'farmer_min_pct', 'farmer_default_pct', 'markup_suggest_pct', 'markup_max_pct', 'payment_days']
+  const keys = ['device_price', 'monthly_fee', 'discount_min_sales', 'discount_pct', 'order_min_l', 'order_max_l', 'farmer_min_pct', 'farmer_default_pct', 'markup_suggest_pct', 'markup_max_pct', 'payment_days', 'suspend_after_months']
   const row = Object.fromEntries(keys.map((k) => [k, Number(s[k])]))
   return must(await supabase.from('platform_settings').update({ ...row, updated_at: new Date().toISOString() }).eq('id', true))
 }
+// dues, monthly warnings and suspension
+export const runMyBilling = () => rpc('run_my_billing')
+export const myDues = () => rpc('my_dues')
+export const myUnpaidBills = () => rpc('my_unpaid_bills')
+export const runBillingChecks = () => rpc('run_billing_checks')
+export const billingAccounts = () => rpc('admin_billing_accounts')
+export const setSellerStatus = (center, suspend, reason) => rpc('billing_set_status', { p_center: center, p_suspend: suspend, p_reason: reason || null })
+export const billingNotices = async (center) => {
+  let q = supabase.from('billing_notices').select('*').order('created_at', { ascending: false }).limit(100)
+  if (center) q = q.eq('area_manager_id', center)
+  return must(await q)
+}
+export const centerInvoices = async (center) => must(await supabase.from('center_invoices').select('*').eq('area_manager_id', center).order('issued_at', { ascending: false }))
+// "12 days" under a month, then "2 months (65 days)"
+export const overdueText = (days) => (days == null ? '' : days < 30 ? `${days} ${days === 1 ? 'day' : 'days'}` : `${Math.floor(days / 30)} ${Math.floor(days / 30) === 1 ? 'month' : 'months'} (${days} days)`)
 export const paymentLabel = { jazzcash: 'JazzCash', easypaisa: 'EasyPaisa', bank: 'Bank transfer', cash: 'Cash' }
 export const monthLabel = (d) => (d ? new Date(`${d.slice(0, 10)}T12:00:00`).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }) : '')
 

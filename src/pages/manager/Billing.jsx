@@ -1,17 +1,15 @@
 import { useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import { useLoad } from '../../lib/useLoad'
-import { useUi } from '../../context/UiContext'
-import { billingOverview, myInvoices, payInvoice, paymentLabel, monthLabel, rsShort, todayKey } from '../../lib/center'
-import { rs, date } from '../../lib/format'
+import { billingOverview, myInvoices, paymentLabel, monthLabel, todayKey, runMyBilling, myDues, billingNotices, overdueText } from '../../lib/center'
+import { rs, date, dateTime } from '../../lib/format'
 import PageHeader from '../../components/PageHeader'
 import Card from '../../components/Card'
 import Badge from '../../components/Badge'
 import Alert from '../../components/Alert'
 import Icon from '../../components/Icon'
-import Sheet from '../../components/Sheet'
 import EmptyState from '../../components/EmptyState'
-import { refError } from '../../lib/validate'
+import { Breakdown, PaySheet } from '../../components/BillPay'
 
 const isOverdue = (i) => i.status === 'due' && i.due_date < todayKey()
 
@@ -19,8 +17,9 @@ export default function Billing() {
   const { center } = useOutletContext() ?? {}
   const seller = center?.type === 'byproduct'
   const { data, error, reload } = useLoad(async () => {
-    const [o, invoices] = await Promise.all([billingOverview(), myInvoices()])
-    return { o, invoices }
+    await runMyBilling().catch(() => {})   // this month's bill and any warning due today
+    const [o, invoices, dues, notices] = await Promise.all([billingOverview(), myInvoices(), myDues(), billingNotices().catch(() => [])])
+    return { o, invoices, dues, notices }
   })
   const [paying, setPaying] = useState(null)
   const o = data?.o
@@ -31,6 +30,7 @@ export default function Billing() {
     <>
       <PageHeader title="Billing" description={seller ? "Your ApnaDairy plan: the monthly platform fee only. Every rupee from your sales is yours." : "Your ApnaDairy plan: the IoT milk tester and the monthly platform fee. Every rupee from your milk sales is yours."} />
       <Alert>{error}</Alert>
+      {data?.dues && <DuesBanner d={data.dues} seller={seller} />}
 
       <div className="grid gap-4 sm:gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]">
         <section className="furrows relative overflow-hidden rounded-[24px] bg-forest-deep p-6 text-cream">
@@ -74,6 +74,17 @@ export default function Billing() {
         </Card>
       </div>
 
+      {data?.dues && (
+        <dl className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {[['Outstanding', rs(data.dues.outstanding), data.dues.due_bills ? `${data.dues.due_bills} ${data.dues.due_bills === 1 ? 'bill' : 'bills'}` : 'all paid'],
+            ['Due date', data.dues.next_due ? date(data.dues.next_due) : '—', data.dues.next_due && data.dues.next_due < todayKey() ? 'overdue' : ''],
+            ['Paid so far', rs(data.dues.paid), data.dues.last_paid_at ? `last on ${date(data.dues.last_paid_at)}` : ''],
+            ['Warnings', data.dues.warnings, data.dues.last_warning_at ? `last on ${date(data.dues.last_warning_at)}` : 'none']].map(([k, v, n]) => (
+            <div key={k} className="panel px-4 py-3"><dt className="text-[12.5px] text-muted">{k}</dt><dd className={`display num mt-0.5 text-[22px] ${n === 'overdue' ? 'text-danger' : ''}`}>{v}</dd>{n && <p className={`text-[12px] ${n === 'overdue' ? 'font-semibold text-danger' : 'text-muted'}`}>{n}</p>}</div>
+          ))}
+        </dl>
+      )}
+
       <h2 className="display mb-3 mt-8 text-[22px] text-forest-deep">To pay</h2>
       {data && due.length === 0 && <div className="panel"><EmptyState title="Nothing to pay">You are all paid up. Thank you.</EmptyState></div>}
       <div className="grid gap-3 lg:grid-cols-2">
@@ -116,55 +127,44 @@ export default function Billing() {
         </div>
       </Card>
 
+      {data?.notices?.length > 0 && (
+        <Card className="mt-6" title="Warnings and notices" subtitle="ApnaDairy sends a warning every 30 days a bill stays unpaid, by email too.">
+          <ul className="grid gap-2">
+            {data.notices.map((n) => (
+              <li key={n.id} className="rounded-2xl bg-cream px-4 py-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <Badge tone={n.kind === 'warning' ? 'amber' : n.kind === 'suspended' ? 'red' : 'green'}>{n.kind === 'warning' ? `Warning ${n.level}` : n.kind === 'suspended' ? 'Suspended' : 'Restored'}</Badge>
+                  <span className="text-[12px] text-muted">{dateTime(n.created_at)}</span>
+                </div>
+                <p className="mt-1.5 text-[14px] font-semibold">{n.title}</p>
+                {n.note && <p className="mt-0.5 text-[13px] text-muted">{n.note}</p>}
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
+
       <PaySheet key={paying?.id ?? 'closed'} invoice={paying} onClose={() => setPaying(null)} onPaid={reload} />
     </>
   )
 }
 
-export function Breakdown({ i }) {
-  const rows = []
-  if (Number(i.device_fee)) rows.push(['IoT milk tester', rs(i.device_fee)])
-  if (Number(i.subscription_fee)) {
-    rows.push(['Platform fee', rs(i.subscription_fee)])
-    if (i.discount_pct) rows.push([`${i.discount_pct}% off, for ${rsShort(i.sales_basis)} sales the month before`, `−${rs(Math.round(i.subscription_fee * i.discount_pct) / 100)}`])
-  }
-  // bills from before the subscription-only plan may still show a commission line
-  if (Number(i.commission)) rows.push([`Commission ${Number(i.commission_pct)}% of ${rs(i.online_sales)} online orders`, rs(i.commission)])
+// overdue: how long, what is paused, and when the account can be suspended
+function DuesBanner({ d, seller }) {
+  if (d.overdue_days == null) return null
+  const paused = seller ? 'Bidding is paused' : 'Bidding and milk testing are paused'
   return (
-    <dl className="mt-4 grid gap-1.5 rounded-2xl bg-cream px-4 py-3 text-[13.5px]">
-      {rows.map(([l, v]) => <div key={l} className="flex justify-between gap-3"><dt className="text-muted">{l}</dt><dd className="num shrink-0 font-medium">{v}</dd></div>)}
-    </dl>
-  )
-}
-
-function PaySheet({ invoice, onClose, onPaid }) {
-  const { toast } = useUi()
-  const [method, setMethod] = useState(invoice?.payment_method && invoice.payment_method !== 'cash' ? invoice.payment_method : 'jazzcash')
-  const [ref, setRef] = useState(invoice?.payment_ref ?? '')
-  const [busy, setBusy] = useState(false)
-  const [err, setErr] = useState('')
-  const submit = async () => {
-    if (refError(ref)) return setErr(refError(ref))
-    setBusy(true); setErr('')
-    try { await payInvoice(invoice.id, method, ref.trim()); toast('Payment sent. ApnaDairy confirms it once the money arrives.'); onPaid(); onClose() } catch (e) { setErr(e.message) }
-    setBusy(false)
-  }
-  return (
-    <Sheet open={!!invoice} onClose={onClose} title={`Pay ${invoice ? rs(invoice.amount) : ''}`} subtitle={invoice?.description}
-      footer={<><button className="btn-secondary" onClick={onClose}>Cancel</button><button className="btn-primary" onClick={submit} disabled={busy}>{busy ? 'Sending…' : 'Send payment details'}</button></>}>
-      <Alert>{err}</Alert>
-      <p className="text-[13px] font-semibold">How did you pay?</p>
-      <div className="mt-2 grid gap-2">
-        {['jazzcash', 'easypaisa', 'bank'].map((m) => (
-          <button key={m} type="button" onClick={() => setMethod(m)}
-            className={`flex items-center justify-between rounded-2xl border px-4 py-3 text-left transition-all ${method === m ? 'border-forest bg-mint-soft ring-2 ring-forest/15' : 'border-line bg-white hover:border-forest/40'}`}>
-            <span className="font-semibold">{paymentLabel[m]}</span>
-            <span className={`grid h-5 w-5 place-items-center rounded-full border-2 ${method === m ? 'border-forest' : 'border-line'}`}>{method === m && <span className="h-2.5 w-2.5 rounded-full bg-forest" />}</span>
-          </button>
-        ))}
+    <div className={`mb-5 flex items-start gap-3 rounded-[20px] px-5 py-4 ${d.eligible ? 'bg-[#f8e2dc] text-danger' : 'bg-haldi-soft text-amber'}`} role="status">
+      <span className="mt-0.5 shrink-0"><Icon name="alert" size={20} /></span>
+      <div className="min-w-0 text-[14px]">
+        <p className="font-semibold">{d.eligible ? 'Your account can be suspended' : `${rs(d.overdue_amount)} overdue for ${overdueText(d.overdue_days)}`}</p>
+        <p className="mt-0.5 leading-relaxed">
+          {d.eligible
+            ? `${rs(d.overdue_amount)} has been unpaid since ${date(d.overdue_since)}. ApnaDairy can suspend your account now. Pay below to keep it.`
+            : `${paused} until it is paid. If it is still unpaid on ${date(d.suspend_from)}, your account can be suspended.`}
+          {d.payment_sent ? ' Your payment was sent and ApnaDairy is checking it.' : ''}
+        </p>
       </div>
-      <div className="field mt-5"><label htmlFor="ref">Transaction ID</label><input id="ref" className="input num" maxLength={30} placeholder="e.g. 0123456789" value={ref} onChange={(e) => setRef(e.target.value)} /></div>
-      <p className="mt-4 rounded-2xl bg-cream px-4 py-3 text-[12.5px] text-muted">Pay ApnaDairy by JazzCash, EasyPaisa or bank transfer, then enter the transaction ID here. ApnaDairy checks it and marks the bill paid. To pay cash, visit the ApnaDairy office.</p>
-    </Sheet>
+    </div>
   )
 }
