@@ -69,16 +69,18 @@ export default function Approvals() {
     }
     const { error } = await supabase.rpc('set_verification', { p_kind: tab.id, p_id: row.id, p_status: next, p_reason: reason })
     if (error) return toast(error.message, 'error')
-    if (next === 'rejected') {
-      // tell them by email too; the rejection stands even if the email cannot be sent
+    const reactivated = next === 'active' && row.verification_status === 'suspended'
+    if (next === 'rejected' || (next === 'active' && !reactivated)) {
+      // tell them by email too; the decision stands even if the email cannot be sent
+      const done = next === 'active' ? 'approved' : 'rejected'
       try {
-        const sent = await sendAccountEmail(row.user_id, 'account_rejected')
-        toast(`${name} rejected. Email sent to ${sent.to}.`)
+        const sent = await sendAccountEmail(row.user_id, next === 'active' ? 'account_approved' : 'account_rejected')
+        toast(`${name} ${done}. Email sent to ${sent.to}.`)
       } catch (e) {
-        toast(`${name} rejected, but the email was not sent: ${e.message}`, 'error')
+        toast(`${name} ${done}, but the email was not sent: ${e.message}`, 'error')
       }
     } else {
-      toast(next === 'active' ? (row.verification_status === 'suspended' ? `${name} reactivated.` : `${name} approved.`) : `${name} suspended.`)
+      toast(reactivated ? `${name} reactivated.` : `${name} suspended.`)
     }
     load()
   }
