@@ -2,13 +2,14 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../context/AuthContext'
+import { homeFor } from '../../lib/roles'
 import AuthShell from '../../components/AuthShell'
 import Alert from '../../components/Alert'
 import Loader from '../../components/Loader'
 
-// opened from the reset email: supabase signs the user in from the link, then they pick a new password
-export default function ResetPassword() {
-  const { session, loading } = useAuth()
+// opened from the reset email (or an admin invite): supabase signs the user in from the link, then they pick a password
+export default function ResetPassword({ invite = false }) {
+  const { session, loading, refreshProfile, profile } = useAuth()
   const nav = useNavigate()
   const [pw, setPw] = useState('')
   const [pw2, setPw2] = useState('')
@@ -18,9 +19,9 @@ export default function ResetPassword() {
   if (loading) return <Loader />
   if (!session) {
     return (
-      <AuthShell title="Link expired" subtitle="This reset link is no longer valid.">
-        <p className="text-[15px] text-muted">Ask for a new link and open it soon after it arrives.</p>
-        <Link to="/forgot-password" className="btn-primary mt-6">Send a new link</Link>
+      <AuthShell title="Link expired" subtitle={invite ? 'This invite link is no longer valid.' : 'This reset link is no longer valid.'}>
+        <p className="text-[15px] text-muted">{invite ? 'Ask the admin who invited you to send the invite again.' : 'Ask for a new link and open it soon after it arrives.'}</p>
+        {!invite && <Link to="/forgot-password" className="btn-primary mt-6">Send a new link</Link>}
       </AuthShell>
     )
   }
@@ -33,12 +34,13 @@ export default function ResetPassword() {
     setBusy(true)
     const { error } = await supabase.auth.updateUser({ password: pw })
     setBusy(false)
-    if (error) setError(error.message)
+    if (error) return setError(error.message)
+    if (invite) { await refreshProfile(); nav(homeFor(profile?.role ?? 'super_admin'), { replace: true }) }
     else nav('/login', { replace: true })
   }
 
   return (
-    <AuthShell title="Set a new password" subtitle="Pick something you have not used before.">
+    <AuthShell title={invite ? 'Welcome to ApnaDairy' : 'Set a new password'} subtitle={invite ? 'Your email is confirmed. Set a password to finish setting up your admin account.' : 'Pick something you have not used before.'}>
       <form onSubmit={onSubmit} className="flex flex-col gap-4">
         <Alert>{error}</Alert>
         <div className="field">

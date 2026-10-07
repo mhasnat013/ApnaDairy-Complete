@@ -18,6 +18,7 @@ export default function DashboardLayout() {
   const nav = profile.role === 'area_manager' && !center ? [] : navFor[key] ?? []
   const items = nav.filter((i) => i.ready)
   const later = nav.filter((i) => !i.ready)
+  const base = profile.role === 'super_admin' ? '/admin' : profile.role === 'business' ? '/business' : '/manager'
   const initials = profile.full_name.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase()
 
   const sidebar = (
@@ -51,11 +52,13 @@ export default function DashboardLayout() {
         )}
       </nav>
       <div className="m-3 flex items-center gap-3 rounded-2xl bg-cream/5 p-3">
-        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-haldi text-[14px] font-bold text-forest-deep">{initials}</span>
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-[14px] font-semibold">{profile.full_name}</p>
-          <p className="truncate text-[12.5px] text-cream/60">{key === 'byproduct' ? 'Dairy seller' : roleLabel[profile.role]}</p>
-        </div>
+        <NavLink to={`${base}/account`} onClick={() => setOpen(false)} className="flex min-w-0 flex-1 items-center gap-3 rounded-xl transition-colors hover:bg-cream/5" title="My account">
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-haldi text-[14px] font-bold text-forest-deep">{initials}</span>
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-[14px] font-semibold">{profile.full_name}</span>
+            <span className="block truncate text-[12.5px] text-cream/60">{key === 'byproduct' ? 'Dairy seller' : roleLabel[profile.role]} · My account</span>
+          </span>
+        </NavLink>
         <button onClick={signOut} className="rounded-full p-2 text-cream/60 transition-colors hover:bg-cream/10 hover:text-cream" aria-label="Sign out" title="Sign out">
           <Icon name="logout" size={17} />
         </button>

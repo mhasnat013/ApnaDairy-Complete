@@ -12,6 +12,7 @@ import Signup from './pages/auth/Signup'
 import Pending from './pages/auth/Pending'
 import ForgotPassword from './pages/auth/ForgotPassword'
 import ResetPassword from './pages/auth/ResetPassword'
+import Welcome from './pages/auth/Welcome'
 import MobileOnly from './pages/auth/MobileOnly'
 const AdminHome = lazy(() => import('./pages/admin/AdminHome'))
 const Approvals = lazy(() => import('./pages/admin/Approvals'))
@@ -45,6 +46,7 @@ const IotDevices = lazy(() => import('./pages/admin/IotDevices'))
 const Analytics = lazy(() => import('./pages/admin/Analytics'))
 const Admins = lazy(() => import('./pages/admin/Admins'))
 const Help = lazy(() => import('./pages/Help'))
+const Account = lazy(() => import('./pages/Account'))
 const Products = lazy(() => import('./pages/seller/Products'))
 import MilkOnly from './components/MilkOnly'
 
@@ -62,6 +64,8 @@ export default function App() {
           <Route path="/pending" element={<Pending />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />
+          <Route path="/set-password" element={<ResetPassword invite />} />
+          <Route path="/welcome" element={<Welcome />} />
           <Route path="/requests" element={<PublicRequests />} />
 
           <Route element={<ProtectedRoute allow={['farmer', 'customer']} />}>
@@ -80,6 +84,7 @@ export default function App() {
               <Route path="iot-devices" element={<IotDevices />} />
               <Route path="analytics" element={<Analytics />} />
               <Route path="admins" element={<Admins />} />
+              <Route path="account" element={<Account />} />
               <Route path="*" element={<ModuleSoon />} />
             </Route>
           </Route>
@@ -102,6 +107,7 @@ export default function App() {
               <Route path="shop" element={<MyShop />} />
               <Route path="help" element={<Help />} />
               <Route path="products" element={<MilkOnly products><Products /></MilkOnly>} />
+              <Route path="account" element={<Account />} />
               <Route path="*" element={<ModuleSoon />} />
             </Route>
           </Route>
@@ -114,6 +120,7 @@ export default function App() {
               <Route path="requirements/:id" element={<RequirementDetail />} />
               <Route path="orders" element={<BusinessOrders />} />
               <Route path="help" element={<Help />} />
+              <Route path="account" element={<Account />} />
               <Route path="*" element={<ModuleSoon />} />
             </Route>
           </Route>

@@ -4,6 +4,8 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../context/AuthContext'
 import AuthShell from '../../components/AuthShell'
 import Alert from '../../components/Alert'
+import GoogleButton, { OrLine } from '../../components/GoogleButton'
+import ResendConfirmation from '../../components/ResendConfirmation'
 import { nameError, titleError, cityError, emailError, phoneError, passwordError, firstError, normPhone, tidyCity, CITIES } from '../../lib/validate'
 
 const roles = [
@@ -55,19 +57,22 @@ export default function Signup() {
     const { data, error } = await supabase.auth.signUp({
       email: form.email.trim().toLowerCase(),
       password: form.password,
-      options: { data: meta },
+      options: { data: meta, emailRedirectTo: `${window.location.origin}/pending` },
     })
     setBusy(false)
     if (error) return setError(error.message)
+    // supabase answers an already-used email without an error, but with no sign-in methods
+    if (data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) return setError('An account with this email already exists. Sign in instead, or use Forgot password.')
     if (!data.session) setDone(true) // email confirmation is on
   }
 
   if (done) {
     return (
-      <AuthShell title="Check your email" subtitle="We sent you a confirmation link.">
+      <AuthShell title="Check your email" subtitle={`We sent a confirmation link to ${form.email.trim().toLowerCase()}.`}>
         <Alert type="success">
-          After confirming, sign in. Your account will be reviewed by the ApnaDairy admin before you get full access.
+          Open the link to confirm your email. Then upload your documents; the ApnaDairy admin reviews your account before it opens.
         </Alert>
+        <ResendConfirmation email={form.email.trim().toLowerCase()} className="mt-4 text-[14px]" />
         <Link to="/login" className="btn-primary mt-6 w-full">Go to sign in</Link>
       </AuthShell>
     )
@@ -87,6 +92,8 @@ export default function Signup() {
         ))}
       </div>
 
+      <GoogleButton label="Sign up with Google" onError={setError} />
+      <OrLine />
       <form onSubmit={onSubmit} noValidate className="flex flex-col gap-4">
 
         <div className="field">

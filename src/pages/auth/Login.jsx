@@ -5,6 +5,8 @@ import { useAuth } from '../../context/AuthContext'
 import { homeFor } from '../../lib/roles'
 import AuthShell from '../../components/AuthShell'
 import Alert from '../../components/Alert'
+import GoogleButton, { OrLine } from '../../components/GoogleButton'
+import ResendConfirmation from '../../components/ResendConfirmation'
 
 export default function Login() {
   const { session, profile } = useAuth()
@@ -12,6 +14,7 @@ export default function Login() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const [unconfirmed, setUnconfirmed] = useState(false)
 
   // already logged in → go to the right place
   if (session && profile) {
@@ -22,16 +25,23 @@ export default function Login() {
     e.preventDefault()
     setError('')
     setBusy(true)
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    setUnconfirmed(false)
+    const { error } = await supabase.auth.signInWithPassword({ email: email.trim().toLowerCase(), password })
     setBusy(false)
-    if (error) setError(error.message)
+    if (error) {
+      setError(error.message)
+      setUnconfirmed(/not confirmed/i.test(error.message))
+    }
     // on success, AuthContext loads the profile and the redirect above runs
   }
 
   return (
     <AuthShell title="Welcome back" subtitle="Sign in to your ApnaDairy portal.">
+      <GoogleButton onError={setError} />
+      <OrLine />
       <form onSubmit={onSubmit} className="flex flex-col gap-4">
         <Alert>{error}</Alert>
+        {unconfirmed && <ResendConfirmation email={email.trim().toLowerCase()} className="-mt-2 text-[14px]" />}
         <div className="field">
           <label htmlFor="email">Email</label>
           <input id="email" type="email" className="input" required autoComplete="email"
