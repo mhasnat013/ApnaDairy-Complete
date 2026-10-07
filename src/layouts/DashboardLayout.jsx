@@ -9,6 +9,7 @@ import { roleLabel } from '../lib/roles'
 import Logo from '../components/Logo'
 import Icon from '../components/Icon'
 import Loader from '../components/Loader'
+import NotificationBell from '../components/NotificationBell'
 
 export default function DashboardLayout() {
   const { profile, signOut } = useAuth()
@@ -26,7 +27,7 @@ export default function DashboardLayout() {
 
   const sidebar = (
     <div className="furrows flex h-full flex-col bg-forest-deep text-cream">
-      <div className="px-6 pb-8 pt-6"><Logo light /></div>
+      <div className="flex items-center justify-between gap-2 pb-8 pl-6 pr-3 pt-6"><Logo light /><span className="hidden lg:block"><NotificationBell light /></span></div>
       <nav className="flex-1 space-y-1 overflow-y-auto px-3" aria-label="Main">
         {items.map((i) => (
           <NavLink key={i.to} to={i.to} end={i.end} onClick={() => setOpen(false)}
@@ -85,6 +86,7 @@ export default function DashboardLayout() {
         <header className="flex h-16 items-center gap-3 border-b border-line bg-cream px-4 lg:hidden">
           <button onClick={() => setOpen(true)} aria-label="Open menu" className="btn-ghost h-10 w-10 p-0"><Icon name="menu" /></button>
           <Logo />
+          <span className="ml-auto"><NotificationBell /></span>
         </header>
         <main className="mx-auto max-w-[1180px] px-4 py-8 sm:px-8 lg:py-10"><Suspense fallback={<Loader />}><Outlet context={{ center, refreshSupport }} /></Suspense></main>
       </div>

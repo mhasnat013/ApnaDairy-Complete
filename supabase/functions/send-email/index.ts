@@ -1,8 +1,10 @@
-// send-email: emails an area manager or business about their account, from a gmail account (free, up to 500 a day).
+// send-email: emails users from a gmail account (free, up to 500 a day).
 //   { user_id, kind: 'account_rejected' }   ->  { sent: true, to }   the reason the admin gave
 //   { user_id, kind: 'account_approved' }   ->  { sent: true, to }   "you can sign in now"
-// only an active super admin can call it, and only when the account really is rejected / approved:
-// the email text comes from the database, never from the caller.
+//   { kind: 'outbox' }                      ->  { sent: n }          notifications waiting to be emailed (supabase/34)
+// the account emails: only an active super admin, and only when the account really is rejected / approved.
+// the outbox: any signed-in user can trigger it; it only sends what the database queued.
+// the email text always comes from the database, never from the caller.
 // optional secret SITE_URL (the portal's link for the sign-in button); otherwise the admin's own portal address is used.
 //
 // deploy: supabase dashboard → edge functions → deploy a new function → via editor, name "send-email".
@@ -32,11 +34,32 @@ Deno.serve(async (req) => {
     const jwt = (req.headers.get('Authorization') ?? '').replace('Bearer ', '')
     const { data: { user } } = await admin.auth.getUser(jwt)
     if (!user) return reply({ error: 'Sign in again.' }, 401)
-    const { data: me } = await admin.from('profiles').select('role, status').eq('id', user.id).maybeSingle()
-    if (me?.role !== 'super_admin' || me?.status !== 'active') return reply({ error: 'Only a super admin can send account emails.' }, 403)
-
     const body = await req.json().catch(() => ({}))
     const kind = body.kind
+    const userName = Deno.env.get('GMAIL_USER'), pass = Deno.env.get('GMAIL_APP_PASSWORD')
+    const site = (Deno.env.get('SITE_URL') ?? req.headers.get('origin') ?? '').replace(/\/$/, '')
+
+    if (kind === 'outbox') {
+      if (!userName || !pass) return reply({ sent: 0, error: 'email is not set up yet' })
+      const { data: jobs, error } = await admin.rpc('claim_email_outbox')
+      if (error) return reply({ error: error.message }, 500)
+      if (!jobs?.length) return reply({ sent: 0 })
+      const client = new SMTPClient({ connection: { hostname: 'smtp.gmail.com', port: 465, tls: true, auth: { username: userName, password: pass } } })
+      let sent = 0
+      try {
+        for (const j of jobs) {
+          if (!j.email || /\.test$/i.test(j.email)) continue   // demo accounts have no inbox
+          const link = j.link && /^https?:\/\//.test(site) ? `${site}${j.link}` : null
+          const mail = noticeMail(String(j.full_name ?? '').split(' ')[0] || 'there', j.title, j.body, link)
+          try { await client.send({ from: `ApnaDairy <${userName}>`, to: j.email, subject: mail.subject, content: mail.text, html: mail.html }); sent++ }
+          catch { await admin.from('notifications').update({ emailed_at: null }).eq('id', j.id) }   // try again next time
+        }
+      } finally { await client.close() }
+      return reply({ sent })
+    }
+
+    const { data: me } = await admin.from('profiles').select('role, status').eq('id', user.id).maybeSingle()
+    if (me?.role !== 'super_admin' || me?.status !== 'active') return reply({ error: 'Only a super admin can send account emails.' }, 403)
     if (kind !== 'account_rejected' && kind !== 'account_approved') return reply({ error: 'Unknown email.' }, 400)
 
     const { data: who } = await admin.from('profiles').select('id, full_name, email, role, status').eq('id', String(body.user_id ?? '')).maybeSingle()
@@ -49,11 +72,9 @@ Deno.serve(async (req) => {
     const place = (app as Record<string, string> | null)?.[nameCol] ?? 'your account'
     const reason = (app as Record<string, string> | null)?.rejection_reason ?? 'No reason was given.'
 
-    const userName = Deno.env.get('GMAIL_USER'), pass = Deno.env.get('GMAIL_APP_PASSWORD')
     if (!userName || !pass) return reply({ error: 'email is not set up yet (GMAIL_USER and GMAIL_APP_PASSWORD are missing)' })
 
     const first = String(who.full_name ?? '').split(' ')[0] || 'there'
-    const site = (Deno.env.get('SITE_URL') ?? req.headers.get('origin') ?? '').replace(/\/$/, '')
     const signIn = /^https?:\/\//.test(site) ? `${site}/login` : null
     const mail = kind === 'account_approved' ? approvedMail(first, place, signIn) : rejectedMail(first, place, reason)
 
@@ -107,5 +128,15 @@ function approvedMail(first: string, place: string, signIn: string | null) {
     <p>Dear ${esc(first)},</p>
     <p>Good news: ApnaDairy has approved <b>${esc(place)}</b>. Your portal is ready, and you can sign in now.</p>
     ${signIn ? `<p style="margin:22px 0"><a href="${esc(signIn)}" style="background:#1f4d36;color:#fffcf4;text-decoration:none;padding:12px 22px;border-radius:999px;font-weight:bold">Sign in to ApnaDairy</a></p>` : ''}`)
+  return { subject, text, html }
+}
+
+function noticeMail(first: string, title: string, body: string | null, link: string | null) {
+  const subject = `ApnaDairy: ${title}`
+  const text = [`Dear ${first},`, '', title, ...(body ? ['', body] : []), ...(link ? ['', `Open: ${link}`] : []), '', 'ApnaDairy team'].join('\n')
+  const html = wrap(`<h2 style="margin:16px 0 12px;font-size:20px;color:#173a28">${esc(title)}</h2>
+    <p>Dear ${esc(first)},</p>
+    ${body ? `<p style="white-space:pre-wrap">${esc(body)}</p>` : ''}
+    ${link ? `<p style="margin:22px 0"><a href="${esc(link)}" style="background:#1f4d36;color:#fffcf4;text-decoration:none;padding:12px 22px;border-radius:999px;font-weight:bold">Open ApnaDairy</a></p>` : ''}`)
   return { subject, text, html }
 }

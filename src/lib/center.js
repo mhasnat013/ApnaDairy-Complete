@@ -281,7 +281,7 @@ export const deviceLog = async (limit = 12) => must(await supabase.from('device_
 // a device test runs about a minute: start, a sample every few seconds, then the server averages them
 async function iot(body) { return callFunction('iot-reading', body) }
 // edge functions return { error } in the body; show that message rather than a generic one
-async function callFunction(name, body) {
+export async function callFunction(name, body) {
   const { data, error } = await supabase.functions.invoke(name, { body })
   if (error) {
     let msg = name === 'iot-reading' ? 'Could not reach the device service. Check your internet and try again.'
