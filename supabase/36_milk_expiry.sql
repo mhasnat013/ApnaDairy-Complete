@@ -88,6 +88,25 @@ drop trigger if exists products_listing_stamp on public.products;
 create trigger products_listing_stamp before insert or update of listed_l on public.products
   for each row execute function public.stamp_milk_listing();
 
+-- the expiry dates come from the stock only: a center cannot edit them directly
+-- (security invoker on purpose: current_user is then the caller, "authenticated" for a direct edit from the app)
+create or replace function public.guard_listing_expiry()
+returns trigger
+language plpgsql security invoker set search_path = public
+as $$
+begin
+  if current_user in ('authenticated', 'anon')
+     and (new.milk_expires_at is distinct from old.milk_expires_at or new.expired_at is distinct from old.expired_at
+          or new.milk_from is distinct from old.milk_from or new.listed_at is distinct from old.listed_at) then
+    raise exception 'the expiry of listed milk is set from your stock and cannot be changed by hand';
+  end if;
+  return new;
+end;
+$$;
+-- runs before products_listing_stamp (triggers fire in name order), so the stamp itself is not blocked
+drop trigger if exists products_guard_expiry on public.products;
+create trigger products_guard_expiry before update on public.products for each row execute function public.guard_listing_expiry();
+
 -- a discount is free now (no retest), but only while the milk has not expired
 create or replace function public.guard_milk_discount()
 returns trigger
@@ -161,7 +180,8 @@ begin
   if v_owner is null then return jsonb_build_object('discarded_l', 0, 'listings', 0); end if;
   -- milk past its 2 days (or its ai shelf life) leaves the stock as discarded
   foreach t in array enum_range(null::milk_kind) loop
-    select round(expired_l, 1) into v_exp from public.milk_shelf(p_center, t);
+    -- never more than is in stock (rounding must not push it over)
+    select least(expired_l, greatest(public.milk_in_stock(p_center, t), 0)) into v_exp from public.milk_shelf(p_center, t);
     if coalesce(v_exp, 0) >= 0.1 then
       insert into milk_usage (area_manager_id, milk_type, litres, reason, note, is_sample)
       values (p_center, t, v_exp, 'spoiled', 'Expired: more than 2 days old, or past its tested shelf life (removed automatically)', coalesce(v_sample, false));
@@ -212,8 +232,12 @@ as $$
 declare r record; n integer := 0;
 begin
   for r in select a.id from area_managers a where a.type = 'milk_center' and a.verification_status = 'active' loop
-    perform public.expire_milk_for(r.id);
-    n := n + 1;
+    begin
+      perform public.expire_milk_for(r.id);   -- one center's problem must not stop the others
+      n := n + 1;
+    exception when others then
+      raise warning 'milk expiry failed for center %: %', r.id, sqlerrm;
+    end;
   end loop;
   return n;
 end;

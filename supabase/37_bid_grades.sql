@@ -11,6 +11,16 @@
 alter table public.bids add column if not exists offered_quality quality_grade;
 alter table public.bulk_orders add column if not exists quality quality_grade;
 
+-- which tested batches each dispatched bulk order took, so the same premium litres are never sent twice
+create table if not exists public.bulk_order_batches (
+  order_id      uuid not null references public.bulk_orders(id) on delete cascade,
+  collection_id uuid not null references public.milk_collections(id) on delete cascade,
+  litres        numeric(10,2) not null check (litres > 0),
+  primary key (order_id, collection_id)
+);
+create index if not exists bulk_order_batches_collection on public.bulk_order_batches (collection_id);
+alter table public.bulk_order_batches enable row level security;   -- only the functions below use it
+
 -- bids and orders made before this file offered exactly what was asked
 update public.bids b set offered_quality = r.quality
   from public.bulk_requirements r
@@ -157,7 +167,7 @@ begin
   select b.user_id into v_owner from business_profiles b where b.id = r.business_id;
   select center_name into v_center from area_managers where id = new.area_manager_id;
   perform public.notify(v_owner, 'new_bid', v_center || case when tg_op = 'UPDATE' then ' changed their offer' else ' sent an offer' end,
-    'Rs ' || public.fmt_qty(new.price_per_l) || ' for ' || public.fmt_qty(new.quantity_l) || case when r.unit = 'kg' then ' kg' else ' L' end
+    'Rs ' || public.fmt_qty(new.price_per_l) || ' for ' || public.qty_text(new.quantity_l, r.unit)
       || case when new.offered_quality is not null then ' of ' || new.offered_quality || ' milk'
               || case when new.offered_quality < r.quality then ' (lower than the ' || r.quality || ' you asked for)' else '' end
          else '' end || '.',
@@ -222,32 +232,43 @@ $$;
 
 -- ---------- what the tested stock is: grade, test times, freshness ----------
 -- fresh milk in stock of this grade or better, batch by batch (first in, first out)
-create or replace function public.fresh_stock_summary(p_center uuid, p_type milk_kind, p_grade quality_grade)
-returns jsonb
+-- fresh tested batches in stock of a grade or better: first in, first out, less what bulk orders already took from each batch
+create or replace function public.fresh_batches(p_center uuid, p_type milk_kind, p_grade quality_grade)
+returns table (id uuid, milk_type milk_kind, litres numeric, quality quality_grade, freshness_score integer, tested_at timestamptz, good_until timestamptz)
 language sql stable security definer set search_path = public
 as $$
   with types as (select x from unnest(case when p_type = 'mixed' then array['buffalo', 'cow', 'mixed']::milk_kind[] else array[p_type] end) x),
   stock as (select t.x, greatest(public.milk_in_stock(p_center, t.x), 0) as left_l from types t),
   b as (
-    select m.milk_type, m.quantity_l, m.quality, m.freshness_score, coalesce(m.reading_at, m.collected_at) as tested_at,
+    select m.id, m.milk_type, m.quantity_l, m.quality, m.freshness_score, coalesce(m.reading_at, m.collected_at) as tested_at,
            coalesce(m.reading_at, m.collected_at) + public.shelf_hours(m.freshness_hours) * interval '1 hour' as good_until,
-           coalesce(sum(m.quantity_l) over (partition by m.milk_type order by m.collected_at desc, m.id rows between unbounded preceding and 1 preceding), 0) as before_l
+           coalesce(sum(m.quantity_l) over (partition by m.milk_type order by m.collected_at desc, m.id rows between unbounded preceding and 1 preceding), 0) as before_l,
+           coalesce((select sum(x.litres) from bulk_order_batches x where x.collection_id = m.id), 0) as taken_l
     from milk_collections m
     where m.area_manager_id = p_center and m.milk_type in (select x from types) and m.status = 'accepted' and m.collected_at > now() - interval '10 days'
   ),
   shelf as (
-    select b.*, least(b.quantity_l, greatest(s.left_l - b.before_l, 0)) as l
+    select b.*, least(b.quantity_l - b.taken_l, greatest(s.left_l - b.before_l, 0)) as l
     from b join stock s on s.x = b.milk_type
   )
+  select shelf.id, shelf.milk_type, shelf.l, shelf.quality, shelf.freshness_score, shelf.tested_at, shelf.good_until
+  from shelf
+  where shelf.l > 0 and shelf.good_until > now() and shelf.quality >= p_grade;
+$$;
+revoke all on function public.fresh_batches(uuid, milk_kind, quality_grade) from public, anon, authenticated;
+
+create or replace function public.fresh_stock_summary(p_center uuid, p_type milk_kind, p_grade quality_grade)
+returns jsonb
+language sql stable security definer set search_path = public
+as $$
   select jsonb_build_object(
     'source', 'stock',
-    'litres', coalesce(round(sum(l), 1), 0),
-    'quality', min(quality),
-    'tested_from', min(tested_at), 'tested_to', max(tested_at),
-    'freshness_score', round(sum(l * freshness_score) / nullif(sum(l) filter (where freshness_score is not null), 0)),
-    'good_until', min(good_until))
-  from shelf
-  where l > 0 and good_until > now() and quality >= p_grade;
+    'litres', coalesce(round(sum(f.litres), 1), 0),
+    'quality', min(f.quality),
+    'tested_from', min(f.tested_at), 'tested_to', max(f.tested_at),
+    'freshness_score', round(sum(f.litres * f.freshness_score) / nullif(sum(f.litres) filter (where f.freshness_score is not null), 0)),
+    'good_until', min(f.good_until))
+  from public.fresh_batches(p_center, p_type, p_grade) f;
 $$;
 revoke all on function public.fresh_stock_summary(uuid, milk_kind, quality_grade) from public, anon;
 grant execute on function public.fresh_stock_summary(uuid, milk_kind, quality_grade) to authenticated;
@@ -288,21 +309,51 @@ begin
         raise exception 'only % L of fresh % milk tested % or better is in your stock, % L is needed',
           round(coalesce((v_stock->>'litres')::numeric, 0)), v_req.milk_type, v_grade, round(v.quantity_l);
       end if;
+      -- take the batches that expire first, and remember them so they are not sent again
       v_need := v.quantity_l;
-      for t in select x from unnest(case when v_req.milk_type = 'mixed' then array['buffalo', 'cow', 'mixed']::milk_kind[] else array[v_req.milk_type] end) x loop
+      for fb in select * from public.fresh_batches(v.area_manager_id, v_req.milk_type, v_grade) f order by f.good_until, f.tested_at loop
         exit when v_need <= 0;
-        v_take := least(v_need, greatest(public.milk_fresh_at(v.area_manager_id, t, now(), v_grade), 0));
-        if v_take > 0 then
-          insert into bulk_order_milk (order_id, milk_type, litres) values (p_order, t, v_take);
-          v_need := v_need - v_take;
-        end if;
+        v_take := least(v_need, fb.litres);
+        insert into bulk_order_batches (order_id, collection_id, litres) values (p_order, fb.id, v_take);
+        v_need := v_need - v_take;
       end loop;
+      insert into bulk_order_milk (order_id, milk_type, litres)
+      select p_order, c.milk_type, sum(x.litres) from bulk_order_batches x join milk_collections c on c.id = x.collection_id
+       where x.order_id = p_order group by c.milk_type;
       update public.bulk_orders set dispatch_quality = v_stock where id = p_order;
 $new$;
     d := replace(d, a, b);
     -- drop the old block that saved the device reading
     d := regexp_replace(d, '      update public\.bulk_orders set dispatch_reading_id = v_r\.id,.*?where id = p_order;\n', '', 's');
-    d := replace(d, '  v_ai          jsonb;', '  v_ai          jsonb;' || chr(10) || '  v_grade       quality_grade;' || chr(10) || '  v_stock       jsonb;');
+    d := replace(d, '  v_ai          jsonb;', '  v_ai          jsonb;' || chr(10) || '  v_grade       quality_grade;' || chr(10) || '  v_stock       jsonb;' || chr(10) || '  fb            record;');
+    execute d;
+  end if;
+end $$;
+
+-- a database that ran the first version of this file: switch dispatch to batches
+do $$
+declare d text; a text; b text;
+begin
+  select pg_get_functiondef('public.update_bulk_order(uuid,bulk_order_status,text,uuid)'::regprocedure) into d;
+  if position('public.milk_fresh_at(v.area_manager_id, t, now(), v_grade)' in d) > 0 then
+    a := substring(d from position('      v_need := v.quantity_l;' in d)
+                     for position('      update public.bulk_orders set dispatch_quality' in d) - position('      v_need := v.quantity_l;' in d));
+    b := $new$      -- take the batches that expire first, and remember them so they are not sent again
+      v_need := v.quantity_l;
+      for fb in select * from public.fresh_batches(v.area_manager_id, v_req.milk_type, v_grade) f order by f.good_until, f.tested_at loop
+        exit when v_need <= 0;
+        v_take := least(v_need, fb.litres);
+        insert into bulk_order_batches (order_id, collection_id, litres) values (p_order, fb.id, v_take);
+        v_need := v_need - v_take;
+      end loop;
+      insert into bulk_order_milk (order_id, milk_type, litres)
+      select p_order, c.milk_type, sum(x.litres) from bulk_order_batches x join milk_collections c on c.id = x.collection_id
+       where x.order_id = p_order group by c.milk_type;
+$new$;
+    d := replace(d, a, b);
+    if position('  fb            record;' in d) = 0 then
+      d := replace(d, '  v_stock       jsonb;', '  v_stock       jsonb;' || chr(10) || '  fb            record;');
+    end if;
     execute d;
   end if;
 end $$;

@@ -114,7 +114,9 @@ begin
   end if;
 end $$;
 
--- the center rows keep the farmer's account when the connection is made here
+-- the center rows keep the farmer's account when the connection is made here.
+-- a farmer who joined through the app decides alone whether they sell to the center (accept / leave below),
+-- so the center cannot switch that row on or off itself.
 create or replace function public.link_farmer_profile()
 returns trigger
 language plpgsql security definer set search_path = public
@@ -123,12 +125,24 @@ begin
   if coalesce(current_setting('apnadairy.farmer_link', true), '') = 'on' then return new; end if;
   if tg_op = 'INSERT' then
     new.profile_id := null;
-  elsif new.profile_id is distinct from old.profile_id then
-    new.profile_id := old.profile_id;
+  else
+    if new.profile_id is distinct from old.profile_id then
+      new.profile_id := old.profile_id;
+    end if;
+    if old.profile_id is not null and new.is_active is distinct from old.is_active then
+      raise exception 'this farmer joined through the app, so only they can stop or start selling to you';
+    end if;
   end if;
   return new;
 end;
 $$;
+
+-- farmers no longer link themselves to center records by phone; they ask a center and the center accepts
+do $$
+begin
+  revoke execute on function public.link_my_farmer_records() from authenticated, public, anon;
+exception when undefined_function then null;
+end $$;
 
 -- centers can no longer add farmers by hand
 drop policy if exists "farmers: center adds" on public.farmers;
@@ -366,6 +380,19 @@ begin
   update farmer_requests set status = 'accepted', reason = null, answered_at = now() where id = r.id;
   perform set_config('apnadairy.farmer_link', 'on', true);
   select id into v_row from farmers where area_manager_id = r.area_manager_id and profile_id = r.farmer_id;
+  -- a row the center once added by hand for the same phone becomes this farmer's row
+  if v_row is null then
+    select id into v_row from farmers
+     where area_manager_id = r.area_manager_id and profile_id is null and public.norm_phone(phone) = public.norm_phone(p.phone)
+     order by is_active desc, created_at limit 1;
+    if v_row is not null then
+      update farmers set profile_id = r.farmer_id where id = v_row;
+    end if;
+  end if;
+  if v_row is null and exists (select 1 from farmers where area_manager_id = r.area_manager_id and profile_id is not null
+                                  and profile_id <> r.farmer_id and public.norm_phone(phone) = public.norm_phone(p.phone)) then
+    raise exception 'another farmer at your center already uses this phone number. ask ApnaDairy to check it';
+  end if;
   if v_row is not null then
     update farmers set is_active = true, full_name = p.full_name, phone = p.phone, village = coalesce(fp.village, fp.city),
            milk_type = fp.milk_type, cattle_count = fp.cattle_count where id = v_row;
@@ -395,7 +422,9 @@ begin
     raise exception 'answer the price offer waiting at your center first';
   end if;
   update farmer_requests set status = 'ended', ended_at = now(), reason = nullif(trim(p_reason), '') where id = r.id;
+  perform set_config('apnadairy.farmer_link', 'on', true);
   update farmers set is_active = false where area_manager_id = r.area_manager_id and profile_id = auth.uid();
+  perform set_config('apnadairy.farmer_link', 'off', true);
   select full_name into v_name from profiles where id = auth.uid();
   select user_id into v_owner from area_managers where id = r.area_manager_id;
   perform public.notify(v_owner, 'farmer_left', v_name || ' stopped selling to you',

@@ -14,10 +14,10 @@ alter table public.bids
   add column if not exists removed_by     uuid references public.profiles(id) on delete set null,
   add column if not exists removed_reason text;
 
--- "500 L buffalo milk", "20 kg ghee"
+-- "500 L buffalo milk", "20 kg ghee", "12 packs butter"
 create or replace function public.req_text(r public.bulk_requirements)
 returns text language sql stable as $$
-  select public.fmt_qty(r.quantity_l) || case when r.unit = 'kg' then ' kg ' else ' L ' end
+  select public.qty_text(r.quantity_l, r.unit) || ' '
          || case when r.product = 'milk' then r.milk_type::text || ' milk' else r.product::text end;
 $$;
 
@@ -98,7 +98,6 @@ declare
   v_owner uuid;
   v_center text;
   v_what  text;
-  v_unit  text;
 begin
   if not public.is_admin() then raise exception 'only super admin can do this'; end if;
   p_reason := nullif(trim(p_reason), '');
@@ -114,17 +113,16 @@ begin
   select bp.user_id, bp.business_name into v_biz from business_profiles bp where bp.id = r.business_id;
   select user_id, center_name into v_owner, v_center from area_managers where id = x.area_manager_id;
   v_what := public.req_text(r);
-  v_unit := case when r.unit = 'kg' then ' kg' else ' L' end;
 
   update bids set status = 'withdrawn', removed_at = now(), removed_by = auth.uid(), removed_reason = p_reason, updated_at = now() where id = p_id;
 
   perform public.notify(v_owner, 'bid_removed', 'ApnaDairy removed your bid',
-    'Your bid of Rs ' || public.fmt_qty(x.price_per_l) || ' for ' || public.fmt_qty(x.quantity_l) || v_unit
+    'Your bid of Rs ' || public.fmt_qty(x.price_per_l) || ' for ' || public.qty_text(x.quantity_l, r.unit)
       || case when x.offered_quality is not null then ' of ' || x.offered_quality || ' milk' else '' end
       || ' on ' || v_biz.business_name || '''s request for ' || v_what || ' was removed. Reason: ' || rtrim(p_reason, '. ') || '.',
     '/manager/bulk-requests?tab=mine', true);
   perform public.notify(v_biz.user_id, 'bid_removed', 'An offer on your request was removed',
-    v_center || '''s offer of Rs ' || public.fmt_qty(x.price_per_l) || ' for ' || public.fmt_qty(x.quantity_l) || v_unit
+    v_center || '''s offer of Rs ' || public.fmt_qty(x.price_per_l) || ' for ' || public.qty_text(x.quantity_l, r.unit)
       || ' on your ' || v_what || ' request was removed by ApnaDairy.',
     '/business/requirements/' || r.id);
 end;

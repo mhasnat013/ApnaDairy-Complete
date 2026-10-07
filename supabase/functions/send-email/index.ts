@@ -40,6 +40,8 @@ Deno.serve(async (req) => {
     const site = (Deno.env.get('SITE_URL') ?? req.headers.get('origin') ?? '').replace(/\/$/, '')
 
     if (kind === 'outbox') {
+      // any signed-in user can flush the outbox, so links in these emails never come from the request
+      const home = (Deno.env.get('SITE_URL') ?? 'https://apnadairy-psi.vercel.app').replace(/\/$/, '')
       if (!userName || !pass) return reply({ sent: 0, error: 'email is not set up yet' })
       const { data: jobs, error } = await admin.rpc('claim_email_outbox')
       if (error) return reply({ error: error.message }, 500)
@@ -49,7 +51,7 @@ Deno.serve(async (req) => {
       try {
         for (const j of jobs) {
           if (!j.email || /\.test$/i.test(j.email)) continue   // demo accounts have no inbox
-          const link = j.link && /^https?:\/\//.test(site) ? `${site}${j.link}` : null
+          const link = j.link && /^https?:\/\//.test(home) ? `${home}${j.link}` : null
           const mail = noticeMail(String(j.full_name ?? '').split(' ')[0] || 'there', j.title, j.body, link)
           try { await client.send({ from: `ApnaDairy <${userName}>`, to: j.email, subject: mail.subject, content: mail.text, html: mail.html }); sent++ }
           catch { await admin.from('notifications').update({ emailed_at: null }).eq('id', j.id) }   // try again next time

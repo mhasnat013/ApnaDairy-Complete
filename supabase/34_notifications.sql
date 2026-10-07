@@ -25,6 +25,12 @@ alter table public.notifications enable row level security;
 drop policy if exists "notifications: own read" on public.notifications;
 create policy "notifications: own read" on public.notifications for select to authenticated using (user_id = auth.uid());
 
+-- "20 L", "5 kg", "12 packs"
+create or replace function public.qty_text(p numeric, p_unit text)
+returns text language sql immutable as $$
+  select public.fmt_qty(p) || case p_unit when 'kg' then ' kg' when 'pack' then case when p = 1 then ' pack' else ' packs' end else ' L' end
+$$;
+
 -- used by the other database functions only
 create or replace function public.notify(p_user uuid, p_kind text, p_title text, p_body text default null,
                                          p_link text default null, p_email boolean default false)
@@ -61,24 +67,33 @@ revoke all on function public.mark_notifications_read(uuid[]) from public, anon;
 grant execute on function public.mark_notifications_read(uuid[]) to authenticated;
 
 -- ---------- bulk market events ----------
--- a new bid: tell the business
-create or replace function public.notify_new_bid()
+-- a new bid: tell the business (37_bid_grades.sql replaces this with the version that shows the grade,
+-- so running this file again leaves that version alone)
+do $do$
+begin
+  if to_regprocedure('public.notify_new_bid()') is null then
+    execute $f$
+create function public.notify_new_bid()
 returns trigger
 language plpgsql security definer set search_path = public
-as $$
+as $body$
 declare v_owner uuid; v_center text; r bulk_requirements;
 begin
   select * into r from bulk_requirements where id = new.requirement_id;
   select b.user_id into v_owner from business_profiles b where b.id = r.business_id;
   select center_name into v_center from area_managers where id = new.area_manager_id;
   perform public.notify(v_owner, 'new_bid', v_center || ' sent an offer',
-    'Rs ' || public.fmt_qty(new.price_per_l) || ' for ' || public.fmt_qty(new.quantity_l) || case when r.unit = 'kg' then ' kg' else ' L' end || '.',
+    'Rs ' || public.fmt_qty(new.price_per_l) || ' for ' || public.qty_text(new.quantity_l, r.unit) || '.',
     '/business/requirements/' || r.id);
   return new;
 end;
-$$;
-drop trigger if exists bids_notify_new on public.bids;
-create trigger bids_notify_new after insert on public.bids for each row execute function public.notify_new_bid();
+$body$;
+$f$;
+  end if;
+  if not exists (select 1 from pg_trigger where tgname = 'bids_notify_new' and tgrelid = 'public.bids'::regclass) then
+    create trigger bids_notify_new after insert on public.bids for each row execute function public.notify_new_bid();
+  end if;
+end $do$;
 
 -- an order: tell the seller their bid was accepted; a cancellation: tell the other side
 create or replace function public.notify_bulk_order()
@@ -89,7 +104,7 @@ declare v_seller uuid; v_buyer uuid; v_buyer_name text; v_seller_name text; v_qt
 begin
   select user_id, center_name into v_seller, v_seller_name from area_managers where id = new.area_manager_id;
   select user_id, business_name into v_buyer, v_buyer_name from business_profiles where id = new.business_id;
-  v_qty := public.fmt_qty(new.quantity_l) || (select case when unit = 'kg' then ' kg' else ' L' end from bulk_requirements where id = new.requirement_id);
+  v_qty := public.qty_text(new.quantity_l, (select unit from bulk_requirements where id = new.requirement_id));
   if tg_op = 'INSERT' then
     perform public.notify(v_seller, 'bid_accepted', v_buyer_name || ' accepted your bid',
       v_qty || ' at Rs ' || public.fmt_qty(new.price_per_l) || ', to deliver on ' || to_char(new.delivery_date, 'DD Mon') || '.', '/manager/bulk-orders');
@@ -106,11 +121,16 @@ $$;
 drop trigger if exists bulk_orders_notify on public.bulk_orders;
 create trigger bulk_orders_notify after insert or update of status on public.bulk_orders for each row execute function public.notify_bulk_order();
 
--- account approved / rejected / suspended (the approval and rejection emails are already sent by the admin page)
-create or replace function public.notify_account_status()
+-- account suspended / restored (the approval and rejection emails are already sent by the admin page).
+-- 38_payment_warnings.sql replaces this with the version that gives the reason, so running this file again leaves that alone
+do $do$
+begin
+  if to_regprocedure('public.notify_account_status()') is null then
+    execute $f$
+create function public.notify_account_status()
 returns trigger
 language plpgsql security definer set search_path = public
-as $$
+as $body$
 begin
   if new.status is distinct from old.status and new.role in ('area_manager', 'business', 'farmer') then
     if new.status = 'suspended' then
@@ -121,9 +141,13 @@ begin
   end if;
   return new;
 end;
-$$;
-drop trigger if exists profiles_notify_status on public.profiles;
-create trigger profiles_notify_status after update of status on public.profiles for each row execute function public.notify_account_status();
+$body$;
+$f$;
+  end if;
+  if not exists (select 1 from pg_trigger where tgname = 'profiles_notify_status' and tgrelid = 'public.profiles'::regclass) then
+    create trigger profiles_notify_status after update of status on public.profiles for each row execute function public.notify_account_status();
+  end if;
+end $do$;
 
 -- ---------- email outbox ----------
 -- the send-email function (kind "outbox") takes up to 20 waiting emails at a time; two callers never get the same one

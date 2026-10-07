@@ -3,6 +3,7 @@ import { Link, Navigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { homeFor, roleLabel } from '../../lib/roles'
 import { mySubmission } from '../../lib/docs'
+import { supabase } from '../../lib/supabase'
 import { dateTime, rs, date } from '../../lib/format'
 import AuthShell from '../../components/AuthShell'
 import Loader from '../../components/Loader'
@@ -20,6 +21,12 @@ export default function Pending() {
   const [sub, setSub] = useState(undefined)   // undefined while loading, then { docs_submitted_at, rejection_reason }
 
   const loadSub = useCallback(() => {
+    if (profile?.role === 'farmer') {
+      // farmers send their details from the app; the reason for a rejection is on their farmer profile
+      supabase.from('farmer_profiles').select('rejection_reason, submitted_at').eq('user_id', profile.id).maybeSingle()
+        .then(({ data }) => setSub(data ? { rejection_reason: data.rejection_reason, docs_submitted_at: data.submitted_at } : null))
+      return
+    }
     if (!profile || !needsDocs(profile.role)) return setSub(null)
     mySubmission(profile.role, profile.id).then(setSub).catch(() => setSub(null))
   }, [profile])
@@ -47,7 +54,7 @@ export default function Pending() {
           <Badge status={profile.status} />
           <p className="mt-3 text-[15px] leading-relaxed text-ink">{rejected ? 'Your application was not approved.' : 'Your account is suspended, so you cannot use the portal right now.'}</p>
           {sub?.rejection_reason || rejected
-            ? <p className="mt-3 rounded-2xl bg-cream px-4 py-3 text-[14px] text-ink"><span className="font-semibold">Reason: </span>{sub?.rejection_reason || 'No reason was given.'} If you think this is a mistake, reply to the email we sent you.</p>
+            ? <p className="mt-3 rounded-2xl bg-cream px-4 py-3 text-[14px] text-ink"><span className="font-semibold">Reason: </span>{sub?.rejection_reason || 'No reason was given.'} {profile.role === 'farmer' && rejected ? 'Fix your details in the ApnaDairy app and send them again.' : 'If you think this is a mistake, reply to the email we sent you.'}</p>
             : null}
         </div>
         {!rejected && profile.role === 'area_manager' && <UnpaidBills />}
@@ -64,13 +71,14 @@ export default function Pending() {
           <div className="flex items-center gap-3">
             <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-haldi-soft text-amber"><Icon name="clock" size={20} /></span>
             <div>
-              <p className="font-semibold text-ink">Your documents are submitted</p>
+              <p className="font-semibold text-ink">{profile.role === 'farmer' ? 'Your details are submitted' : 'Your documents are submitted'}</p>
               {sub?.docs_submitted_at && <p className="text-[13px] text-muted">Sent {dateTime(sub.docs_submitted_at)}</p>}
             </div>
           </div>
           <p className="mt-4 text-[15px] leading-relaxed text-ink">
-            The ApnaDairy admin has not approved your account yet. They are checking your details and documents.
-            Once approved, your portal opens when you sign in. You can leave this page and come back any time.
+            {profile.role === 'farmer'
+              ? 'The ApnaDairy admin has not approved your account yet. They are checking your details and picture. Once approved, open the ApnaDairy app and choose a milk center near you.'
+              : 'The ApnaDairy admin has not approved your account yet. They are checking your details and documents. Once approved, your portal opens when you sign in. You can leave this page and come back any time.'}
           </p>
           <button onClick={() => { refreshProfile(); loadSub() }} className="btn-secondary btn-sm mt-4"><Icon name="clock" size={14} />Check again</button>
         </div>
