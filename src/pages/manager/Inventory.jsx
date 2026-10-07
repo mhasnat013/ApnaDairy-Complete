@@ -4,7 +4,7 @@ import { useUi } from '../../context/UiContext'
 import { Link } from 'react-router-dom'
 import {
   milkStock, myMilkShelf, stockBatches, usageLog, recordUsage, undoUsage, shelfBatches, stockLeft, milkLabel, usageLabel, timeOf,
-  dayBook, myFirstDay, todayKey,
+  dayBook, myFirstDay, todayKey, runMilkExpiry, shelfHours, milkDay, gradeLabel, dateTimeShort,
 } from '../../lib/center'
 import { litres, date, relative, rs } from '../../lib/format'
 import PageHeader from '../../components/PageHeader'
@@ -20,6 +20,7 @@ const TYPES = ['buffalo', 'cow', 'mixed']
 
 export default function Inventory() {
   const { data, error, reload } = useLoad(async () => {
+    await runMilkExpiry().catch(() => null)   // milk past its 2 days leaves the stock first
     const [stock, batches, usage, shelf] = await Promise.all([milkStock(), stockBatches(), usageLog(), myMilkShelf()])
     return { stock, batches, usage, shelf }
   })
@@ -27,22 +28,23 @@ export default function Inventory() {
 
   return (
     <>
-      <PageHeader title="Inventory" description="Milk on your shelf, which milk to sell first, and a day book of what came in and went out on any day.">
+      <PageHeader title="Inventory" description="Your tested milk: how much, its grade and freshness, when it was tested and when it expires. Milk can be sold for 2 days at most, then it is discarded automatically.">
         <Link to="/manager/shop" className="btn-secondary"><Icon name="store" size={17} />Listings on the app</Link>
         <button className="btn-primary" onClick={() => setUsage({})}><Icon name="minus" size={17} />Take milk out</button>
       </PageHeader>
       <Alert>{error}</Alert>
-      <MilkStock data={data} onUse={setUsage} onChanged={reload} />
+      <MilkStock data={data} onChanged={reload} />
       <DayBook stamp={data} />
       <UsageForm key={usage ? 'usage-' + (usage.milk_type ?? '') : 'usage-closed'} value={usage} stock={data?.stock} onClose={() => setUsage(null)} onSaved={reload} />
     </>
   )
 }
 
-function MilkStock({ data, onUse, onChanged }) {
+function MilkStock({ data, onChanged }) {
   const { toast, confirm } = useUi()
   // a wrong entry can be taken back for 15 minutes, after that it stays in the history
-  const canUndo = (u) => Date.now() - new Date(u.created_at) < 15 * 6e4
+  const auto = (u) => (u.note ?? '').startsWith('Expired:')
+  const canUndo = (u) => !auto(u) && Date.now() - new Date(u.created_at) < 15 * 6e4
   const undo = async (u) => {
     if (!(await confirm({ title: 'Undo this entry?', body: `${litres(u.litres)} ${usageLabel[u.reason].toLowerCase()} goes back into stock. The undo is saved in the history.`, confirmLabel: 'Undo' }))) return
     try { await undoUsage(u.id); toast(`${litres(u.litres)} back in stock.`); onChanged() } catch (e) { toast(e.message, 'error') }
@@ -65,11 +67,7 @@ function MilkStock({ data, onUse, onChanged }) {
               <p className="display num mt-2 text-[34px]">{data ? litres(Math.round(left)) : '—'}</p>
               <p className="text-[13px] text-muted">{left <= 0 ? 'Nothing in stock' : expired > 0 ? `${litres(Math.round(Number(sh.sellable_l) * 10) / 10)} fresh to sell` : soon > 0 ? <span className="font-semibold text-amber">{Math.round(soon)} L to sell within 12 h</span> : `freshest from ${mine[mine.length - 1] ? relative(mine[mine.length - 1].collected_at) : 'today'}`}</p>
               {expired > 0 && (
-                <div className="mt-3 rounded-2xl bg-[#f8e2dc] px-3 py-2.5 text-[13px] text-danger">
-                  <p className="font-semibold">{litres(expired)} past shelf life</p>
-                  <p className="mt-0.5 text-[12px]">It can no longer be sold. Throw it away and record it.</p>
-                  <button className="btn-danger btn-sm mt-2" onClick={() => onUse({ milk_type: t, litres: expired, reason: 'spoiled', note: 'Past shelf life' })}>Record as spoiled</button>
-                </div>
+                <p className="mt-3 rounded-2xl bg-[#f8e2dc] px-3 py-2.5 text-[13px] text-danger"><b>{litres(expired)} expired.</b> It is being discarded automatically and cannot be sold.</p>
               )}
               {s && (
                 <dl className="mt-4 grid grid-cols-3 gap-2 border-t border-line pt-3 text-[12px] text-muted">
@@ -84,23 +82,28 @@ function MilkStock({ data, onUse, onChanged }) {
       </div>
 
       <div className="grid gap-4 sm:gap-5 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
-        <Card title="Sell first" subtitle="Milk on the shelf, oldest shelf life first. Based on each collection’s AI freshness estimate.">
+        <Card title="Milk in stock" subtitle="Each tested batch still on your shelf, the one that expires first at the top. Day 1 is full price; on day 2 you can give a discount in My shop.">
           {data && shelf.length === 0 && <EmptyState title="The shelf is empty">Accepted milk shows up here until it is sold.</EmptyState>}
-          <ul className="grid gap-3">
+          <ul className="grid grid-cols-[minmax(0,1fr)] gap-3">
             {shelf.slice(0, 8).map((b) => {
-              const life = Math.max(0, Math.min(1, b.hoursLeft / (b.freshness_hours || 24)))
+              const life = Math.max(0, Math.min(1, b.hoursLeft / shelfHours(b.freshness_hours)))
               const tone = b.hoursLeft <= 0 ? 'bg-danger' : b.hoursLeft < 6 ? 'bg-danger' : b.hoursLeft < 12 ? 'bg-haldi' : 'bg-forest-2'
+              const day = milkDay(b.collected_at)
               return (
                 <li key={b.id} className="rounded-2xl border border-line bg-white px-4 py-3">
                   <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="truncate font-semibold">{litres(+b.remaining.toFixed(1))} {milkLabel[b.milk_type].toLowerCase()}</p>
-                      <p className="truncate text-[12.5px] text-muted">from {b.farmer?.full_name}, {relative(b.collected_at)}</p>
+                      <p className="truncate font-semibold">{litres(+b.remaining.toFixed(1))} {milkLabel[b.milk_type].toLowerCase()}
+                        {b.quality && <span className="ml-2 rounded-full bg-mint-soft px-2 py-0.5 text-[11.5px] font-semibold text-forest">{gradeLabel[b.quality]}</span>}</p>
+                      <p className="truncate text-[12.5px] text-muted">from {b.farmer?.full_name} · tested {dateTimeShort(b.reading_at ?? b.collected_at)}{b.freshness_score != null ? ` · freshness ${b.freshness_score}/100` : ''}</p>
                     </div>
                     {b.hoursLeft <= 0 ? (
-                      <button className="btn-danger btn-sm shrink-0" onClick={() => onUse({ milk_type: b.milk_type, litres: +b.remaining.toFixed(1), reason: 'spoiled' })}>Past shelf life</button>
+                      <span className="shrink-0 rounded-full bg-[#f8e2dc] px-2.5 py-1 text-[12px] font-semibold text-danger">Expired</span>
                     ) : (
-                      <span className={`num shrink-0 text-[13px] font-semibold ${b.hoursLeft < 12 ? 'text-amber' : 'text-forest'}`}>{Math.round(b.hoursLeft)} h left</span>
+                      <span className="shrink-0 text-right">
+                        <span className={`block rounded-full px-2.5 py-0.5 text-[12px] font-semibold ${day >= 2 ? 'bg-haldi-soft text-amber' : 'bg-mint-soft text-forest'}`}>Day {Math.min(day, 2)}</span>
+                        <span className={`num mt-0.5 block text-[12.5px] font-semibold ${b.hoursLeft < 12 ? 'text-amber' : 'text-muted'}`}>{Math.round(b.hoursLeft)} h left</span>
+                      </span>
                     )}
                   </div>
                   <div className="mt-2 h-1.5 rounded-full bg-cream-2"><div className={`h-1.5 rounded-full ${tone}`} style={{ width: `${life * 100}%` }} /></div>

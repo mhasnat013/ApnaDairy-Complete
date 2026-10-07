@@ -5,7 +5,7 @@ import { useUi } from '../../context/UiContext'
 import { useLoad } from '../../lib/useLoad'
 import {
   myCenter, milkListings, myPublicListings, myPublicShop, shopProfile, saveShopProfile, shopPhotos, uploadShopPhoto, deleteShopPhoto,
-  setCoverPhoto, photoUrl, myReviews, myBulkReviews, myPublicProducts, replyReview, createListing, saveListing, myMilkShelf, stockGrade, milkCost, platformSettings, milkLabel, gradeLabel,
+  setCoverPhoto, photoUrl, myReviews, runMilkExpiry, dateTimeShort, milkDay, myBulkReviews, myPublicProducts, replyReview, createListing, saveListing, myMilkShelf, stockGrade, milkCost, platformSettings, milkLabel, gradeLabel,
 } from '../../lib/center'
 import { rs, litres, date, relative } from '../../lib/format'
 import PageHeader from '../../components/PageHeader'
@@ -15,7 +15,6 @@ import Alert from '../../components/Alert'
 import Icon from '../../components/Icon'
 import EmptyState from '../../components/EmptyState'
 import Sheet from '../../components/Sheet'
-import RetestSheet from '../../components/RetestSheet'
 import { HillsStrip } from '../../components/Farm'
 import { qtyText, perUnit } from '../../lib/b2b'
 import { phoneError, numberError, firstError, prettyPhone } from '../../lib/validate'
@@ -35,6 +34,7 @@ export default function MyShop() {
       ])
       return { center, shop, prof, photos, reviews, bizReviews, pub, byproduct: true }
     }
+    await runMilkExpiry().catch(() => null)   // listings whose milk passed its 2 days end first
     const [listings, pub, shop, prof, photos, reviews, bizReviews, shelf, cost, platform, ...g] = await Promise.all([
       milkListings(), myPublicListings(center.id), myPublicShop(center.id), shopProfile(), shopPhotos(), myReviews(), myBulkReviews().catch(() => []),
       myMilkShelf(), milkCost(), platformSettings(), ...TYPES.map((t) => stockGrade(center.id, t).catch(() => null)),
@@ -152,15 +152,18 @@ function Stat({ label, value, hint }) {
 function ListingCard({ listing, pub, fresh, grade, reload, onEdit }) {
   const { toast } = useUi()
   const [busy, setBusy] = useState(false)
-  const [retesting, setRetesting] = useState(false)
-  const onApp = pub ? Number(pub.available_l) : 0
+  const expired = !!listing.expired_at || (listing.milk_expires_at && new Date(listing.milk_expires_at) <= new Date())
+  const onApp = pub && !expired ? Number(pub.available_l) : 0
+  const hoursLeft = listing.milk_expires_at ? (new Date(listing.milk_expires_at) - Date.now()) / 36e5 : null
+  const day = listing.milk_from ? milkDay(listing.milk_from) : null
   const price = Math.round(Number(listing.price) * (100 - (Number(listing.discount_pct) || 0)) / 100)
   const toggle = async () => {
     setBusy(true)
     try { await saveListing({ ...listing, listed_l: listing.listed_l ?? onApp, is_available: !listing.is_available }); toast(listing.is_available ? `${listing.name} hidden from the app.` : `${listing.name} is on the app.`); await reload() } catch (e) { toast(e.message, 'error') }
     setBusy(false)
   }
-  const status = !listing.is_available ? ['grey', 'Hidden from customers'] : onApp > 0 ? ['green', 'Customers can order it'] : ['amber', 'Sold out on the app']
+  const status = expired ? ['red', 'Expired: its milk passed 2 days and was discarded']
+    : !listing.is_available ? ['grey', 'Hidden from customers'] : onApp > 0 ? ['green', 'Customers can order it'] : ['amber', 'Sold out on the app']
   return (
     <section className={`panel animate-rise p-5 sm:p-6 ${listing.is_available ? '' : 'opacity-80'}`}>
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -168,14 +171,13 @@ function ListingCard({ listing, pub, fresh, grade, reload, onEdit }) {
         <ProductImage category="milk" size={56} />
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2"><p className="display text-[20px] text-forest-deep">{listing.name}</p><GradeChip grade={grade} /></div>
-          <p className={`mt-1 inline-flex items-center gap-1.5 text-[13px] font-medium ${status[0] === 'green' ? 'text-forest' : status[0] === 'amber' ? 'text-amber' : 'text-muted'}`}>
-            <span className={`h-2 w-2 rounded-full ${status[0] === 'green' ? 'bg-forest-2' : status[0] === 'amber' ? 'bg-haldi' : 'bg-line'}`} />{status[1]}</p>
+          <p className={`mt-1 inline-flex items-center gap-1.5 text-[13px] font-medium ${status[0] === 'green' ? 'text-forest' : status[0] === 'amber' ? 'text-amber' : status[0] === 'red' ? 'text-danger' : 'text-muted'}`}>
+            <span className={`h-2 w-2 rounded-full ${status[0] === 'green' ? 'bg-forest-2' : status[0] === 'amber' ? 'bg-haldi' : status[0] === 'red' ? 'bg-danger' : 'bg-line'}`} />{status[1]}</p>
           {listing.description && <p className="mt-1 truncate text-[13px] text-muted">“{listing.description}”</p>}
         </div>
         </div>
         <div className="flex items-center gap-3">
-          {Number(listing.listed_l) > 0 && <button className="btn-secondary btn-sm" onClick={() => setRetesting(true)}><Icon name="chip" size={14} />Retest</button>}
-          <button className="btn-secondary btn-sm" onClick={onEdit}><Icon name="edit" size={14} />Edit</button>
+          <button className={expired ? 'btn-primary btn-sm' : 'btn-secondary btn-sm'} onClick={onEdit}><Icon name={expired ? 'plus' : 'edit'} size={14} />{expired ? 'List fresh milk' : 'Edit'}</button>
           <button role="switch" aria-checked={listing.is_available} aria-label="Show on the app" disabled={busy} onClick={toggle}
             className={`relative h-7 w-[52px] shrink-0 rounded-full transition-colors ${listing.is_available ? 'bg-forest' : 'bg-line'}`}>
             <span className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-all ${listing.is_available ? 'left-[26px]' : 'left-0.5'}`} />
@@ -185,12 +187,15 @@ function ListingCard({ listing, pub, fresh, grade, reload, onEdit }) {
       <div className="mt-4 grid grid-cols-3 gap-2">
         <Stat label="On the app" value={litres(onApp)} hint={`${litres(fresh)} fresh in stock`} />
         <Stat label="Price" value={rs(price)} hint={Number(listing.discount_pct) ? `per litre, ${listing.discount_pct}% off` : 'per litre'} />
-        <Stat label="Freshness" value={pub ? `${pub.freshness_score}/100` : '—'} hint={pub?.hours_left ? `about ${Math.round(pub.hours_left)} h left` : 'no fresh milk'} />
+        <Stat label={expired ? 'Expired' : 'Sells until'} value={listing.milk_expires_at ? dateTimeShort(listing.milk_expires_at) : '—'}
+          hint={expired ? 'list fresh milk again' : hoursLeft == null ? 'no fresh milk' : `${day ? `day ${Math.min(day, 2)} · ` : ''}${Math.max(1, Math.round(hoursLeft))} h left`} />
       </div>
-      {onApp <= 0 && listing.is_available && fresh > 0 && (
+      {!expired && day >= 2 && !Number(listing.discount_pct) && (
+        <button className="mt-3 text-left text-[13.5px] font-semibold text-amber underline" onClick={onEdit}>Day 2: give a discount to sell it before it expires</button>
+      )}
+      {!expired && onApp <= 0 && listing.is_available && fresh > 0 && (
         <button className="mt-3 text-[13.5px] font-semibold text-forest underline" onClick={onEdit}>Add litres: {litres(fresh)} of fresh milk is in stock</button>
       )}
-      {retesting && <RetestSheet listing={listing} onClose={() => setRetesting(false)} onDone={reload} />}
     </section>
   )
 }
@@ -203,7 +208,7 @@ function ListingSheet({ open, listing, startType, taken, fresh, grades, guide, p
   const [type, setType] = useState(first)
   const g = guide(type)
   const [f, setF] = useState(() => listing
-    ? { litres: String(listing.listed_l == null ? Number(pub?.available_l ?? Math.floor(fresh(listing.milk_type))) : Number(listing.listed_l)), price: String(Number(listing.price)), discount: String(listing.discount_pct ?? 0), description: listing.description ?? '' }
+    ? { litres: String(listing.expired_at ? Math.floor(fresh(listing.milk_type)) : listing.listed_l == null ? Number(pub?.available_l ?? Math.floor(fresh(listing.milk_type))) : Number(listing.listed_l)), price: String(Number(listing.price)), discount: String(listing.expired_at ? 0 : listing.discount_pct ?? 0), description: listing.description ?? '' }
     : { litres: String(fresh(first) || ''), price: String(guide(first)?.suggest ?? ({ cow: 205, buffalo: 240, mixed: 210 })[first] ?? ''), discount: '0', description: '' })
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
@@ -220,13 +225,15 @@ function ListingSheet({ open, listing, startType, taken, fresh, grades, guide, p
     if (l > max) return setErr(`You have ${litres(max)} of fresh ${milkLabel[type].toLowerCase()} milk. List that much or less.`)
     if (!(Number(f.price) > 0)) return setErr('Enter your price per litre.')
     if (g && Number(f.price) > g.max) return setErr(`The most you can charge is ${rs(g.max)} a litre (${g.maxPct}% above what you pay farmers).`)
+    const d = Number(f.discount || 0)
+    if (!(d >= 0 && d <= 90) || !Number.isInteger(d)) return setErr('The discount can be 0 to 90%.')
     setBusy(true)
     try {
       if (listing) {
-        await saveListing({ ...listing, listed_l: l, price: f.price, description: f.description.trim() })
+        await saveListing({ ...listing, listed_l: l, price: f.price, description: f.description.trim(), discount_pct: d })
         toast('Listing saved.')
       } else {
-        await createListing(type, f.price, l, f.description.trim())
+        await createListing(type, f.price, l, f.description.trim(), d)
         toast(`${litres(l)} of ${milkLabel[type].toLowerCase()} milk is on the app.`)
       }
       onSaved(); onClose()
@@ -268,7 +275,7 @@ function ListingSheet({ open, listing, startType, taken, fresh, grades, guide, p
                 <span className="text-[13px] text-muted">of {litres(max)} fresh in stock</span>
                 {max > 0 && Number(f.litres) !== max && <button type="button" className="text-[13px] font-semibold text-forest underline" onClick={() => setF({ ...f, litres: String(max) })}>List all</button>}
               </div>
-              <span className="hint">Every order takes its litres off this number. When it reaches 0 the milk shows as sold out.</span></div>
+              <span className="hint">Every order takes its litres off this number. Milk sells for 2 days at most after it was collected; then the listing ends and the milk is discarded automatically.</span></div>
 
             <div className="grid gap-4 sm:grid-cols-[1fr_140px]">
               <div className="field"><label htmlFor="lp">Price per litre</label>
@@ -277,9 +284,9 @@ function ListingSheet({ open, listing, startType, taken, fresh, grades, guide, p
                 {g && <span className="hint">You pay farmers {rs(Math.round(g.cost))}. Fair price {rs(g.suggest)}, at most {rs(g.max)}.
                   {Number(f.price) !== g.suggest && <button type="button" className="ml-1 font-semibold text-forest underline" onClick={() => setF({ ...f, price: String(g.suggest) })}>Use {rs(g.suggest)}</button>}</span>}
               </div>
-              <div className="field"><span className="label">Discount</span>
-                <p className="num flex h-11 items-center text-[15px] font-semibold">{Number(f.discount) > 0 ? `${f.discount}% off` : 'None'}</p>
-                <span className="hint">{listing ? 'Retest the milk to change it.' : 'Set after a retest.'}</span></div>
+              <div className="field"><label htmlFor="ld">Discount</label>
+                <div className="flex items-center gap-2"><input id="ld" className="input num w-20" type="number" min="0" max="90" step="1" value={f.discount} onChange={set('discount')} /><span className="text-muted">%</span></div>
+                <span className="hint">Usually on day 2, to sell the milk before it expires.</span></div>
             </div>
 
             <div className="field"><label htmlFor="lx">Description <span className="font-normal text-muted">(optional)</span></label>

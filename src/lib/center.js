@@ -43,6 +43,7 @@ export const dayKey = (d) => new Date(d).toLocaleDateString('en-CA', { timeZone:
 export const shortDay = (key) => new Date(`${key}T12:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
 export const weekday = (key) => new Date(`${key}T12:00:00`).toLocaleDateString('en-GB', { weekday: 'short' })
 export const timeOf = (d) => new Date(d).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Karachi' })
+export const dateTimeShort = (d) => new Date(d).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Karachi' })
 export const currentShift = () => (Number(new Date().toLocaleString('en-GB', { hour: 'numeric', hour12: false, timeZone: 'Asia/Karachi' })) < 13 ? 'morning' : 'evening')
 // start and end of a pakistan calendar day as ISO strings, for range filters
 export const dayRange = (key) => [new Date(`${key}T00:00:00+05:00`).toISOString(), new Date(`${key}T24:00:00+05:00`).toISOString()]
@@ -87,7 +88,7 @@ export const recentCollections = async (limit = 60) =>
 export const farmerCollections = async (farmerId) =>
   must(await supabase.from('milk_collections').select('*').eq('farmer_id', farmerId).order('collected_at', { ascending: false }).limit(200))
 export const stockBatches = async () =>
-  must(await supabase.from('milk_collections').select('id, milk_type, quantity_l, collected_at, freshness_hours, quality, farmer:farmers(full_name)')
+  must(await supabase.from('milk_collections').select('id, milk_type, quantity_l, collected_at, reading_at, freshness_hours, freshness_score, quality, test_source, farmer:farmers(full_name)')
     .eq('status', 'accepted').gte('collected_at', new Date(Date.now() - 4 * 864e5).toISOString()).order('collected_at', { ascending: false }))
 export const readingsSince = async (days = 14) =>
   must(await supabase.from('milk_collections')
@@ -147,11 +148,17 @@ export const saveProduct = async (p) => {
     : await supabase.from('products').insert(row).select().single())
 }
 export const setProduct = async (id, patch) => must(await supabase.from('products').update(patch).eq('id', id))
+export const runMilkExpiry = () => rpc('run_milk_expiry')
 export const recordUsage = async (u) => must(await supabase.from('milk_usage').insert({ milk_type: u.milk_type, litres: Number(u.litres), reason: u.reason, note: u.note || null }))
 export const saveSettings = async (centerId, s) =>
   must(await supabase.from('center_settings').upsert({ area_manager_id: centerId, cow_rate: Number(s.cow_rate), buffalo_rate: Number(s.buffalo_rate), mixed_rate: Number(s.mixed_rate), updated_at: new Date().toISOString() }))
 
 // ---------- stock: which collections are still on the shelf (first in, first out) ----------
+// milk sells for at most 2 days after it was collected and tested, sooner if the ai test says so (supabase/36)
+export const MILK_DAYS = 2
+export const shelfHours = (aiHours) => Math.min(aiHours ?? 24, MILK_DAYS * 24)
+// day 1, day 2 or expired, from when the milk was collected
+export const milkDay = (collectedAt) => Math.floor((Date.now() - new Date(collectedAt).getTime()) / 864e5) + 1
 // the oldest milk is sold first, so what is left in stock is the newest milk
 export function shelfBatches(batches, stockRows) {
   const left = Object.fromEntries((stockRows ?? []).map((s) => [s.milk_type, Math.max(0, s.bought_l - s.sold_l - s.bulk_l - s.used_l)]))
@@ -160,7 +167,7 @@ export function shelfBatches(batches, stockRows) {
     const remaining = Math.min(Number(b.quantity_l), left[b.milk_type] ?? 0)
     if (remaining < 0.1) continue
     left[b.milk_type] -= remaining
-    const expires = new Date(b.collected_at).getTime() + (b.freshness_hours ?? 24) * 36e5
+    const expires = new Date(b.reading_at ?? b.collected_at).getTime() + shelfHours(b.freshness_hours) * 36e5
     out.push({ ...b, remaining, expiresAt: expires, hoursLeft: (expires - Date.now()) / 36e5 })
   }
   return out.sort((a, b) => a.expiresAt - b.expiresAt)
@@ -225,14 +232,15 @@ export const myBulkReviews = async () => must(await supabase.from('bulk_reviews'
   .select('*, business:business_profiles(business_name, business_type), order:bulk_orders(quantity_l, delivery_date, delivered_at, requirement:bulk_requirements(milk_type))')
   .order('created_at', { ascending: false }).limit(100))
 export const milkListings = async () => must(await supabase.from('products').select('*').eq('area_manager_id', await mySellerId()).eq('category', 'milk'))
-export const createListing = async (type, price, litres, description) => must(await supabase.from('products').insert({
+export const createListing = async (type, price, litres, description, discount = 0) => must(await supabase.from('products').insert({
   name: `Fresh ${({ cow: 'cow', buffalo: 'buffalo', mixed: 'mixed' })[type]} milk`, category: 'milk', milk_type: type, unit: 'litre',
-  price: Number(price), listed_l: Number(litres), description: description || null, is_available: true,
+  price: Number(price), listed_l: Number(litres), description: description || null, is_available: true, discount_pct: Number(discount) || 0,
 }).select().single())
-// the discount is not set here: it changes only after a retest (retestListing, then setListingDiscount)
+// milk listings last as long as their milk (2 days at most, supabase/36); the discount is free until then
 export const saveListing = async (l) => must(await supabase.from('products').update({
   price: Number(l.price), is_available: !!l.is_available,
   listed_l: Number(l.listed_l) || 0, description: l.description || null,
+  ...(l.discount_pct != null ? { discount_pct: Number(l.discount_pct) || 0 } : {}),
 }).eq('id', l.id))
 // retest milk still on the app; returns the ai's suggested discount, or takes failed milk off the app
 export const retestListing = (productId, readingId) => rpc('retest_listing', { p_product: productId, p_reading: readingId })
