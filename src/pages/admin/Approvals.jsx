@@ -10,7 +10,7 @@ import EmptyState from '../../components/EmptyState'
 import { date, cap } from '../../lib/format'
 import DocsDrawer from '../../components/DocsDrawer'
 import { hasRequiredDocs } from '../../lib/docs'
-import { sendAccountEmail } from '../../lib/center'
+import { sendAccountEmail, removeRejectedAccount, rejectedApplications } from '../../lib/center'
 
 const tabs = [
   { id: 'area_manager', label: 'Area Managers', table: 'area_managers', fk: 'area_managers_user_id_fkey' },
@@ -27,6 +27,7 @@ export default function Approvals() {
   const [error, setError] = useState('')
   const [docsByUser, setDocsByUser] = useState({})
   const [viewing, setViewing] = useState(null)
+  const [history, setHistory] = useState([])
   const { toast, confirm } = useUi()
 
   const load = useCallback(async () => {
@@ -38,6 +39,8 @@ export default function Approvals() {
       .order('created_at', { ascending: false })
     setError(error?.message ?? '')
     setRows(data ?? [])
+    // rejected applications whose login was removed (the email can sign up again)
+    setHistory(status === 'rejected' ? await rejectedApplications(tab.id).catch(() => []) : [])
 
     // document counts for the listed applicants
     const ids = (data ?? []).map((r) => r.user_id)
@@ -59,7 +62,7 @@ export default function Approvals() {
       const rejecting = next === 'rejected'
       const answer = await confirm({
         title: rejecting ? `Reject ${name}?` : `Suspend ${name}?`,
-        body: rejecting ? 'Say why. They see the reason when they sign in, and it is emailed to them.' : 'They lose access to the portal until you reactivate them.',
+        body: rejecting ? 'Say why. The reason is emailed to them, then their account is removed so they can apply again later with the same email.' : 'They lose access to the portal until you reactivate them.',
         input: rejecting ? 'e.g. The CNIC photo is not clear and the utility bill is for a different address.' : 'Reason (optional, shown to them)',
         inputRequired: rejecting ? 10 : undefined,
         confirmLabel: rejecting ? 'Reject' : 'Suspend', danger: true,
@@ -73,16 +76,29 @@ export default function Approvals() {
     if (next === 'rejected' || (next === 'active' && !reactivated)) {
       // tell them by email too; the decision stands even if the email cannot be sent
       const done = next === 'active' ? 'approved' : 'rejected'
+      let sent = null
       try {
-        const sent = await sendAccountEmail(row.user_id, next === 'active' ? 'account_approved' : 'account_rejected')
-        toast(`${name} ${done}. Email sent to ${sent.to}.`)
+        sent = await sendAccountEmail(row.user_id, next === 'active' ? 'account_approved' : 'account_rejected')
       } catch (e) {
-        toast(`${name} ${done}, but the email was not sent: ${e.message}`, 'error')
+        toast(next === 'rejected'
+          ? `${name} rejected, but the email was not sent (${e.message}). Their account stays so they can read the reason when they sign in. Remove it from the Rejected tab later.`
+          : `${name} approved, but the email was not sent: ${e.message}`, 'error')
       }
+      if (sent && next === 'rejected') {
+        // the reason reached them, so free the email for a new application
+        try { await removeRejectedAccount(row.user_id); toast(`${name} rejected. Email sent to ${sent.to}, and they can sign up again later.`) }
+        catch (e) { toast(`${name} rejected and emailed, but the account could not be removed: ${e.message}`, 'error') }
+      } else if (sent) toast(`${name} ${done}. Email sent to ${sent.to}.`)
     } else {
       toast(reactivated ? `${name} reactivated.` : `${name} suspended.`)
     }
     load()
+  }
+
+  const removeOld = async (r) => {
+    const name = r.center_name ?? r.business_name
+    if (!(await confirm({ title: `Remove ${name}'s account?`, body: 'The rejection stays in your records below. Their login is removed, so they can sign up again with the same email.', confirmLabel: 'Remove account', danger: true }))) return
+    try { await removeRejectedAccount(r.user_id); toast(`${name} removed. The email can sign up again.`); load() } catch (e) { toast(e.message, 'error') }
   }
 
   return (
@@ -113,7 +129,7 @@ export default function Approvals() {
           <tbody>
             {loading && <SkeletonRows cols={7} />}
             {!loading && rows.length === 0 && (
-              <tr><td colSpan={7}><EmptyState title={`No ${status} applications`}>New sign-ups appear under Pending.</EmptyState></td></tr>
+              <tr><td colSpan={7}><EmptyState title={status === 'rejected' ? 'No rejected accounts waiting' : `No ${status} applications`}>{status === 'rejected' ? 'Rejected applicants are emailed and removed, and are listed below.' : 'New sign-ups appear under Pending.'}</EmptyState></td></tr>
             )}
             {!loading && rows.map((r) => (
               <tr key={r.id}>
@@ -158,7 +174,7 @@ export default function Approvals() {
                     {r.verification_status === 'suspended' && (
                       <button onClick={() => act(r, 'active')} className="btn-primary btn-sm">Reactivate</button>
                     )}
-                    {r.verification_status === 'rejected' && <span className="text-[12.5px] text-muted">Rejected, final</span>}
+                    {r.verification_status === 'rejected' && <button onClick={() => removeOld(r)} className="btn-secondary btn-sm" title="Remove the login so this email can sign up again">Remove account</button>}
                     {r.verification_status === 'pending' && (
                       <button onClick={() => act(r, 'rejected')} className="btn-danger btn-sm">Reject</button>
                     )}
@@ -172,6 +188,27 @@ export default function Approvals() {
           </tbody>
         </table>
       </div>
+
+      {status === 'rejected' && history.length > 0 && (
+        <div className="panel mt-5 overflow-x-auto">
+          <p className="px-5 pt-4 text-[13.5px] text-muted">Rejected and removed. Each of these emails can sign up again.</p>
+          <table className="table min-w-[860px]">
+            <thead><tr><th>{tab.id === 'area_manager' ? 'Center' : 'Business'}</th><th>Owner</th><th>City</th><th>Documents</th><th>Rejected</th><th>Reason</th></tr></thead>
+            <tbody>
+              {history.map((h) => (
+                <tr key={h.id}>
+                  <td><p className="font-semibold text-ink">{h.place_name}</p><p className="text-[13px] text-muted">{cap(h.place_type)}</p></td>
+                  <td><p>{h.full_name}</p><p className="text-[13px] text-muted">{h.email}</p><p className="text-[13px] text-muted">{h.phone}</p></td>
+                  <td>{h.city}</td>
+                  <td className="num text-[13px]">{h.documents} file{h.documents === 1 ? '' : 's'}</td>
+                  <td className="num text-muted">{date(h.rejected_at)}</td>
+                  <td className="max-w-[280px] text-[13px]">{h.reason}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {viewing && <DocsDrawer row={viewing} onClose={() => setViewing(null)} />}
     </>

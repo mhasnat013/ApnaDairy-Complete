@@ -84,14 +84,14 @@ function rejectedMail(first: string, place: string, reason: string) {
       `Dear ${first},`, '',
       `Thank you for applying to ApnaDairy with ${place}. We checked your details and documents, and we could not approve the application.`, '',
       `Reason: ${reason}`, '',
-      'If you think this is a mistake, or you can send the right documents, reply to this email.', '',
+      'You can sign up again with this email address once you have the right documents. If you think this is a mistake, reply to this email.', '',
       'ApnaDairy team',
   ].join('\n')
   const html = wrap(`<h2 style="margin:16px 0 12px;font-size:20px;color:#173a28">Your application was not approved</h2>
     <p>Dear ${esc(first)},</p>
     <p>Thank you for applying to ApnaDairy with <b>${esc(place)}</b>. We checked your details and documents, and we could not approve the application.</p>
     <p style="background:#f8e2dc;border-radius:12px;padding:12px 14px;color:#9b2c1f"><b>Reason:</b> ${esc(reason)}</p>
-    <p>If you think this is a mistake, or you can send the right documents, reply to this email.</p>`)
+    <p>You can sign up again with this email address once you have the right documents. If you think this is a mistake, reply to this email.</p>`)
   return { subject, text, html }
 }
 
