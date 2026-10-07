@@ -1,4 +1,5 @@
--- 28: a rejection always has a reason (it is shown to the applicant and emailed by the send-email function)
+-- 28: a rejection always has a reason (it is shown to the applicant and emailed by the send-email function),
+-- and it is final: a rejected application cannot be approved later
 -- run after 27_document_submit.sql (safe to run again).
 
 create or replace function public.set_verification(p_kind text, p_id uuid, p_status account_status, p_reason text default null)
@@ -25,6 +26,10 @@ begin
   end if;
   if v_user is null then raise exception 'record not found'; end if;
 
+  -- a rejection is final
+  if p_status = 'active' and exists (select 1 from profiles where id = v_user and status = 'rejected') then
+    raise exception 'this application was rejected, and a rejection is final. it cannot be approved now';
+  end if;
   if p_status = 'active' and (v_sent is null or not public.has_required_docs(v_user)) then
     raise exception 'cannot approve: the documents are not submitted yet';
   end if;

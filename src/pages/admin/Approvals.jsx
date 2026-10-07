@@ -60,7 +60,7 @@ export default function Approvals() {
       const answer = await confirm({
         title: rejecting ? `Reject ${name}?` : `Suspend ${name}?`,
         body: rejecting ? 'Say why. They see the reason when they sign in, and it is emailed to them.' : 'They lose access to the portal until you reactivate them.',
-        input: rejecting ? 'e.g. The CNIC photo is not clear. Please sign up again with a clear photo.' : 'Reason (optional, shown to them)',
+        input: rejecting ? 'e.g. The CNIC photo is not clear and the utility bill is for a different address.' : 'Reason (optional, shown to them)',
         inputRequired: rejecting ? 10 : undefined,
         confirmLabel: rejecting ? 'Reject' : 'Suspend', danger: true,
       })
@@ -78,7 +78,7 @@ export default function Approvals() {
         toast(`${name} rejected, but the email was not sent: ${e.message}`, 'error')
       }
     } else {
-      toast(next === 'active' ? `${name} approved.` : `${name} suspended.`)
+      toast(next === 'active' ? (row.verification_status === 'suspended' ? `${name} reactivated.` : `${name} approved.`) : `${name} suspended.`)
     }
     load()
   }
@@ -145,13 +145,18 @@ export default function Approvals() {
                 <td className="num text-muted">{date(r.created_at)}</td>
                 <td>
                   <Badge status={r.verification_status} />
+                  {r.verification_status !== 'active' && r.rejection_reason && <p className="mt-1 max-w-[220px] text-[12px] text-muted">{r.rejection_reason}</p>}
                 </td>
                 <td>
                   <div className="flex justify-end gap-2">
-                    {r.verification_status !== 'active' && (
+                    {r.verification_status === 'pending' && (
                       <button onClick={() => act(r, 'active')} className="btn-primary btn-sm" disabled={!r.docs_submitted_at}
                         title={r.docs_submitted_at ? undefined : 'They have not submitted their documents yet'}>Approve</button>
                     )}
+                    {r.verification_status === 'suspended' && (
+                      <button onClick={() => act(r, 'active')} className="btn-primary btn-sm">Reactivate</button>
+                    )}
+                    {r.verification_status === 'rejected' && <span className="text-[12.5px] text-muted">Rejected, final</span>}
                     {r.verification_status === 'pending' && (
                       <button onClick={() => act(r, 'rejected')} className="btn-danger btn-sm">Reject</button>
                     )}
