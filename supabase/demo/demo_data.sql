@@ -1,8 +1,14 @@
 -- demo data for presentations (optional)
--- run after all the numbered files (01 to 32). safe to run again: every run gives the demo accounts a fresh month.
--- your own accounts and data are never touched. remove everything with demo/remove_demo.sql.
+-- run after all the numbered files (01 to 32). safe to run again: every run gives the demo accounts a fresh month
+-- and sets their password to the one below. remove everything with demo/remove_demo.sql after the demo.
 --
--- demo accounts, all with the password  Demo@2026
+-- step 1: put your own demo password on the next line (at least 8 letters and numbers). it is not saved in this file
+--         on github, so do not commit it. all six demo accounts sign in with it.
+select set_config('demo.password', 'PUT-YOUR-DEMO-PASSWORD-HERE', false);
+--
+-- step 2: run the whole file in the supabase sql editor.
+--
+-- demo accounts
 --   khalid@apnadairy.test   Imran Khalid, Khalid Milk Center (milk collection center, Rawalpindi)
 --   taxila@apnadairy.test   Shahid Mehmood, Taxila Dairy Point (milk collection center, Taxila)
 --   ghee@apnadairy.test     Bilal Ahmed, Bilal Desi Ghee House (dairy products seller, Rawalpindi)
@@ -18,21 +24,33 @@
 --     a confirmed order waiting for dispatch, and open requests to bid on
 --   support: a resolved complaint about an order, an open question, a billing ticket
 -- the demo accounts' emails end in .test, so no email is ever sent to them.
+-- they are real approved accounts on your project: they can see open requests and bid like any seller. remove them after the demo.
+--
+-- what a re-run resets: the demo accounts' own data, and the requests posted by the two demo businesses
+-- (with any bids and orders on them). real accounts' tickets, shop orders and requests are left alone.
 
 -- ---------- helpers for this script only (they disappear when the session ends) ----------
 create or replace function pg_temp.demo_user(p_email text, p_meta jsonb)
 returns uuid language plpgsql as $$
-declare v_id uuid;
+declare v_id uuid; v_demo boolean; v_pw text := current_setting('demo.password', true);
 begin
-  select id into v_id from auth.users where email = p_email;
-  if v_id is not null then return v_id; end if;
+  if v_pw is null or v_pw like 'PUT-YOUR-%' or char_length(v_pw) < 8 or v_pw !~ '[0-9]' or v_pw !~ '[A-Za-z]' then
+    raise exception 'put your own demo password (at least 8 letters and numbers) on the set_config line at the top of this file';
+  end if;
+  select id, coalesce((raw_app_meta_data->>'demo')::boolean, false) into v_id, v_demo from auth.users where email = p_email;
+  if v_id is not null then
+    -- never take over an account someone else made with a demo email
+    if not v_demo then raise exception '% exists but was not made by this script. remove it first', p_email; end if;
+    update auth.users set encrypted_password = extensions.crypt(v_pw, extensions.gen_salt('bf')), updated_at = now() where id = v_id;
+    return v_id;
+  end if;
   v_id := gen_random_uuid();
   insert into auth.users (instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
                           raw_app_meta_data, raw_user_meta_data, created_at, updated_at,
                           confirmation_token, email_change, email_change_token_new, recovery_token)
   values ('00000000-0000-0000-0000-000000000000', v_id, 'authenticated', 'authenticated', p_email,
-          extensions.crypt('Demo@2026', extensions.gen_salt('bf')), now() - interval '45 days',
-          '{"provider": "email", "providers": ["email"]}', p_meta, now() - interval '45 days', now(), '', '', '', '');
+          extensions.crypt(v_pw, extensions.gen_salt('bf')), now() - interval '45 days',
+          '{"provider": "email", "providers": ["email"], "demo": true}', p_meta, now() - interval '45 days', now(), '', '', '', '');
   insert into auth.identities (provider_id, user_id, identity_data, provider, last_sign_in_at, created_at, updated_at)
   values (v_id::text, v_id, jsonb_build_object('sub', v_id::text, 'email', p_email, 'email_verified', true), 'email', now(), now(), now());
   return v_id;
@@ -146,15 +164,17 @@ begin
   select id into b2 from business_profiles where user_id = u_bakery;
 
   -- ---------- 2. clear what an earlier run made ----------
-  delete from support_tickets where opened_by in (u_khalid, u_taxila, u_ghee, u_grill, u_bakery) or center_id in (c1, c2, s1);
-  delete from bulk_reviews where business_id in (b1, b2);
+  -- tickets the demo accounts opened, and the requests the demo businesses posted (with the bids and orders on them)
+  delete from support_tickets where opened_by in (u_khalid, u_taxila, u_ghee, u_grill, u_bakery, u_hotel);
+  delete from bulk_reviews where order_id in (select id from bulk_orders where business_id in (b1, b2));
   delete from delivery_codes where order_kind = 'bulk' and order_id in (select id from bulk_orders where business_id in (b1, b2));
-  delete from bulk_orders where business_id in (b1, b2) or area_manager_id in (c1, c2, s1);
-  delete from bids where area_manager_id in (c1, c2, s1);
+  delete from bulk_orders where business_id in (b1, b2);
+  delete from bids where requirement_id in (select id from bulk_requirements where business_id in (b1, b2));
   delete from bulk_requirements where business_id in (b1, b2);
-  delete from shop_reviews where area_manager_id = s1;
-  delete from delivery_codes where order_kind = 'shop' and order_id in (select id from shop_orders where area_manager_id = s1);
-  delete from shop_orders where area_manager_id = s1;
+  -- the ghee shop's made-up orders (no customer account); orders from real app customers stay
+  delete from shop_reviews where area_manager_id = s1 and customer_id is null;
+  delete from delivery_codes where order_kind = 'shop' and order_id in (select id from shop_orders where area_manager_id = s1 and customer_id is null);
+  delete from shop_orders where area_manager_id = s1 and customer_id is null;
   delete from products where area_manager_id = s1;
 
   -- ---------- 3. the two milk centers: the app's own sample month ----------

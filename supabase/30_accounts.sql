@@ -19,9 +19,14 @@ as $$
 declare
   me public.profiles;
 begin
-  select * into me from profiles where id = auth.uid();
+  select * into me from profiles where id = auth.uid() for update;   -- one sign-up at a time
   if me.id is null then raise exception 'sign in again'; end if;
   if me.role <> 'customer' then raise exception 'this account is already set up'; end if;
+  if me.status <> 'active' then raise exception 'this account is switched off. contact ApnaDairy'; end if;   -- e.g. a removed admin
+  if exists (select 1 from area_managers where user_id = me.id) or exists (select 1 from business_profiles where user_id = me.id) then
+    raise exception 'this account is already set up';
+  end if;
+  if exists (select 1 from admin_invites where user_id = me.id) then raise exception 'this account was invited as an admin'; end if;
   if exists (select 1 from shop_orders where customer_id = me.id) then
     raise exception 'this account is used in the customer app. sign up with another google account or email';
   end if;
@@ -37,6 +42,7 @@ begin
     values (me.id, p_manager_type::area_manager_type, trim(p_center_name), initcap(trim(p_city)), nullif(trim(p_address), ''));
   else
     if char_length(trim(coalesce(p_business_name, ''))) not between 2 and 80 then raise exception 'enter the business name'; end if;
+    if p_business_type not in ('restaurant', 'bakery', 'hotel', 'shop', 'distributor', 'other') then raise exception 'choose the type of business'; end if;
     insert into business_profiles (user_id, business_name, business_type, city, address)
     values (me.id, trim(p_business_name), p_business_type::business_type, initcap(trim(p_city)), nullif(trim(p_address), ''));
   end if;
@@ -61,14 +67,20 @@ alter table public.admin_invites enable row level security;
 drop policy if exists "admin invites: admins read" on public.admin_invites;
 create policy "admin invites: admins read" on public.admin_invites for select to authenticated using (public.is_admin());
 
--- opening the invite link confirms the email; only then does the account become an admin
+-- opening the invite link confirms the email; only then does the account become an admin.
+-- only a plain account made by the invite itself: never a seller, buyer, farmer or app customer with orders.
 create or replace function public.accept_admin_invite()
 returns trigger
 language plpgsql security definer set search_path = public
 as $$
 begin
   if old.email_confirmed_at is null and new.email_confirmed_at is not null
-     and exists (select 1 from admin_invites where user_id = new.id and accepted_at is null) then
+     and exists (select 1 from admin_invites where user_id = new.id and accepted_at is null)
+     and exists (select 1 from profiles where id = new.id and role = 'customer')
+     and not exists (select 1 from area_managers where user_id = new.id)
+     and not exists (select 1 from business_profiles where user_id = new.id)
+     and not exists (select 1 from farmers where profile_id = new.id)
+     and not exists (select 1 from shop_orders where customer_id = new.id) then
     update profiles set role = 'super_admin', status = 'active', updated_at = now() where id = new.id;
     update admin_invites set accepted_at = now() where user_id = new.id;
   end if;

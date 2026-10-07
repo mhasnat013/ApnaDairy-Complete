@@ -67,7 +67,7 @@ function ProductCard({ p, reload, onEdit }) {
     setBusy(false)
   }
   return (
-    <section className={`panel animate-rise p-5 ${p.is_available ? '' : 'opacity-80'}`}>
+    <section className={`panel min-w-0 animate-rise p-5 ${p.is_available ? '' : 'opacity-80'}`}>
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-start gap-3">
         <ProductImage category={p.category} size={64} />

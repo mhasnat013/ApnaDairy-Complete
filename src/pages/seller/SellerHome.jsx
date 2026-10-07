@@ -87,7 +87,7 @@ export default function SellerHome({ center }) {
         {data && data.board.length === 0 && <p className="py-4 text-center text-muted">No open requests right now. New ones appear here as soon as businesses post them.</p>}
         <ul className="grid gap-2 sm:grid-cols-2">
           {(data?.board ?? []).slice(0, 4).map((r) => (
-            <li key={r.id}><Link to={`/manager/bulk-requests/${r.id}`} className="flex items-center justify-between gap-3 rounded-2xl border border-line bg-surface px-4 py-3 hover:border-forest/40">
+            <li key={r.id} className="min-w-0"><Link to={`/manager/bulk-requests/${r.id}`} className="flex items-center justify-between gap-3 rounded-2xl border border-line bg-surface px-4 py-3 hover:border-forest/40">
               <div className="min-w-0"><p className="truncate font-semibold">{reqTitle(r)}</p><p className="truncate text-[12.5px] text-muted">{r.business_name}, {r.delivery_city} · closes {relative(r.bid_deadline)}</p></div>
               <Icon name="arrow" size={16} className="shrink-0 text-forest" />
             </Link></li>

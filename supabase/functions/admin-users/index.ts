@@ -45,7 +45,14 @@ Deno.serve(async (req) => {
       if (!inv) return reply({ error: 'Invite not found.' })
       if (inv.accepted_at) return reply({ error: 'This invite was already accepted.' })
       if (body.action === 'cancel') {
-        const { error } = await admin.auth.admin.deleteUser(inv.user_id)   // the invite row goes with it
+        // remove the login only if it is still the bare invited one; otherwise just drop the invite
+        const { data: who } = await admin.from('profiles').select('role').eq('id', inv.user_id).maybeSingle()
+        const { data: au } = await admin.auth.admin.getUserById(inv.user_id)
+        if (who?.role === 'customer' && !au?.user?.email_confirmed_at) {
+          const { error } = await admin.auth.admin.deleteUser(inv.user_id)   // the invite row goes with it
+          return error ? reply({ error: error.message }) : reply({ ok: true })
+        }
+        const { error } = await admin.from('admin_invites').delete().eq('user_id', inv.user_id)
         return error ? reply({ error: error.message }) : reply({ ok: true })
       }
       const { error } = await admin.auth.admin.inviteUserByEmail(inv.email, { redirectTo, data: { full_name: inv.full_name, role: 'customer' } })
@@ -59,6 +66,13 @@ Deno.serve(async (req) => {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) return reply({ error: 'Enter a valid email address.' })
     if (!/^03\d{9}$/.test(phone)) return reply({ error: 'Phone must be a mobile number like 0300 1234567.' })
 
+    // a new person only: supabase would otherwise re-send the invite to an account someone else already made
+    // with this email (not confirmed yet), and that account would become an admin
+    const { data: existing } = await admin.from('profiles').select('id').ilike('email', email).maybeSingle()
+    if (existing) return reply({ error: 'An account with this email already exists. Admins need a new email address.' })
+    const { data: pending } = await admin.from('admin_invites').select('user_id').ilike('email', email).maybeSingle()
+    if (pending) return reply({ error: 'This email already has an invite. Use Send again on the Admins page.' })
+
     // the login exists but has no password and no admin rights until the link is opened
     const { data: invited, error } = await admin.auth.admin.inviteUserByEmail(email, {
       redirectTo, data: { full_name: name, phone, role: 'customer' },
@@ -67,9 +81,12 @@ Deno.serve(async (req) => {
       const taken = /already|registered|exists/i.test(error.message)
       return reply({ error: taken ? 'An account with this email already exists. Admins need a new email address.' : `The invite could not be sent: ${error.message}` })
     }
+    // must be the login this invite just made: never confirmed, no password, created a moment ago
+    const fresh = !invited.user.email_confirmed_at && Date.now() - new Date(invited.user.created_at).getTime() < 5 * 60 * 1000
+    if (!fresh) return reply({ error: 'An account with this email already exists. Admins need a new email address.' })
     const { error: e2 } = await admin.from('admin_invites').insert({ user_id: invited.user.id, email, full_name: name, invited_by: user.id })
     if (e2) {
-      await admin.auth.admin.deleteUser(invited.user.id)
+      await admin.auth.admin.deleteUser(invited.user.id)   // only the fresh login made above
       return reply({ error: e2.message }, 500)
     }
     return reply({ invite: { id: invited.user.id, email, full_name: name } })

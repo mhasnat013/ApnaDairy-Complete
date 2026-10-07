@@ -115,7 +115,8 @@ grant execute on function public.open_ticket(text, text, text, uuid, uuid, uuid)
 
 -- ---------- reply ----------
 -- the person who opened it: back to "open" (also reopens a resolved ticket)
--- apnadairy or the seller: "answered"
+-- apnadairy: "answered"
+-- the seller: no change, so a complaint stays with apnadairy until apnadairy answers it
 create or replace function public.reply_ticket(p_ticket uuid, p_body text)
 returns void
 language plpgsql security definer set search_path = public
@@ -138,8 +139,10 @@ begin
 
   insert into support_messages (ticket_id, author_id, side, body) values (t.id, auth.uid(), v_side, trim(p_body));
   update support_tickets
-     set status = case when v_side = 'user' then 'open' else 'answered' end,
-         resolved_at = null, resolved_by = null, updated_at = now()
+     set status = case v_side when 'user' then 'open' when 'admin' then 'answered' else status end,
+         resolved_at = case when v_side = 'seller' then resolved_at end,
+         resolved_by = case when v_side = 'seller' then resolved_by end,
+         updated_at = now()
    where id = t.id;
 end;
 $$;
@@ -262,7 +265,8 @@ as $$
   select count(*)::int from support_tickets t
   where case
     when public.is_admin() then t.status = 'open'
-    else (t.opened_by = auth.uid() and t.status = 'answered')
+    else (t.opened_by = auth.uid() and t.status <> 'resolved'
+          and (select x.side from support_messages x where x.ticket_id = t.id order by x.created_at desc limit 1) <> 'user')
       or (t.center_id is not null and t.center_id = public.my_seller_id() and t.status = 'open'
           and (select x.side from support_messages x where x.ticket_id = t.id order by x.created_at desc limit 1) = 'user')
   end;

@@ -20,7 +20,7 @@ export const topicsFor = (role) =>
 export function ticketState(t, viewer) {
   if (t.status === 'resolved') return { label: 'Resolved', tone: 'grey', waiting: false }
   if (viewer === 'admin') return t.status === 'open' ? { label: 'Needs reply', tone: 'amber', waiting: true } : { label: 'Replied', tone: 'green', waiting: false }
-  if (t.mine) return t.status === 'answered' ? { label: 'New reply', tone: 'amber', waiting: true } : { label: 'Waiting for reply', tone: 'blue', waiting: false }
+  if (t.mine) return t.last_side && t.last_side !== 'user' ? { label: 'New reply', tone: 'amber', waiting: true } : { label: 'Waiting for reply', tone: 'blue', waiting: false }
   // a complaint about this seller's order
   return t.status === 'open' && t.last_side === 'user' ? { label: 'Needs your reply', tone: 'amber', waiting: true } : { label: 'Replied', tone: 'green', waiting: false }
 }

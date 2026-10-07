@@ -30,7 +30,7 @@ export default function Complaints() {
 
   return (
     <>
-      <PageHeader title="Complaints & support" description="Tickets from businesses and area managers. Complaints about an order are also shown to that seller, who can reply. Only you or the person who opened a ticket can resolve it." />
+      <PageHeader title="Complaints & support" description="Tickets from businesses and area managers. Complaints about an order are also shown to that seller, who can reply, but a ticket stays here until ApnaDairy answers it. Only you or the person who opened a ticket can resolve it." />
 
       <div className="mb-6"><StatRow cols={3}>
         <StatCard label="Need a reply" value={open.length} tone={open.length ? 'haldi' : 'plain'} note={open.length ? `Oldest waiting ${oldest < 1 ? 'under an hour' : oldest < 48 ? `${Math.round(oldest)} hours` : `${Math.round(oldest / 24)} days`}` : 'All caught up'} />
