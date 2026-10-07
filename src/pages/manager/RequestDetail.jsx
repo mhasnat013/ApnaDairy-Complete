@@ -35,7 +35,7 @@ function Capacity({ cap, kind, over, onUse, useLabel }) {
         <div className={`mt-1 flex justify-between gap-3 border-t pt-1.5 font-semibold ${over || none ? 'border-danger/20' : 'border-line text-ink'}`}><dt>You can offer</dt><dd className="num shrink-0">{litres(cap.max_l)}</dd></div>
       </dl>
       {none && <p className="mt-2 text-[12.5px]">{graded && Number(cap.share) === 0 && Number(cap.stock_l) === 0
-        ? `None of your milk in the last 14 days tested ${gradeRule(cap.grade).toLowerCase()}, so you cannot offer it yet.`
+        ? `None of your milk in the last 14 days tested ${qualityLabel[cap.grade].toLowerCase()} or better, so you cannot offer it yet.`
         : Number(cap.daily_l) > 0 ? `Your ${kind} for that day is already promised. Pick another delivery date.` : `You have no ${kind} to offer yet. Buy and test milk from farmers first.`}</p>}
       {!none && <p className="mt-2 text-[12px]">The milk is tested on your IoT device before dispatch. Only {gradeRule(cap.grade).toLowerCase()} milk can be sent.</p>}
       {over && !none && <p className="mt-2 text-[12.5px]">You can’t offer more milk than you will have. <button type="button" className="font-semibold underline" onClick={onUse}>Use {useLabel}</button></p>}

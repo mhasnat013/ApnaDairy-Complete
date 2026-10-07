@@ -1,17 +1,16 @@
 import { supabase } from './supabase'
 
 export const milkLabel = { cow: 'Cow milk', buffalo: 'Buffalo milk', mixed: 'Mixed milk' }
-// bulk milk grades are ai model 1's grades from the iot test (supabase/24_bulk_grades.sql, 26_model1.sql).
-// stored as standard = Poor, fresh = Acceptable, premium = Good; spoiled milk is never sent
-export const qualityLabel = { standard: 'Any quality', fresh: 'Acceptable or better', premium: 'Good' }
+// bulk milk grades are the iot test grades (supabase/24_bulk_grades.sql)
+export const qualityLabel = { standard: 'Standard', fresh: 'Fresh', premium: 'Premium' }
 export const GRADES = ['standard', 'fresh', 'premium']
 // what the dispatch test has to show
-export const gradeRule = (q) => (q === 'premium' ? 'Good' : q === 'fresh' ? 'Acceptable or better' : 'Poor or better')
+export const gradeRule = (q) => (q === 'premium' ? 'Premium' : `${qualityLabel[q] ?? 'Standard'} or better`)
 export const gradeOk = (got, need) => GRADES.indexOf(got) >= GRADES.indexOf(need ?? 'standard')
 export const qualityHint = {
-  standard: 'Any milk the AI model does not rate spoiled',
-  fresh: 'The AI model rates it Acceptable or Good',
-  premium: 'The AI model rates it Good'
+  standard: 'Passes the IoT milk test',
+  fresh: 'IoT quality score 82 or more',
+  premium: 'IoT quality score 88 or more'
 }
 export const productQualityHint = { standard: 'Good everyday quality', premium: 'Best grade, pure and rich' }
 export const orderSteps = ['confirmed', 'dispatched', 'delivered']

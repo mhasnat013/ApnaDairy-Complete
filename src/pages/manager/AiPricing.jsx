@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useLoad } from '../../lib/useLoad'
-import { priceHistory, platformSettings, myMarketRates, assessMilk, predictModel1, milkLabel, gradeLabel, riskLabel, PARAMS, inRange } from '../../lib/center'
+import { priceHistory, platformSettings, myMarketRates, assessMilk, milkLabel, gradeLabel, riskLabel, PARAMS, inRange } from '../../lib/center'
 import { date, plural } from '../../lib/format'
 import { rs } from '../../lib/format'
 import PageHeader from '../../components/PageHeader'
@@ -27,9 +27,7 @@ export default function AiPricing() {
   // live result while the sliders move
   useEffect(() => {
     let live = true
-    // ask model 1 first (its answer is saved), then the database prices it; slow sliders, so the model is not flooded
-    const t = setTimeout(() => predictModel1(r.temperature_c, r.ph, r.ec_ms).catch(() => null)
-      .then(() => assessMilk(type, { ...r, reading_at: new Date().toISOString() })).then((x) => live && setAi(x)).catch(() => {}), 450)
+    const t = setTimeout(() => assessMilk(type, { ...r, reading_at: new Date().toISOString() }).then((x) => live && setAi(x)).catch(() => {}), 180)
     return () => { live = false; clearTimeout(t) }
   }, [type, r])
 
@@ -55,7 +53,7 @@ export default function AiPricing() {
         <Kpi accent label="Farmers’ share of market rate" value={data ? `${Math.round(share * 100)}%` : null} note={`average over ${plural(offers.length, 'offers')}, 30 days`} />
         <Kpi label="Farmers accepted" value={data ? `${answered.length ? Math.round((acceptedOffers / answered.length) * 100) : 0}%` : null} note="of offers they answered" />
         <Kpi label="Bad milk caught" value={data ? caught : null} note="samples the models rejected" />
-        <Kpi label="AI model" value="Model 1" note="SVM + 3 random forests, trained" />
+        <Kpi label="Models" value="2" note="quality and freshness" />
       </div>
 
       <Card className="mt-4 sm:mt-5" title={`One litre of ${milkLabel[type].toLowerCase()} milk`} subtitle="Who gets what, for the sample in Try it below">
@@ -95,9 +93,9 @@ export default function AiPricing() {
           <h3 className="mt-7 text-[14px] font-semibold">How the offer is worked out</h3>
           <ol className="mt-3 grid gap-2 text-[13.5px]">
             {[
-              ['Model 1 grades the milk', 'temperature, pH and EC give quality, freshness, shelf life and spoilage risk'],
-              ['The purity check', 'TDS and EC flag added water or salt (Model 2 will take this over)'],
-              ['Grade and market rate', 'Good +6%, Acceptable as is, Poor −8% on your base rate'],
+              ['Model 1 reads freshness', 'temperature, time, pH and EC give shelf life and spoilage risk'],
+              ['Model 2 checks purity', 'temperature, pH, EC and TDS give adulteration risk'],
+              ['Grade and market rate', 'Premium +6%, Fresh as is, Standard −8% on your base rate'],
               ['Offer to the farmer', `${Number(pf.farmer_default_pct)}% of market, at least ${Number(pf.farmer_min_pct)}%. Spoiled or adulterated milk gets no offer`],
             ].map(([t, d], i) => (
               <li key={t} className="flex items-start gap-3 rounded-xl border border-line px-3 py-2.5">
@@ -137,11 +135,11 @@ export default function AiPricing() {
               </div>
               <div className="mt-4 grid gap-2 sm:grid-cols-2">
                 <div className={`rounded-2xl px-4 py-3 ${ai.accept ? 'bg-cream/10' : 'bg-white/60'}`}>
-                  <p className="text-[12px] font-semibold">Model 1 · {ai.source === 'model' ? 'trained model' : 'backup rules'}</p>
-                  <p className="mt-1 text-[14px]">{ai.model_quality ? `${ai.model_quality} · ` : ''}freshness {ai.score}/100 · {ai.freshness_hours} h shelf life · {ai.spoilage_pct != null ? `${Math.round(ai.spoilage_pct)}%` : riskLabel[ai.spoilage_risk].toLowerCase()} spoilage risk</p>
+                  <p className="text-[12px] font-semibold">Model 1 · Freshness</p>
+                  <p className="mt-1 text-[14px]">{ai.freshness_hours} h shelf life · {riskLabel[ai.spoilage_risk].toLowerCase()} spoilage risk</p>
                 </div>
                 <div className={`rounded-2xl px-4 py-3 ${ai.accept ? 'bg-cream/10' : 'bg-white/60'}`}>
-                  <p className="text-[12px] font-semibold">Adulteration check</p>
+                  <p className="text-[12px] font-semibold">Model 2 · Adulteration</p>
                   <p className="mt-1 text-[14px]">{riskLabel[ai.adulteration_risk]} risk · {ai.adulteration_score}%{ai.suspected ? ` · likely ${ai.suspected}` : ''}</p>
                 </div>
               </div>

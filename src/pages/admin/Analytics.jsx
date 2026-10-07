@@ -116,10 +116,10 @@ export default function Analytics() {
 function QualityCard({ quality, loading }) {
   const q = quality ?? {}
   const seg = [
-    { label: 'Good', value: Number(q.premium ?? 0), color: C.g1 },
-    { label: 'Acceptable', value: Number(q.fresh ?? 0), color: C.g2 },
-    { label: 'Poor', value: Number(q.standard ?? 0), color: C.g3 },
-    { label: 'Not bought (spoiled or adulterated)', value: Number(q.failed ?? 0), color: C.danger },
+    { label: 'Premium', value: Number(q.premium ?? 0), color: C.g1 },
+    { label: 'Fresh', value: Number(q.fresh ?? 0), color: C.g2 },
+    { label: 'Standard', value: Number(q.standard ?? 0), color: C.g3 },
+    { label: 'Failed test', value: Number(q.failed ?? 0), color: C.danger },
   ]
   const total = seg.reduce((n, s) => n + s.value, 0)
   return (

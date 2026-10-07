@@ -1,3 +1,4 @@
+-- kept for later: run this only when model 1 is plugged in (and use iot-reading_with_model1.ts as the edge function).
 -- 26: the trained ai model 1 (quality, freshness, shelf life, spoilage risk) in every milk test
 -- run after 25_retest_discount.sql (safe to run again).
 --

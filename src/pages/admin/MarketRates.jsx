@@ -104,14 +104,14 @@ export default function MarketRates() {
         </Card>
         <Card title="How the price is worked out" subtitle="For every milk test">
           <ol className="grid gap-2 text-[13.5px]">
-            {[['Market rate', 'from this table, for the center’s city'], ['Grade', 'from AI Model 1: Good +6%, Acceptable as is, Poor −8%'], ['Farmer offer', 'the suggested share of the market rate, never below the minimum (see Billing, platform rules)']].map(([t, d], i) => (
+            {[['Market rate', 'from this table, for the center’s city'], ['Grade', 'Premium +6%, Fresh as is, Standard −8%'], ['Farmer offer', 'the suggested share of the market rate, never below the minimum (see Billing, platform rules)']].map(([t, d], i) => (
               <li key={t} className="flex items-start gap-3 rounded-xl border border-line px-3 py-2.5">
                 <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-forest text-[12px] font-bold text-cream">{i + 1}</span>
                 <span><b>{t}</b><span className="block text-muted">{d}</span></span>
               </li>
             ))}
           </ol>
-          <p className="mt-3 text-[12.5px] text-muted">Example: buffalo milk at {rs(rows['*']?.buffalo?.rate ?? 200)} graded Good is priced at {rs(Math.round((rows['*']?.buffalo?.rate ?? 200) * 1.06))} a litre.</p>
+          <p className="mt-3 text-[12.5px] text-muted">Example: buffalo milk at {rs(rows['*']?.buffalo?.rate ?? 200)} graded Premium is priced at {rs(Math.round((rows['*']?.buffalo?.rate ?? 200) * 1.06))} a litre.</p>
         </Card>
       </div>
     </>

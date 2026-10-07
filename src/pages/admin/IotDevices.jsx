@@ -11,8 +11,7 @@ import Icon from '../../components/Icon'
 import Sheet from '../../components/Sheet'
 import EmptyState from '../../components/EmptyState'
 
-// where the device writes in firebase: the live folder, or a test folder for calibration
-const FOLDERS = [['Result', 'Live device'], ['Demo', 'Test values']]
+// the device writes to the Result folder in firebase
 const DEFAULT_DB = 'https://milk123-3b7d4-default-rtdb.firebaseio.com'
 
 export default function IotDevices() {
@@ -55,7 +54,7 @@ export default function IotDevices() {
                     <tr key={d.serial}>
                       <td><p className="num font-semibold">{d.serial}</p><p className="max-w-[220px] truncate text-[12.5px] text-muted">{d.label ?? 'ESP32 tester'}</p></td>
                       <td>{d.center ? <><p className="font-medium">{d.center.center_name}</p><p className="text-[12.5px] text-muted">{d.center.city}</p></> : <span className="text-muted">Not given yet</span>}</td>
-                      <td><span className={`rounded-full px-2.5 py-1 text-[12px] font-semibold ${d.path === 'Result' ? 'bg-mint-soft text-forest' : 'bg-haldi-soft text-amber'}`}>{d.path === 'Result' ? 'Live device' : d.path === 'Demo' ? 'Demo values' : d.path}</span></td>
+                      <td><span className={`rounded-full px-2.5 py-1 text-[12px] font-semibold ${d.path === 'Result' ? 'bg-mint-soft text-forest' : 'bg-haldi-soft text-amber'}`}>{d.path === 'Result' ? 'Live device' : `/${d.path}`}</span></td>
                       <td className="text-[13.5px]">{a?.last_test ? relative(a.last_test) : <span className="text-muted">Never</span>}</td>
                       <td className="num text-right">{a ? Number(a.tests_7d) : 0}{Number(a?.failed_7d) > 0 && <p className="text-[12px] text-amber">{Number(a.failed_7d)} re-test</p>}</td>
                       <td>{d.is_active ? <Badge tone="green">On</Badge> : <Badge tone="grey">Off</Badge>}</td>
@@ -102,7 +101,6 @@ function DeviceSheet({ device, devices, centers, onClose, onSaved }) {
     if (!/^[A-Za-z0-9-]{3,30}$/.test(f.serial.trim())) return setErr('Serial: 3 to 30 letters, numbers or dashes, as printed on the device.')
     if (isNew && devices.some((d) => d.serial === f.serial.trim().toUpperCase())) return setErr('A device with this serial already exists.')
     if (!/^https:\/\/[a-z0-9.-]+\.(firebaseio\.com|firebasedatabase\.app)\/?$/i.test(f.db_url.trim())) return setErr('Database link: the Firebase Realtime Database URL, like https://name-default-rtdb.firebaseio.com')
-    if (!/^[A-Za-z0-9_/-]{1,60}$/.test(f.path.trim())) return setErr('Folder: letters, numbers, dashes or slashes only.')
     const moving = (device?.area_manager_id ?? '') !== f.center
     if (moving && device?.area_manager_id) {
       const from = device.center?.center_name ?? 'its center'
@@ -131,15 +129,7 @@ function DeviceSheet({ device, devices, centers, onClose, onSaved }) {
         <div className="field"><label htmlFor="du">Firebase database link</label>
           <input id="du" className="input text-[14px]" value={f.db_url} onChange={set('db_url')} required />
           <span className="hint">The secret key stays on the server, never here.</span></div>
-        <div className="field"><span className="label">Reads from folder</span>
-          <div className="flex flex-wrap gap-1.5">
-            {FOLDERS.map(([k, l]) => (
-              <button key={k} type="button" onClick={() => set('path')(k)}
-                className={`rounded-full border-[1.5px] px-3.5 py-1.5 text-[13.5px] font-medium transition-all ${f.path === k ? 'border-forest bg-mint-soft text-forest' : 'border-line bg-white hover:border-[#cdbd98]'}`}>
-                <span className="num">/{k}</span> · {l}</button>
-            ))}
-          </div>
-          <span className="hint">{f.path === 'Demo' ? 'Readings come from the Demo folder in Firebase. Use it to check or calibrate a center before its device is set up.' : 'Readings come from what the ESP32 sends.'}</span></div>
+        <p className="rounded-2xl bg-cream px-4 py-3 text-[13px] text-muted">Readings come from the device's <span className="num font-semibold text-ink">/Result</span> folder in Firebase, which the ESP32 writes to.</p>
         <div className="field"><label htmlFor="dc">Given to</label>
           <select id="dc" className="input" value={f.center} onChange={set('center')}>
             <option value="">Nobody yet</option>
@@ -151,13 +141,6 @@ function DeviceSheet({ device, devices, centers, onClose, onSaved }) {
           <button type="button" role="switch" aria-checked={f.is_active} aria-label="Switched on" onClick={() => set('is_active')(!f.is_active)}
             className={`relative h-7 w-[52px] shrink-0 rounded-full transition-colors ${f.is_active ? 'bg-forest' : 'bg-line'}`}>
             <span className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-all ${f.is_active ? 'left-[26px]' : 'left-0.5'}`} />
-          </button>
-        </div>
-        <div className="flex items-center justify-between gap-3 rounded-2xl bg-cream px-4 py-3">
-          <span><span className="block text-[14px] font-semibold">TDS sensor corrects to 25 °C</span><span className="text-[12.5px] text-muted">Turn on if the firmware passes the temperature to the TDS sensor. EC for AI Model 1 is then worked back to the milk’s own temperature. Off: EC = TDS ÷ 640.</span></span>
-          <button type="button" role="switch" aria-checked={!!f.tds_at_25c} aria-label="TDS sensor corrects to 25 °C" onClick={() => set('tds_at_25c')(!f.tds_at_25c)}
-            className={`relative h-7 w-[52px] shrink-0 rounded-full transition-colors ${f.tds_at_25c ? 'bg-forest' : 'bg-line'}`}>
-            <span className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-all ${f.tds_at_25c ? 'left-[26px]' : 'left-0.5'}`} />
           </button>
         </div>
       </form>

@@ -362,19 +362,15 @@ export default function RecordMilk() {
           <section className={`panel p-5 sm:p-6 ${ai.accept ? '' : 'border-[#efc6bb]'}`}>
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="flex items-center gap-2 text-[13px] font-semibold text-muted"><Icon name="spark" size={16} />AI assessment</p>
-              <span className={`rounded-full px-2.5 py-0.5 text-[11.5px] ${ai.source === 'model' ? 'bg-mint-soft text-forest' : 'bg-haldi-soft text-amber'}`}>{ai.source === 'model' ? 'Model 1: trained SVM + random forests' : 'Model 1 not reached, backup rules used'}</span>
+              <span className="rounded-full bg-cream-2 px-2.5 py-0.5 text-[11.5px] text-muted">quality and freshness models</span>
             </div>
-            <h2 className={`display mt-3 text-[30px] ${ai.accept ? 'text-forest-deep' : 'text-danger'}`}>{ai.accept ? `${gradeLabel[ai.quality]} milk` : ai.model_quality === 'Spoiled' ? 'Spoiled: do not buy' : 'Do not buy this milk'}</h2>
-            <p className="mt-1 text-[14px] text-muted">Freshness score {ai.score}/100</p>
+            <h2 className={`display mt-3 text-[30px] ${ai.accept ? 'text-forest-deep' : 'text-danger'}`}>{ai.accept ? `${gradeLabel[ai.quality]} milk` : 'Do not buy this milk'}</h2>
+            <p className="mt-1 text-[14px] text-muted">Quality score {ai.score}/100</p>
 
             <div className="mt-5 grid gap-3 sm:grid-cols-2">
-              <ModelCard title="Model 1 · Quality and freshness" inputs="temperature, pH, EC" bad={ai.spoilage_risk === 'high'} warn={ai.spoilage_risk === 'medium'}
-                facts={[
-                  ...(ai.model_quality ? [['Quality', ai.model_quality]] : []),
-                  ['Shelf life', `${ai.freshness_hours} h`],
-                  ['Spoilage risk', ai.spoilage_pct != null ? `${Math.round(ai.spoilage_pct)}%` : riskLabel[ai.spoilage_risk], ai.spoilage_pct != null ? riskLabel[ai.spoilage_risk] : null],
-                ]} />
-              <ModelCard title="Adulteration check" inputs="temperature, pH, EC, TDS (rules until Model 2)" bad={ai.adulteration_risk === 'high'} warn={ai.adulteration_risk === 'medium'}
+              <ModelCard title="Model 1 · Freshness" inputs="temperature, time, pH, EC" bad={ai.spoilage_risk === 'high'} warn={ai.spoilage_risk === 'medium'}
+                facts={[['Shelf life', `${ai.freshness_hours} h`, 'once chilled'], ['Spoilage risk', riskLabel[ai.spoilage_risk]]]} />
+              <ModelCard title="Model 2 · Adulteration" inputs="temperature, pH, EC, TDS" bad={ai.adulteration_risk === 'high'} warn={ai.adulteration_risk === 'medium'}
                 facts={[['Risk', riskLabel[ai.adulteration_risk], `${ai.adulteration_score}% probability`], ['Likely additive', ai.suspected ? ai.suspected.charAt(0).toUpperCase() + ai.suspected.slice(1) : 'None']]} />
             </div>
             <ul className="mt-4 grid gap-2">

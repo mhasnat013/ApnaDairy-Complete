@@ -13,9 +13,7 @@ import EmptyState from '../../components/EmptyState'
 import { TrendChart, RangeBar, C } from '../../components/charts'
 
 // a reading is a problem when the ai flagged it: failed, adulteration risk, or milk starting to sour
-const flagged = (r) => !r.quality || r.model_quality === 'Spoiled' || r.model_quality === 'Poor' || r.adulteration_risk !== 'low' || (r.spoilage_risk && r.spoilage_risk !== 'low') || Number(r.ph) < 6.55
-// ai model 1's own classes
-const modelTone = { Good: 'green', Acceptable: 'blue', Poor: 'amber', Spoiled: 'red' }
+const flagged = (r) => !r.quality || r.adulteration_risk !== 'low' || (r.spoilage_risk && r.spoilage_risk !== 'low') || Number(r.ph) < 6.55
 const avg = (rows, k) => (rows.length ? rows.reduce((n, r) => n + Number(r[k]), 0) / rows.length : null)
 
 export default function IotReadings() {
@@ -66,7 +64,7 @@ export default function IotReadings() {
             {PARAMS.filter((p) => p.sensor !== 'from TDS').map((p) => <li key={p.key} className="rounded-full bg-cream/10 px-2.5 py-1">{p.sensor}</li>)}
           </ul>
           <p className="mt-3 rounded-2xl bg-cream/5 p-3 text-[12.5px] leading-relaxed text-cream/70">{data?.device
-            ? 'The ESP32 tester sends temperature, pH and TDS to the cloud. EC is worked out from TDS (TDS ÷ 640). AI Model 1 then grades the sample and the adulteration check runs.'
+            ? 'The ESP32 tester sends temperature, pH and TDS to the cloud. EC is worked out from TDS (TDS ÷ 640), then both AI models score the sample.'
             : 'ApnaDairy links your tester once it is paid for. Milk can only be tested and bought with the device, so readings cannot be typed in or changed.'}</p>
         </section>
 
@@ -85,15 +83,10 @@ export default function IotReadings() {
               ))}
             </div>
           ) : <EmptyState title="No readings yet">Test a sample to see it here.</EmptyState>}
-          {latest?.model_quality && (
-            <p className="mt-5 flex flex-wrap items-center gap-2 rounded-2xl bg-cream px-4 py-3 text-[13.5px]">
-              <Icon name="spark" size={15} className="text-forest" /><b>AI Model 1:</b> {latest.model_quality} · freshness {latest.freshness_score}/100 · about {latest.freshness_hours} h shelf life{latest.spoilage_pct != null ? ` · ${Math.round(latest.spoilage_pct)}% spoilage risk` : ''}
-            </p>
-          )}
         </Card>
       </div>
 
-      <Card className="mt-4 sm:mt-5" title="From sensors to AI" subtitle="Each reading goes to AI Model 1 and the adulteration check. Their results decide the grade and the price.">
+      <Card className="mt-4 sm:mt-5" title="From sensors to AI" subtitle="Each reading is sent to two models. Their results decide the grade and the price.">
         <div className="grid gap-3 md:grid-cols-2">
           {MODELS.map((m) => (
             <div key={m.key} className="rounded-2xl border border-line bg-white p-4">
@@ -162,11 +155,9 @@ export default function IotReadings() {
                     return <td key={p.key} className={`num text-right ${r[p.key] == null || inRange(p, v) ? '' : 'font-bold text-danger'}`}>{r[p.key] == null ? '—' : v.toFixed(p.digits)}</td>
                   })}
                   <td>
-                    {r.model_quality
-                      ? <Badge tone={modelTone[r.model_quality]} dot={false}>{r.model_quality}</Badge>
-                      : r.quality ? <Badge tone={gradeTone[r.quality]} dot={false}>{gradeLabel[r.quality]}</Badge> : <Badge tone="red" dot={false}>Failed</Badge>}
+                    {r.quality ? <Badge tone={gradeTone[r.quality]} dot={false}>{gradeLabel[r.quality]}</Badge> : <Badge tone="red" dot={false}>Failed</Badge>}
                     {r.adulteration_risk !== 'low' && <p className="mt-1 text-[12px] font-semibold text-danger">{riskLabel[r.adulteration_risk]} adulteration risk{r.suspected ? `, likely ${r.suspected}` : ''}</p>}
-                    {r.spoilage_risk && r.spoilage_risk !== 'low' && <p className="mt-1 text-[12px] font-semibold text-amber">{r.spoilage_pct != null ? `${Math.round(r.spoilage_pct)}%` : riskLabel[r.spoilage_risk]} spoilage risk</p>}
+                    {r.spoilage_risk && r.spoilage_risk !== 'low' && <p className="mt-1 text-[12px] font-semibold text-amber">{riskLabel[r.spoilage_risk]} spoilage risk</p>}
                     <p className="mt-0.5 max-w-[240px] text-[12px] text-muted">{r.ai_notes?.[0]}</p>
                   </td>
                 </tr>

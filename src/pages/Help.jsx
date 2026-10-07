@@ -27,7 +27,7 @@ const FAQ = {
     ['How do I buy in bulk?', 'Post a requirement: what you need, how much, the delivery date and when bidding closes. Verified sellers bid in the open and you can see every offer.'],
     ['Can I take offers from more than one seller?', 'Yes. Accept bids one by one until your quantity is covered. You cannot accept more than you asked for.'],
     ['How do I confirm a delivery?', 'Each order has a 4-digit delivery code. Give it to the driver only when the order has arrived. You can also press Received yourself.'],
-    ['How is milk quality checked?', 'You pick the lowest grade you accept: any quality, Acceptable or better, or Good. These grades come from ApnaDairy’s AI model, which reads the seller’s IoT milk test. The milk is tested again before dispatch, and only milk of your grade or better can be sent. Spoiled milk is never sent. You see the test result on the order.'],
+    ['How is milk quality checked?', 'You pick a grade: Standard, Fresh or Premium. These are the grades the seller’s IoT milk test gives. The milk is tested again before dispatch, and only milk of your grade or better can be sent. You see the test result on the order.'],
     ['How do I pay?', 'You pay the seller directly. ApnaDairy takes no cut from your orders.'],
     ['What if a seller cancels?', 'Your requirement opens again for bids for up to 12 hours, so other sellers can step in. Cancellations show on that seller’s track record.'],
   ],

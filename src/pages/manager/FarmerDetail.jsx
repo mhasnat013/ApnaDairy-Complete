@@ -87,7 +87,7 @@ export default function FarmerDetail() {
         </Kpi>
         <Kpi label="Milk in 30 days" value={data ? litres(Math.round(s.litres_30d || 0)) : null} note={`${accepted30.length} drop-offs`} />
         <Kpi label="Earned in 30 days" value={data ? rs(Math.round(s.earned_30d || 0)) : null} note={avgPrice ? `average ${rs(Math.round(avgPrice))} per litre` : ' '} />
-        <Kpi label="Quality" value={data ? `${premium}%` : null} note={`rated Good${Number(s.failed_30d) ? ` · ${s.failed_30d} failed tests` : ' · no failed tests'}`} />
+        <Kpi label="Quality" value={data ? `${premium}%` : null} note={`premium${Number(s.failed_30d) ? ` · ${s.failed_30d} failed tests` : ' · no failed tests'}`} />
       </div>
 
       <Card className="mt-4 sm:mt-5" title="Milk supplied" subtitle="Litres accepted each day, last 30 days">
