@@ -9,7 +9,7 @@ import PageHeader from '../../components/PageHeader'
 import Badge from '../../components/Badge'
 import Alert from '../../components/Alert'
 import Loader from '../../components/Loader'
-import { MilkChurn } from '../../components/Farm'
+import ProductImage from '../../components/ProductImage'
 import OffersList from '../../components/OffersList'
 import { numberError, firstError } from '../../lib/validate'
 
@@ -215,8 +215,8 @@ export default function RequestDetail() {
       <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_400px]">
         <section className="space-y-5">
           <div className="furrows relative animate-rise overflow-hidden rounded-[24px] bg-forest-deep p-6 text-cream sm:p-7">
-            <MilkChurn size={84} stroke="#fffcf4" className="absolute -bottom-2 right-5 opacity-90" />
-            <p className="display num text-[54px] leading-none">{qtyText(req.quantity_l, req.unit)}</p>
+            <ProductImage category={req.product ?? 'milk'} size={92} className="absolute right-5 top-5 shadow-lg ring-4 ring-cream/15 sm:right-7 sm:top-7" />
+            <p className="display num pr-28 text-[54px] leading-none">{qtyText(req.quantity_l, req.unit)}</p>
             <p className="mt-2 text-[17px] font-semibold">{isMilk(req) ? milkLabel[req.milk_type] : `${productLabel[req.product]}, from ${milkLabel[req.milk_type].toLowerCase()}`}</p>
             {isMilk(req) && <span className="mt-4 inline-flex rounded-full bg-haldi px-3 py-1 text-[13px] font-bold text-forest-deep">{qualityLabel[req.quality]}</span>}
             {isMilk(req) && <p className="mt-1.5 text-[13.5px] text-cream/70">{qualityHint[req.quality]}</p>}

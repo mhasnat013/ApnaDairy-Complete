@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" role="img" aria-label="Cream (malai)">
+  <rect width="240" height="240" rx="40" fill="#e9eef0"/>
+  <circle cx="120" cy="126" r="84" fill="#dde6e9"/>
+  <ellipse cx="120" cy="200" rx="70" ry="9" fill="#c6d3d8"/>
+  <path d="M60 118c22-36 36-14 52-34 12-16 30-12 38 4 6 12 22 8 30 22 4 6 2 10 0 12" fill="#fffcf4" stroke="#173a28" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M96 106c8-6 14 2 22-6M132 98c6 4 12 2 16 6" fill="none" stroke="#e6ddc7" stroke-width="4" stroke-linecap="round"/>
+  <path d="M46 118h148c0 40-30 74-74 74s-74-34-74-74z" fill="#1f4d36" stroke="#173a28" stroke-width="3" stroke-linejoin="round"/>
+  <path d="M58 132c38 12 86 12 124 0" fill="none" stroke="#2f6b4d" stroke-width="4" stroke-linecap="round"/>
+  <path d="M46 118h148" stroke="#173a28" stroke-width="3"/>
+  <ellipse cx="120" cy="118" rx="74" ry="10" fill="#fffcf4" stroke="#173a28" stroke-width="3"/>
+  <path d="M100 192l-6 10h52l-6-10" fill="#1f4d36" stroke="#173a28" stroke-width="3" stroke-linejoin="round"/>
+</svg>

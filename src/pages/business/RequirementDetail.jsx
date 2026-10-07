@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import ProductImage from '../../components/ProductImage'
 import { requirementWithBids, rankBids, bidIssues, gradeRule, acceptBid, cancelRequirement, qualityLabel, coveredL, stillNeeded, isExpired, reqTitle, qtyText, perUnit, isMilk, productLabel } from '../../lib/b2b'
 import { useLoad } from '../../lib/useLoad'
 import { useUi } from '../../context/UiContext'
@@ -129,7 +130,8 @@ export default function RequirementDetail() {
         {isOpen && <button className="btn-danger" onClick={onCancel} disabled={busy}>{covered > 0 ? 'Stop taking bids' : 'Cancel requirement'}</button>}
       </PageHeader>
 
-      <div className="mb-8 flex flex-wrap gap-2">
+      <div className="mb-8 flex flex-wrap items-center gap-2">
+        <ProductImage category={req.product ?? 'milk'} size={44} className="mr-1" />
         <Badge status={expired ? 'closed' : req.status} tone={expired ? 'grey' : undefined}>{expired ? 'Date passed' : biddingLive ? 'Taking bids' : isOpen ? 'Bidding closed, pick a bid' : req.status === 'closed' ? 'Stopped' : req.status === 'awarded' ? 'Covered' : undefined}</Badge>
         {isMilk(req) && <span className="rounded-full bg-cream-2 px-3 py-1 text-[13px] font-medium">{qualityLabel[req.quality]}</span>}
         <span className="num rounded-full bg-cream-2 px-3 py-1 text-[13px] font-medium">Target {req.target_price ? `${rs(req.target_price)} / ${per}` : 'best offer'}</span>

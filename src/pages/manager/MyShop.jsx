@@ -19,6 +19,7 @@ import RetestSheet from '../../components/RetestSheet'
 import { HillsStrip } from '../../components/Farm'
 import { qtyText, perUnit } from '../../lib/b2b'
 import { phoneError, numberError, firstError, prettyPhone } from '../../lib/validate'
+import ProductImage from '../../components/ProductImage'
 
 const TYPES = ['buffalo', 'cow', 'mixed']
 
@@ -163,11 +164,14 @@ function ListingCard({ listing, pub, fresh, grade, reload, onEdit }) {
   return (
     <section className={`panel animate-rise p-5 sm:p-6 ${listing.is_available ? '' : 'opacity-80'}`}>
       <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex min-w-0 items-start gap-3">
+        <ProductImage category="milk" size={56} />
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2"><p className="display text-[20px] text-forest-deep">{listing.name}</p><GradeChip grade={grade} /></div>
           <p className={`mt-1 inline-flex items-center gap-1.5 text-[13px] font-medium ${status[0] === 'green' ? 'text-forest' : status[0] === 'amber' ? 'text-amber' : 'text-muted'}`}>
             <span className={`h-2 w-2 rounded-full ${status[0] === 'green' ? 'bg-forest-2' : status[0] === 'amber' ? 'bg-haldi' : 'bg-line'}`} />{status[1]}</p>
           {listing.description && <p className="mt-1 truncate text-[13px] text-muted">“{listing.description}”</p>}
+        </div>
         </div>
         <div className="flex items-center gap-3">
           {Number(listing.listed_l) > 0 && <button className="btn-secondary btn-sm" onClick={() => setRetesting(true)}><Icon name="chip" size={14} />Retest</button>}
@@ -283,7 +287,7 @@ function ListingSheet({ open, listing, startType, taken, fresh, grades, guide, p
 
             <div className="rounded-2xl border border-line bg-cream px-4 py-3.5 text-[13.5px]">
               <p className="text-[12px] font-semibold uppercase tracking-wide text-muted">Customers will see</p>
-              <p className="mt-1.5"><b className="num">{litres(Number(f.litres) || 0)}</b> of {milkLabel[type].toLowerCase()} milk{grades[type] ? `, ${gradeLabel[grades[type]].toLowerCase()} grade` : ''}, at <b className="num">{rs(final)}</b> a litre{Number(f.discount) > 0 ? ` (${f.discount}% off)` : ''}.</p>
+              <div className="mt-2 flex items-start gap-3"><ProductImage category="milk" size={44} /><p><b className="num">{litres(Number(f.litres) || 0)}</b> of {milkLabel[type].toLowerCase()} milk{grades[type] ? `, ${gradeLabel[grades[type]].toLowerCase()} grade` : ''}, at <b className="num">{rs(final)}</b> a litre{Number(f.discount) > 0 ? ` (${f.discount}% off)` : ''}.</p></div>
               {platform && <p className="mt-1 text-muted">They can order {Number(platform.order_min_l)} to {Number(platform.order_max_l)} L at a time, set by ApnaDairy.</p>}
             </div>
           </>
@@ -544,8 +548,9 @@ function PhonePreview({ data }) {
           <ul className="mt-2 grid gap-2">
             {listings.length === 0 && <li className="rounded-2xl bg-surface px-3 py-3 text-[12.5px] text-muted">{data?.byproduct ? 'No products on sale yet' : 'No milk listed yet'}</li>}
             {data?.byproduct && listings.map((l) => (
-              <li key={l.id} className="flex items-start justify-between gap-2 rounded-2xl border border-line bg-surface px-3 py-2.5">
-                <div className="min-w-0">
+              <li key={l.id} className="flex items-center justify-between gap-2 rounded-2xl border border-line bg-surface px-3 py-2.5">
+                <ProductImage category={l.category} size={38} />
+                <div className="min-w-0 flex-1">
                   <p className="truncate text-[13.5px] font-semibold">{l.name}</p>
                   <p className="text-[11.5px] text-muted">{qtyText(l.available_qty, l.unit)} available{l.expires_on ? ` · best before ${date(l.expires_on)}` : ''}</p>
                 </div>
@@ -558,7 +563,8 @@ function PhonePreview({ data }) {
             {!data?.byproduct && listings.map((l) => (
               <li key={l.id} className="rounded-2xl border border-line bg-surface px-3 py-2.5">
                 <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
+                  <ProductImage category="milk" size={38} />
+                  <div className="min-w-0 flex-1">
                     <p className="truncate text-[13.5px] font-semibold">{l.name}</p>
                     <p className="text-[11.5px] text-muted">{Number(l.available_l) > 0 ? `${Math.floor(l.available_l)} L available` : 'Sold out for now'}{l.quality ? ` · ${l.quality[0].toUpperCase()}${l.quality.slice(1)}` : ''}</p>
                   </div>

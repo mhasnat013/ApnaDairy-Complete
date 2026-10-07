@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom'
 import Reveal from './Reveal'
 import { milkLabel, qualityLabel, isMilk, productLabel, qtyText, perUnit } from '../../lib/b2b'
 import { rs, date, relative } from '../../lib/format'
-import { MilkChurn } from '../Farm'
+import ProductImage from '../ProductImage'
 
 // real open requests from the database — proof the marketplace is working
 export default function LiveBoard({ requests }) {
@@ -31,8 +31,8 @@ export default function LiveBoard({ requests }) {
             {list.map((r, i) => (
               <Reveal key={r.id} delay={i * 0.08}>
                 <article className="group relative h-full overflow-hidden rounded-[24px] bg-cream p-6 text-ink transition-transform duration-300 hover:-translate-y-1">
-                  <MilkChurn size={70} className="absolute -right-3 -top-3 opacity-15 transition-transform duration-500 group-hover:rotate-12" />
-                  <p className="display num text-[48px] leading-none text-forest">{qtyText(r.quantity_l, r.unit ?? 'litre')}</p>
+                  <ProductImage category={r.product ?? 'milk'} size={56} className="absolute right-5 top-5 transition-transform duration-500 group-hover:rotate-6" />
+                  <p className="display num pr-16 text-[48px] leading-none text-forest">{qtyText(r.quantity_l, r.unit ?? 'litre')}</p>
                   <p className="mt-2 font-semibold">{isMilk(r) ? `${milkLabel[r.milk_type]}, ${qualityLabel[r.quality].toLowerCase()}` : productLabel[r.product]}</p>
                   <p className="mt-3 text-[15px] text-muted">
                     For a {r.business_type === 'other' ? 'business' : r.business_type} in {r.delivery_city} by <span className="num">{date(r.required_date)}</span>

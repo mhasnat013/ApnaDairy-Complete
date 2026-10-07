@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" role="img" aria-label="Desi ghee">
+  <rect width="240" height="240" rx="40" fill="#f6e6bf"/>
+  <circle cx="120" cy="128" r="84" fill="#f1d99a"/>
+  <ellipse cx="120" cy="206" rx="78" ry="9" fill="#e3c27a"/>
+  <rect x="66" y="56" width="108" height="26" rx="8" fill="#1f4d36" stroke="#173a28" stroke-width="3"/>
+  <path d="M74 70h92" stroke="#2f6b4d" stroke-width="3"/>
+  <path d="M70 82h100v104c0 12-9 20-20 20H90c-11 0-20-8-20-20z" fill="#fff6dc" stroke="#173a28" stroke-width="3" stroke-linejoin="round"/>
+  <path d="M74 104h92v80c0 10-7 17-17 17H91c-10 0-17-7-17-17z" fill="#e9b649"/>
+  <path d="M74 104c15 7 31 7 46 0s31-7 46 0" fill="none" stroke="#173a28" stroke-width="3" stroke-linecap="round"/>
+  <path d="M90 124c4 2 8 2 12 0M118 140c4 2 8 2 12 0M96 160c4 2 8 2 12 0M130 172c4 2 8 2 12 0" stroke="#d29a2c" stroke-width="3" stroke-linecap="round"/>
+  <rect x="84" y="128" width="72" height="40" rx="9" fill="#fffcf4" stroke="#173a28" stroke-width="3"/>
+  <path d="M102 148c6-10 30-10 36 0-6 10-30 10-36 0z" fill="#e2a93b" stroke="#173a28" stroke-width="2.5"/>
+  <path d="M82 90v86" stroke="#ffffff" stroke-width="5" stroke-linecap="round" opacity=".7"/>
+</svg>

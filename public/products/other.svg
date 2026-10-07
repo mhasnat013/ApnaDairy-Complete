@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" role="img" aria-label="Other dairy (khoya, sweets)">
+  <rect width="240" height="240" rx="40" fill="#f1e5d2"/>
+  <circle cx="120" cy="126" r="84" fill="#e9d6b8"/>
+  <ellipse cx="120" cy="170" rx="96" ry="30" fill="#fffcf4" stroke="#173a28" stroke-width="3"/>
+  <ellipse cx="120" cy="166" rx="76" ry="19" fill="#efe6cf"/>
+  <path d="M60 140l26-12 26 12-26 12z" fill="#f4e7c9" stroke="#173a28" stroke-width="3" stroke-linejoin="round"/>
+  <path d="M60 140v14l26 12 26-12v-14l-26 12z" fill="#e8d5ad" stroke="#173a28" stroke-width="3" stroke-linejoin="round"/>
+  <path d="M74 134l12 5" stroke="#8fbf74" stroke-width="3" stroke-linecap="round"/>
+  <path d="M110 124l26-12 26 12-26 12z" fill="#f7e3b5" stroke="#173a28" stroke-width="3" stroke-linejoin="round"/>
+  <path d="M110 124v14l26 12 26-12v-14l-26 12z" fill="#ebcd8f" stroke="#173a28" stroke-width="3" stroke-linejoin="round"/>
+  <path d="M126 118l12 5M140 114l6 3" stroke="#c4cfd3" stroke-width="3" stroke-linecap="round"/>
+  <path d="M132 150l26-12 26 12-26 12z" fill="#f2dcc0" stroke="#173a28" stroke-width="3" stroke-linejoin="round"/>
+  <path d="M132 150v12l26 12 26-12v-12l-26 12z" fill="#e2c39b" stroke="#173a28" stroke-width="3" stroke-linejoin="round"/>
+  <circle cx="156" cy="148" r="3" fill="#8fbf74"/>
+  <circle cx="92" cy="74" r="20" fill="#e2a93b" stroke="#173a28" stroke-width="3"/>
+  <circle cx="92" cy="74" r="9" fill="#f6d27a"/>
+</svg>

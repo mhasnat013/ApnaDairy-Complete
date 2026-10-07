@@ -7,7 +7,7 @@ import { rs, date } from '../../lib/format'
 import PageHeader from '../../components/PageHeader'
 import ChoiceCards from '../../components/ChoiceCards'
 import Alert from '../../components/Alert'
-import { MilkChurn } from '../../components/Farm'
+import ProductImage from '../../components/ProductImage'
 import { numberError, cityError, firstError, tidyCity, CITIES } from '../../lib/validate'
 
 const iso = (d) => d.toLocaleDateString('en-CA', { timeZone: 'Asia/Karachi' })
@@ -85,7 +85,8 @@ export default function NewRequirement() {
             <div className="flex flex-wrap gap-1.5">
               {['milk', ...PRODUCTS].map((v) => (
                 <button key={v} type="button" onClick={() => setF((p) => ({ ...p, product: v, unit: v === 'milk' ? 'litre' : defaultUnit[v], quality: v === 'milk' ? (p.quality || 'standard') : 'standard', quantity_l: '' }))}
-                  className={`rounded-full border-[1.5px] px-3.5 py-1.5 text-[14px] font-medium transition-all ${f.product === v ? 'border-forest bg-mint-soft text-forest' : 'border-line bg-white hover:border-[#cdbd98]'}`}>
+                  className={`inline-flex items-center gap-2 rounded-full border-[1.5px] py-1 pl-1 pr-3.5 text-[14px] font-medium transition-all ${f.product === v ? 'border-forest bg-mint-soft text-forest' : 'border-line bg-white hover:border-[#cdbd98]'}`}>
+                  <ProductImage category={v} size={28} className="rounded-full" />
                   {productLabel[v]}
                 </button>
               ))}
@@ -184,7 +185,7 @@ export default function NewRequirement() {
                 <p className="display num text-[42px] leading-none">{f.quantity_l ? qtyText(f.quantity_l, f.unit) : qtyText(0, f.unit).replace('0', '—')}</p>
                 <p className="mt-2 font-semibold">{f.product === 'milk' ? milkLabel[f.milk_type] : `${productLabel[f.product]}, from ${milkLabel[f.milk_type].toLowerCase()}`}</p>
               </div>
-              <MilkChurn size={52} stroke="#fffcf4" />
+              <ProductImage category={f.product} size={60} className="ring-4 ring-cream/15" />
             </div>
             {f.product === 'milk' ? <div className="mx-6 mb-5 inline-flex rounded-full bg-haldi px-3 py-1 text-[13px] font-semibold text-forest-deep">{qualityLabel[f.quality]}</div> : <div className="mb-5" />}
             <dl className="space-y-2.5 bg-cream/5 px-6 py-5 text-[14px]">

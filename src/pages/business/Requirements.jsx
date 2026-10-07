@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import ProductImage from '../../components/ProductImage'
 import { myRequirements, qualityLabel, coveredL, isExpired, reqTitle, qtyText, isMilk, productLabel } from '../../lib/b2b'
 import { useLoad } from '../../lib/useLoad'
 import { rs, date, relative } from '../../lib/format'
@@ -55,12 +56,15 @@ export default function Requirements() {
             )}
             {!loading && rows.map((r) => (
               <tr key={r.id} className="clickable" onClick={() => nav(`/business/requirements/${r.id}`)}>
-                <td>
+                <td><div className="flex items-center gap-3">
+                  <ProductImage category={r.product ?? 'milk'} size={40} />
+                  <div className="min-w-0">
                   <Link to={`/business/requirements/${r.id}`} className="font-semibold text-ink hover:underline" onClick={(e) => e.stopPropagation()}>
                     {reqTitle(r)}
                   </Link>
                   <p className="text-[13px] text-muted">{isMilk(r) ? qualityLabel[r.quality] : productLabel[r.product]}{coveredL(r) > 0 ? ` · ${qtyText(coveredL(r), r.unit)} ordered` : ''}</p>
-                </td>
+                  </div>
+                </div></td>
                 <td className="num">{date(r.required_date)}<p className="text-[13px] text-muted">{r.delivery_city}</p></td>
                 <td className="num text-right">{r.target_price ? rs(r.target_price) : <span className="text-muted">Open</span>}</td>
                 <td className="text-right"><span className={`num inline-grid h-7 min-w-7 place-items-center rounded-full px-2 text-[13px] font-semibold ${r.bid_count ? 'bg-haldi-soft text-amber' : 'bg-cream-2 text-muted'}`}>{r.bid_count}</span></td>

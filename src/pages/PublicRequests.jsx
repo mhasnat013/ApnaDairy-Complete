@@ -11,6 +11,7 @@ import Footer from '../components/landing/Footer'
 import Segmented from '../components/Segmented'
 import Alert from '../components/Alert'
 import { MilkChurn } from '../components/Farm'
+import ProductImage from '../components/ProductImage'
 import OffersList from '../components/OffersList'
 
 const sorts = {
@@ -56,8 +57,11 @@ function RequestCard({ r, onOpen, i }) {
     <button onClick={() => onOpen(r)} style={{ animationDelay: `${Math.min(i, 8) * 50}ms` }}
       className="panel group flex animate-rise flex-col p-5 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-forest/40 hover:shadow-[0_24px_40px_-30px_rgb(23_58_40/.7)] focus-visible:-translate-y-0.5">
       <div className="flex items-start justify-between gap-3">
-        {isMilk(r) && <span className={`rounded-full px-2.5 py-1 text-[12.5px] font-semibold ${qualityTone[r.quality]}`}>{qualityLabel[r.quality]}</span>}
-        <span className="num rounded-full bg-cream-2 px-2.5 py-1 text-[12.5px] font-medium text-muted">{r.bid_count} {r.bid_count === 1 ? 'offer' : 'offers'}</span>
+        <ProductImage category={r.product ?? 'milk'} size={56} />
+        <div className="flex flex-col items-end gap-1.5">
+          <span className="num rounded-full bg-cream-2 px-2.5 py-1 text-[12.5px] font-medium text-muted">{r.bid_count} {r.bid_count === 1 ? 'offer' : 'offers'}</span>
+          {isMilk(r) && <span className={`rounded-full px-2.5 py-1 text-[12.5px] font-semibold ${qualityTone[r.quality]}`}>{qualityLabel[r.quality]}</span>}
+        </div>
       </div>
       <p className="display num mt-4 text-[38px] leading-none text-forest-deep">{qtyText(r.quantity_l, r.unit)}</p>
       <p className="mt-1.5 text-[15.5px] font-semibold">{isMilk(r) ? milkLabel[r.milk_type] : productLabel[r.product]}</p>
@@ -90,7 +94,7 @@ function DetailPanel({ r, onClose }) {
       <aside className="absolute inset-y-0 right-0 flex w-full max-w-[460px] animate-rise flex-col overflow-y-auto bg-surface shadow-2xl">
         <div className="furrows relative bg-forest-deep p-6 text-cream">
           <button onClick={onClose} className="absolute right-4 top-4 rounded-full bg-cream/10 px-3 py-1 text-[13px] font-medium hover:bg-cream/20">Close</button>
-          <MilkChurn size={56} stroke="#fffcf4" className="mb-3" />
+          <ProductImage category={r.product ?? 'milk'} size={64} className="mb-4 ring-4 ring-cream/15" />
           <p className="display num text-[44px] leading-none">{qtyText(r.quantity_l, r.unit)}</p>
           <p className="mt-2 text-[17px] font-semibold">{isMilk(r) ? milkLabel[r.milk_type] : `${productLabel[r.product]}, from ${milkLabel[r.milk_type].toLowerCase()}`}</p>
           {isMilk(r) && <span className="mt-3 inline-flex rounded-full bg-haldi px-3 py-1 text-[13px] font-bold text-forest-deep">{qualityLabel[r.quality]}</span>}

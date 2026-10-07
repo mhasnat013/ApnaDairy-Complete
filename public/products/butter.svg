@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" role="img" aria-label="Butter">
+  <rect width="240" height="240" rx="40" fill="#f8efc9"/>
+  <circle cx="120" cy="124" r="84" fill="#f4e4a3"/>
+  <ellipse cx="120" cy="172" rx="92" ry="26" fill="#fffcf4" stroke="#173a28" stroke-width="3"/>
+  <ellipse cx="120" cy="168" rx="72" ry="16" fill="#efe6cf"/>
+  <path d="M64 120l40-22 74 14v30l-40 24-74-14z" fill="#f7d65e" stroke="#173a28" stroke-width="3" stroke-linejoin="round"/>
+  <path d="M64 120l74 14 40-22M138 134v32" fill="none" stroke="#173a28" stroke-width="3" stroke-linejoin="round"/>
+  <path d="M64 120v32l74 14" fill="none" stroke="#173a28" stroke-width="3" stroke-linejoin="round"/>
+  <path d="M138 134l40-22v30l-40 24z" fill="#e8bf3c" stroke="#173a28" stroke-width="3" stroke-linejoin="round"/>
+  <path d="M84 116l30 6" stroke="#fff3b8" stroke-width="5" stroke-linecap="round"/>
+  <path d="M150 70l42 46" stroke="#173a28" stroke-width="3" stroke-linecap="round"/>
+  <path d="M140 60c8-6 18-4 22 4l-10 10z" fill="#c9d3cd" stroke="#173a28" stroke-width="3" stroke-linejoin="round"/>
+  <rect x="180" y="104" width="12" height="34" rx="6" transform="rotate(-42 186 121)" fill="#1f4d36" stroke="#173a28" stroke-width="3"/>
+</svg>

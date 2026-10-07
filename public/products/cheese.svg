@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" role="img" aria-label="Cheese">
+  <rect width="240" height="240" rx="40" fill="#f8ecc4"/>
+  <circle cx="120" cy="126" r="84" fill="#f3dc95"/>
+  <ellipse cx="120" cy="198" rx="80" ry="9" fill="#e2c477"/>
+  <path d="M42 140l120-62 40 34v54l-160 20z" fill="#f6c94a" stroke="#173a28" stroke-width="3" stroke-linejoin="round"/>
+  <path d="M42 140l160-28" fill="none" stroke="#173a28" stroke-width="3"/>
+  <path d="M42 140v46l160-20v-54z" fill="#f2bb35" stroke="#173a28" stroke-width="3" stroke-linejoin="round"/>
+  <path d="M42 140l120-62 40 34z" fill="#fbd864" stroke="#173a28" stroke-width="3" stroke-linejoin="round"/>
+  <ellipse cx="148" cy="104" rx="9" ry="5" fill="#e3a725"/>
+  <ellipse cx="110" cy="122" rx="7" ry="4" fill="#e3a725"/>
+  <circle cx="80" cy="162" r="9" fill="#e3a725" stroke="#173a28" stroke-width="2.5"/>
+  <circle cx="128" cy="160" r="6" fill="#e3a725" stroke="#173a28" stroke-width="2.5"/>
+  <circle cx="170" cy="146" r="10" fill="#e3a725" stroke="#173a28" stroke-width="2.5"/>
+  <circle cx="104" cy="176" r="4.5" fill="#e3a725" stroke="#173a28" stroke-width="2"/>
+</svg>

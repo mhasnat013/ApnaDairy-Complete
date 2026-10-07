@@ -4,6 +4,7 @@ import { useLoad } from '../../lib/useLoad'
 import { useUi } from '../../context/UiContext'
 import { SkeletonRows } from '../../components/Skeleton'
 import { rs, date } from '../../lib/format'
+import ProductImage from '../../components/ProductImage'
 import PageHeader from '../../components/PageHeader'
 import OrderProgress from '../../components/OrderProgress'
 import Alert from '../../components/Alert'
@@ -48,7 +49,7 @@ export default function BusinessOrders() {
             {data?.map((o) => (
               <tr key={o.id}>
                 <td><p className="font-semibold">{o.center?.center_name}</p><p className="text-[13px] text-muted">{o.center?.city}</p></td>
-                <td className="num">{qtyText(o.quantity_l, o.requirement?.unit)}<p className="text-[13px] text-muted">{isMilk(o.requirement) ? milkLabel[o.requirement?.milk_type] : productLabel[o.requirement?.product]}</p></td>
+                <td className="num"><div className="flex items-center gap-3"><ProductImage category={o.requirement?.product ?? 'milk'} size={36} /><div>{qtyText(o.quantity_l, o.requirement?.unit)}<p className="text-[13px] text-muted">{isMilk(o.requirement) ? milkLabel[o.requirement?.milk_type] : productLabel[o.requirement?.product]}</p></div></div></td>
                 <td className="num text-right">{rs(o.price_per_l)}<span className="text-[12px] text-muted"> / {perUnit(o.requirement?.unit)}</span></td>
                 <td className="num text-right font-semibold">{rs(o.total_amount)}</td>
                 <td className="num">{date(o.delivery_date)}<p className="text-[13px] text-muted">{o.delivery_city}</p></td>

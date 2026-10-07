@@ -10,6 +10,7 @@ import Alert from '../../components/Alert'
 import Icon from '../../components/Icon'
 import Sheet from '../../components/Sheet'
 import EmptyState from '../../components/EmptyState'
+import ProductImage from '../../components/ProductImage'
 
 const MILK = { buffalo: 'Buffalo milk', cow: 'Cow milk', mixed: 'Mixed milk' }
 const daysTo = (d) => (d ? Math.round((new Date(`${d}T12:00:00`) - new Date(`${todayKey()}T12:00:00`)) / 864e5) : null)
@@ -68,11 +69,14 @@ function ProductCard({ p, reload, onEdit }) {
   return (
     <section className={`panel animate-rise p-5 ${p.is_available ? '' : 'opacity-80'}`}>
       <div className="flex items-start justify-between gap-3">
+        <div className="flex min-w-0 items-start gap-3">
+        <ProductImage category={p.category} size={64} />
         <div className="min-w-0">
           <span className="rounded-full bg-haldi-soft px-2.5 py-0.5 text-[12px] font-semibold text-forest-deep">{categoryLabel[p.category]}</span>
           <p className="display mt-2 truncate text-[20px] text-forest-deep">{p.name}</p>
           <p className={`mt-0.5 inline-flex items-center gap-1.5 text-[13px] font-medium ${({ forest: 'text-forest', amber: 'text-amber', danger: 'text-danger', muted: 'text-muted' })[status[0]]}`}>
             <span className={`h-2 w-2 rounded-full ${status[0] === 'forest' ? 'bg-forest-2' : status[0] === 'amber' ? 'bg-haldi' : status[0] === 'danger' ? 'bg-danger' : 'bg-line'}`} />{status[1]}</p>
+        </div>
         </div>
         <button role="switch" aria-checked={p.is_available} aria-label="Show on the app" disabled={busy} onClick={toggle}
           className={`relative h-7 w-[52px] shrink-0 rounded-full transition-colors ${p.is_available ? 'bg-forest' : 'bg-line'}`}>
@@ -142,7 +146,8 @@ function ProductSheet({ product, onClose, onSaved }) {
             <div className="flex flex-wrap gap-1.5">
               {PRODUCTS.map((c) => (
                 <button key={c} type="button" onClick={() => pick(c)}
-                  className={`rounded-full border-[1.5px] px-3.5 py-1.5 text-[13.5px] font-medium transition-all ${f.category === c ? 'border-forest bg-mint-soft text-forest' : 'border-line bg-white hover:border-[#cdbd98]'}`}>{categoryLabel[c]}</button>
+                  className={`flex items-center gap-2 rounded-full border-[1.5px] py-1 pl-1 pr-3.5 text-[13.5px] font-medium transition-all ${f.category === c ? 'border-forest bg-mint-soft text-forest' : 'border-line bg-white hover:border-[#cdbd98]'}`}>
+                  <ProductImage category={c} size={28} className="rounded-full" />{categoryLabel[c]}</button>
               ))}
             </div>
           </div>
@@ -183,7 +188,9 @@ function ProductSheet({ product, onClose, onSaved }) {
           <input id="px" className="input" maxLength={140} value={f.description ?? ''} onChange={set('description')} placeholder="e.g. Made the traditional way from buffalo milk" /></div>
         <div className="rounded-2xl border border-line bg-cream px-4 py-3.5 text-[13.5px]">
           <p className="text-[12px] font-semibold uppercase tracking-wide text-muted">Customers will see</p>
-          <p className="mt-1.5"><b>{f.name || categoryLabel[f.category]}</b>, {rs(final)} per {perUnit(f.unit)}{Number(f.discount_pct) > 0 ? ` (${f.discount_pct}% off)` : ''}, {stock > 0 ? `${qtyText(stock, f.unit)} available` : 'out of stock'}.</p>
+          <div className="mt-2 flex items-start gap-3"><ProductImage category={f.category} size={48} />
+          <p><b>{f.name || categoryLabel[f.category]}</b>, {rs(final)} per {perUnit(f.unit)}{Number(f.discount_pct) > 0 ? ` (${f.discount_pct}% off)` : ''}, {stock > 0 ? `${qtyText(stock, f.unit)} available` : 'out of stock'}.</p></div>
+          <p className="mt-1.5 text-[12px] text-muted">The picture comes with the product type, the same on every shop, so customers recognise it at a glance.</p>
         </div>
       </form>
     </Sheet>
