@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import ProductImage from '../../components/ProductImage'
-import { requirementWithBids, rankBids, bidIssues, gradeRule, acceptBid, cancelRequirement, qualityLabel, coveredL, stillNeeded, isExpired, reqTitle, qtyText, perUnit, isMilk, productLabel } from '../../lib/b2b'
+import { requirementWithBids, rankBids, bidIssues, offeredGrade, lowerGrade, acceptBid, cancelRequirement, qualityLabel, coveredL, stillNeeded, isExpired, reqTitle, qtyText, perUnit, isMilk, productLabel } from '../../lib/b2b'
 import { useLoad } from '../../lib/useLoad'
 import { useUi } from '../../context/UiContext'
 import { rs, date, dateTime, relative } from '../../lib/format'
@@ -58,7 +58,9 @@ function BidCard({ b, req, rank, canAccept, onAccept, busy, highlight }) {
         <div className="flex justify-between gap-3"><dt className="text-muted">Supplies</dt><dd className="num font-medium">{Q(b.quantity_l)}</dd></div>
         <div className="flex justify-between gap-3"><dt className="text-muted">Arrives</dt><dd className="num font-medium">{date(b.delivery_date)}</dd></div>
         {isMilk(req)
-          ? <div className="flex justify-between gap-3"><dt className="text-muted">Quality</dt><dd className="text-right font-medium">{gradeRule(req.quality)}, tested at dispatch</dd></div>
+          ? <div className="flex justify-between gap-3"><dt className="text-muted">Grade offered</dt><dd className="text-right">
+              <span className={`rounded-full px-2.5 py-0.5 text-[13px] font-bold ${lowerGrade(b, req) ? 'bg-haldi-soft text-amber' : 'bg-mint-soft text-forest'}`}>{qualityLabel[offeredGrade(b, req)]}</span>
+              <span className="block text-[12px] text-muted">{lowerGrade(b, req) ? `lower than the ${qualityLabel[req.quality]} you asked for` : 'from their tested stock'}</span></dd></div>
           : <div className="flex justify-between gap-3"><dt className="text-muted">Ready</dt><dd className="font-medium">{Number(b.make_qty) > 0 ? `${Q(b.quantity_l - b.make_qty)} in stock, ${Q(b.make_qty)} to be made` : 'All in stock'}</dd></div>}
         <div className="flex justify-between gap-3"><dt className="text-muted">Total</dt><dd className="num font-bold">{rs(b.price_per_l * b.quantity_l)}</dd></div>
       </dl>
@@ -104,7 +106,7 @@ export default function RequirementDetail() {
     const rest = need - take
     const ok = await confirm({
       title: `Buy from ${b.center?.center_name}?`,
-      body: `${Q(take)} at ${rs(b.price_per_l)} per ${per}, ${rs(b.price_per_l * take)} in total, delivered on ${date(b.delivery_date)}. ${rest > 0 ? `You still need ${Q(rest)}, so you can accept more bids after this.` : 'This covers your whole order, so the other bids will be declined.'} You pay the center directly on delivery.`,
+      body: `${isMilk(req) && lowerGrade(b, req) ? `This is ${qualityLabel[offeredGrade(b, req)]} milk, not the ${qualityLabel[req.quality]} you asked for. ` : ''}${Q(take)}${isMilk(req) ? ` of ${qualityLabel[offeredGrade(b, req)].toLowerCase()} milk` : ''} at ${rs(b.price_per_l)} per ${per}, ${rs(b.price_per_l * take)} in total, delivered on ${date(b.delivery_date)}. ${rest > 0 ? `You still need ${Q(rest)}, so you can accept more bids after this.` : 'This covers your whole order, so the other bids will be declined.'} You pay the center directly on delivery.`,
       confirmLabel: 'Accept bid',
     })
     if (!ok) return

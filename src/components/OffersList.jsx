@@ -1,10 +1,10 @@
 import { publicBids } from '../lib/b2b'
 import { useLoad } from '../lib/useLoad'
 import { rs, date } from '../lib/format'
-import { qtyText } from '../lib/b2b'
+import { qtyText, qualityLabel } from '../lib/b2b'
 
 // every live offer on a request, cheapest first — visible to everyone
-export default function OffersList({ requirementId, target, highlight, dark = false, unit = 'litre' }) {
+export default function OffersList({ requirementId, target, highlight, dark = false, unit = 'litre', asked = null }) {
   const { data, loading, error } = useLoad(() => publicBids(requirementId), [requirementId])
   const muted = dark ? 'text-cream/65' : 'text-muted'
 
@@ -31,6 +31,7 @@ export default function OffersList({ requirementId, target, highlight, dark = fa
               </p>
               <p className={`num text-[13px] ${muted}`}>
                 {b.center_city}, {qtyText(b.quantity_l, unit)} by {date(b.delivery_date)}
+                {b.offered_quality && <> · <span className={`font-semibold ${asked && b.offered_quality !== asked ? 'text-amber' : ''}`}>{qualityLabel[b.offered_quality]}{asked && b.offered_quality !== asked ? ` (asked ${qualityLabel[asked]})` : ''}</span></>}
               </p>
             </div>
             <div className="shrink-0 text-right">

@@ -1,21 +1,20 @@
 import { Link } from 'react-router-dom'
-import { useEffect, useState } from 'react'
-import { centerOrders, updateBulkOrder, milkLabel, qualityLabel, qtyText, perUnit, isMilk, productLabel, gradeRule, gradeOk } from '../../lib/b2b'
+import { useState } from 'react'
+import { centerOrders, updateBulkOrder, myDispatchStock, milkLabel, qualityLabel, qtyText, perUnit, isMilk, productLabel } from '../../lib/b2b'
 import { useLoad } from '../../lib/useLoad'
 import { useAuth } from '../../context/AuthContext'
-import { myCenter, assessMilk, gradeLabel } from '../../lib/center'
+import { myCenter, gradeLabel, dateTimeShort } from '../../lib/center'
 import ProductImage from '../../components/ProductImage'
 import DeliverySheet from '../../components/DeliverySheet'
 import { useUi } from '../../context/UiContext'
 import { SkeletonRows } from '../../components/Skeleton'
-import { rs, date, cap, plural } from '../../lib/format'
+import { rs, date, cap } from '../../lib/format'
 import PageHeader from '../../components/PageHeader'
 import OrderProgress from '../../components/OrderProgress'
 import Alert from '../../components/Alert'
 import EmptyState from '../../components/EmptyState'
 import Sheet from '../../components/Sheet'
 import Icon from '../../components/Icon'
-import { useDeviceTest } from '../../lib/useDeviceTest'
 
 const next = { confirmed: ['dispatched', 'Mark dispatched'], dispatched: ['delivered', 'Mark delivered'] }
 
@@ -34,7 +33,7 @@ export default function BulkOrders() {
       const ok = await confirm({ title: 'Cancel this order?', body: `${qtyText(o.quantity_l, o.requirement?.unit)} for ${o.buyer?.business_name}. The buyer will see it as cancelled.`, confirmLabel: 'Cancel order', danger: true, cancelLabel: 'Keep order' })
       if (!ok) return
     }
-    // milk is tested on the device before it leaves; products just leave stock
+    // milk goes out of tested stock; products just leave stock
     if (status === 'dispatched' && isMilk(o.requirement)) return setTesting(o)
     if (status === 'dispatched') {
       const ok = await confirm({ title: `Dispatch ${qtyText(o.quantity_l, o.requirement?.unit)}?`, body: 'This takes it out of your product stock now, oldest stock first.', confirmLabel: 'Dispatch' })
@@ -48,8 +47,8 @@ export default function BulkOrders() {
 
   return (
     <>
-      <PageHeader title="Bulk orders" description={center?.type === 'byproduct' ? 'Bids you won. Dispatch each order when it leaves, and the buyer’s 4-digit code confirms delivery.' : 'Bids you won. Milk is tested on your IoT device before it is dispatched, and the buyer’s 4-digit code confirms delivery.'} />
-      {testing && <DispatchTest order={testing} onClose={() => setTesting(null)} onDone={() => { toast('Tested and dispatched. The buyer can see the test result.'); reload() }} />}
+      <PageHeader title="Bulk orders" description={center?.type === 'byproduct' ? 'Bids you won. Dispatch each order when it leaves, and the buyer’s 4-digit code confirms delivery.' : 'Bids you won. Milk goes out of your tested stock at the grade you offered, and the buyer’s 4-digit code confirms delivery.'} />
+      {testing && <DispatchFromStock order={testing} onClose={() => setTesting(null)} onDone={() => { toast('Dispatched from your tested stock. The buyer can see its grade and test time.'); reload() }} />}
       <DeliverySheet key={delivering?.id ?? 'closed'} order={delivering} kind="bulk" demo={center?.is_demo}
         title={delivering ? `Deliver to ${delivering.buyer?.business_name}` : ''} subtitle={delivering ? `${qtyText(delivering.quantity_l, delivering.requirement?.unit)} · ${rs(delivering.total_amount)}` : ''}
         submit={(code) => updateBulkOrder(delivering.id, 'delivered', code)}
@@ -68,7 +67,7 @@ export default function BulkOrders() {
             {data?.map((o) => (
               <tr key={o.id}>
                 <td><p className="font-semibold">{o.buyer?.business_name}</p><p className="text-[13px] text-muted">{cap(o.buyer?.business_type)}</p></td>
-                <td className="num"><div className="flex items-center gap-3"><ProductImage category={o.requirement?.product ?? 'milk'} size={36} /><div>{qtyText(o.quantity_l, o.requirement?.unit)} at {rs(o.price_per_l)}/{perUnit(o.requirement?.unit)}<p className="text-[13px] text-muted">{isMilk(o.requirement) ? `${milkLabel[o.requirement?.milk_type]}, ${qualityLabel[o.requirement?.quality]?.toLowerCase()}` : productLabel[o.requirement?.product]}</p></div></div></td>
+                <td className="num"><div className="flex items-center gap-3"><ProductImage category={o.requirement?.product ?? 'milk'} size={36} /><div>{qtyText(o.quantity_l, o.requirement?.unit)} at {rs(o.price_per_l)}/{perUnit(o.requirement?.unit)}<p className="text-[13px] text-muted">{isMilk(o.requirement) ? `${milkLabel[o.requirement?.milk_type]}, ${qualityLabel[o.quality ?? o.requirement?.quality]?.toLowerCase()}${o.quality && o.requirement?.quality && o.quality !== o.requirement.quality ? ` (asked ${qualityLabel[o.requirement.quality].toLowerCase()})` : ''}` : productLabel[o.requirement?.product]}</p></div></div></td>
                 <td className="num text-right font-semibold">{rs(o.total_amount)}</td>
                 <td className="num">{date(o.delivery_date)}<p className="text-[13px] text-muted">{o.delivery_address ? `${o.delivery_address}, ` : ''}{o.delivery_city}</p></td>
                 <td><OrderProgress order={o} /></td>
@@ -91,61 +90,36 @@ export default function BulkOrders() {
   )
 }
 
-// before bulk milk leaves the center, the milk going out is tested on the iot device
-function DispatchTest({ order, onClose, onDone }) {
-  const { test, reading, err, run, cancel, left } = useDeviceTest()
-  const [ai, setAi] = useState(null)
+// bulk milk goes out of the center's tested stock: no new test, the order keeps what that stock was
+function DispatchFromStock({ order, onClose, onDone }) {
   const [busy, setBusy] = useState(false)
   const [fail, setFail] = useState('')
-  const type = order.requirement?.milk_type ?? 'mixed'
-  const need = order.requirement?.quality ?? 'standard'
-  const gradeGood = ai?.accept && gradeOk(ai.quality, need)
-  const ok = reading && reading.status === 'ok' && gradeGood
-  // the same ai check the database runs before it lets the milk go
-  useEffect(() => {
-    let live = true
-    setAi(null)
-    if (reading?.status === 'ok') assessMilk(type, reading).then((x) => live && setAi(x)).catch((e) => live && setFail(e.message))
-    return () => { live = false }
-  }, [reading, type])
+  const { data: st, error } = useLoad(() => myDispatchStock(order.id), [order.id])
+  const grade = order.quality ?? order.requirement?.quality ?? 'standard'
+  const have = Number(st?.litres ?? 0)
+  const ok = st && have >= Number(order.quantity_l)
   const send = async () => {
     setBusy(true); setFail('')
-    try { await updateBulkOrder(order.id, 'dispatched', null, reading.id); onDone(); onClose() } catch (e) { setFail(e.message) }
+    try { await updateBulkOrder(order.id, 'dispatched'); onDone(); onClose() } catch (e) { setFail(e.message) }
     setBusy(false)
   }
   return (
-    <Sheet open onClose={() => { cancel(); onClose() }} title={`Test and dispatch ${qtyText(order.quantity_l, 'litre')}`}
-      subtitle={`For ${order.buyer?.business_name}, who asked for ${gradeRule(need).toLowerCase()} milk. Dip the probes in the milk that is going out. Only milk that tests ${gradeRule(need).toLowerCase()} can be sent.`}
-      footer={<><button className="btn-secondary" onClick={() => { cancel(); onClose() }}>Cancel</button><button className="btn-primary" disabled={!ok || busy} onClick={send}>{busy ? 'Dispatching…' : 'Dispatch'}</button></>}>
-      <Alert>{err || fail}</Alert>
-      {test ? (
-        <div className="rounded-[20px] bg-forest-deep px-5 py-6 text-center text-cream">
-          <p className="display num text-[44px] leading-none">{test.finishing ? '…' : left}</p>
-          <p className="mt-2 text-[13px] text-cream/75">{test.finishing ? 'Averaging the readings…' : `Keep the probes in the milk · ${plural(test.samples.length, 'readings')} so far`}</p>
-          {!test.finishing && <button className="btn-on-dark btn-sm mt-4" onClick={cancel}>Cancel test</button>}
-        </div>
-      ) : !reading ? (
-        <div className="rounded-[20px] bg-cream px-5 py-6 text-center">
-          <p className="text-[14px] text-muted">The device is read every few seconds for a minute and the values are averaged.</p>
-          <button className="btn-primary mt-4" onClick={run}><Icon name="chip" size={16} />Take reading</button>
-        </div>
-      ) : (
+    <Sheet open onClose={onClose} title={`Dispatch ${qtyText(order.quantity_l, 'litre')}`}
+      subtitle={`For ${order.buyer?.business_name}. You offered ${gradeLabel[grade].toLowerCase()} milk, so it goes out of your tested stock of that grade or better. No new test is needed.`}
+      footer={<><button className="btn-secondary" onClick={onClose}>Cancel</button><button className="btn-primary" disabled={!ok || busy} onClick={send}>{busy ? 'Dispatching…' : 'Dispatch'}</button></>}>
+      <Alert>{error || fail}</Alert>
+      {!st && !error ? <div className="skeleton h-40 rounded-2xl" /> : st && (
         <div className="grid gap-3">
-          <dl className="grid grid-cols-4 gap-2">
-            {[['Temp', `${Number(reading.temperature_c)} °C`], ['pH', Number(reading.ph)], ['EC', `${Number(reading.ec_ms)}`], ['TDS', Math.round(reading.tds_ppm)]].map(([k, v]) => (
-              <div key={k} className="rounded-2xl bg-cream px-3 py-2.5"><dt className="text-[12px] text-muted">{k}</dt><dd className="num font-bold">{v}</dd></div>
+          <dl className="grid grid-cols-2 gap-2">
+            {[['Needed', qtyText(order.quantity_l, 'litre')], [`${gradeLabel[grade]} or better in stock`, qtyText(Math.floor(have * 10) / 10, 'litre')],
+              ['Grade of that stock', st.quality ? `${gradeLabel[st.quality]}${st.quality !== grade ? ' (better)' : ''}` : '—'], ['Freshness', st.freshness_score != null ? `${st.freshness_score}/100` : '—'],
+              ['Tested', st.tested_from ? `${dateTimeShort(st.tested_from)}${st.tested_to && st.tested_to !== st.tested_from ? ` to ${dateTimeShort(st.tested_to)}` : ''}` : '—'],
+              ['Good until', st.good_until ? dateTimeShort(st.good_until) : '—']].map(([k, v]) => (
+              <div key={k} className="rounded-2xl bg-cream px-3 py-2.5"><dt className="text-[12px] text-muted">{k}</dt><dd className="num font-semibold">{v}</dd></div>
             ))}
           </dl>
-          {reading.status !== 'ok' ? (
-            <p className="rounded-2xl bg-haldi-soft px-4 py-3 text-[13.5px] text-amber">{(reading.problems ?? []).join(' ') || 'The test did not finish properly.'} Test again.</p>
-          ) : !ai ? <div className="skeleton h-14" /> : gradeGood ? (
-            <p className="rounded-2xl bg-mint-soft px-4 py-3 text-[13.5px] text-forest"><b>Passed: {gradeLabel[ai.quality]} milk.</b> Fresh for about {Math.round(ai.freshness_hours)} more hours. The buyer sees this test with the order.</p>
-          ) : ai.accept ? (
-            <p className="rounded-2xl bg-[#f8e2dc] px-4 py-3 text-[13.5px] text-danger"><b>This milk tests {gradeLabel[ai.quality]}, the buyer asked for {gradeRule(need).toLowerCase()}.</b> It cannot be sent. Test better milk, or cancel the order.</p>
-          ) : (
-            <p className="rounded-2xl bg-[#f8e2dc] px-4 py-3 text-[13.5px] text-danger"><b>Failed: this milk cannot be sent.</b> {(ai.notes ?? []).join('. ')}. Use other milk and test again, or cancel the order.</p>
-          )}
-          {!ok && <button className="btn-secondary" onClick={run}><Icon name="chip" size={16} />Test again</button>}
+          {ok ? <p className="rounded-2xl bg-mint-soft px-4 py-3 text-[13.5px] text-forest">The buyer sees this stock's grade, test time and freshness with the order.</p>
+            : <p className="rounded-2xl bg-[#f8e2dc] px-4 py-3 text-[13.5px] text-danger"><b>Not enough {gradeLabel[grade].toLowerCase()} milk in stock.</b> Buy and test more milk from your farmers, or cancel the order.</p>}
         </div>
       )}
     </Sheet>

@@ -34,10 +34,14 @@ export const stillNeeded = (req) => Math.max(0, Number(req.quantity_l) - covered
 export const isExpired = (req) => req.status === 'open' && req.required_date < new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Karachi' })
 const one = (x) => (Array.isArray(x) ? x[0] ?? null : x ?? null)
 
-// a bid "qualifies" when it covers the quantity still needed and arrives on time
-// (milk grade is checked by the iot test at dispatch)
+// the grade a milk bid or order really offers (it can be lower than the buyer asked for)
+export const offeredGrade = (bid, req) => bid?.offered_quality ?? bid?.quality ?? req?.quality ?? 'standard'
+export const lowerGrade = (bid, req) => isMilk(req) && GRADES.indexOf(offeredGrade(bid, req)) < GRADES.indexOf(req?.quality ?? 'standard')
+
+// a bid "qualifies" when it covers the quantity still needed, arrives on time and offers the grade asked for
 export function bidIssues(bid, req) {
   const issues = []
+  if (lowerGrade(bid, req)) issues.push(`Offers ${qualityLabel[offeredGrade(bid, req)]} milk, you asked for ${qualityLabel[req.quality]}`)
   const need = req.orders ? stillNeeded(req) || Number(req.quantity_l) : Number(req.quantity_l)
   if (Number(bid.quantity_l) < need) issues.push(`Covers ${qtyText(bid.quantity_l, req.unit)} of ${qtyText(need, req.unit)}`)
   if (bid.delivery_date > req.required_date) issues.push('Arrives after your date')
@@ -55,7 +59,7 @@ export function rankBids(bids, req) {
   return { top, others }
 }
 
-const BID_FIELDS = 'id, price_per_l, quantity_l, make_qty, delivery_date, max_age_hours, notes, status, created_at, updated_at, area_manager_id'
+const BID_FIELDS = 'id, price_per_l, quantity_l, make_qty, delivery_date, max_age_hours, notes, status, created_at, updated_at, area_manager_id, offered_quality'
 
 // ---------- business ----------
 export async function myRequirements() {
@@ -155,6 +159,8 @@ export const placeBid = (a) => rpc('place_bid', a)
 export const myProductCapacity = (product, requirementId) => rpc('my_product_capacity', { p_product: product, p_requirement: requirementId ?? null })
 export const withdrawBid = (id) => rpc('withdraw_bid', { p_bid: id })
 export const acceptBid = (id) => rpc('accept_bid', { p_bid: id })
+// what tested stock a bulk milk order would go out of (grade, test time, freshness)
+export const myDispatchStock = (orderId) => rpc('my_dispatch_stock', { p_order: orderId })
 export const cancelRequirement = (id) => rpc('cancel_requirement', { p_requirement: id })
 export const rateOrder = (id, rating, comment) => rpc('rate_bulk_order', { p_order: id, p_rating: rating, p_comment: comment || null })
 // returns null when done, or a message when the delivery code was wrong

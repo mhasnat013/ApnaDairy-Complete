@@ -119,7 +119,7 @@ function DetailPanel({ r, onClose }) {
 
         <section className="px-6 pb-5">
           <p className="mb-3 font-semibold">Offers so far</p>
-          <OffersList requirementId={r.id} target={r.target_price} unit={r.unit} />
+          <OffersList requirementId={r.id} target={r.target_price} unit={r.unit} asked={isMilk(r) ? r.quality : null} />
         </section>
 
         <div className="mx-6 rounded-2xl bg-cream px-5 py-4 text-[14.5px]">
