@@ -1,8 +1,10 @@
 import { useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link, useOutletContext, useSearchParams } from 'react-router-dom'
 import { useLoad } from '../../lib/useLoad'
 import { useUi } from '../../context/UiContext'
 import { farmersWithStats, saveFarmer, milkLabel } from '../../lib/center'
+import { myFarmerRequests, myCenterReviews } from '../../lib/farmers'
+import FarmerRequests from './FarmerRequests'
 import { rs, litres, relative } from '../../lib/format'
 import PageHeader from '../../components/PageHeader'
 import Segmented from '../../components/Segmented'
@@ -15,9 +17,14 @@ import { nameError, phoneError, numberError, firstError, prettyPhone } from '../
 export default function Farmers() {
   const [params, setParams] = useSearchParams()
   const { data, error, loading, reload } = useLoad(farmersWithStats)
+  const { center } = useOutletContext() ?? {}
+  const { data: requests, reload: reloadRequests } = useLoad(() => myFarmerRequests().catch(() => []))
+  const { data: reviews } = useLoad(() => (center?.id ? myCenterReviews(center.id).catch(() => []) : Promise.resolve([])), [center?.id])
   const [q, setQ] = useState('')
   const [sort, setSort] = useState('milk')
-  const [editing, setEditing] = useState(params.get('add') ? {} : null)
+  const [editing, setEditing] = useState(null)
+  const tab = params.get('tab') === 'requests' ? 'requests' : 'farmers'
+  const waiting = (requests ?? []).filter((r) => r.status === 'pending').length
 
   const all = data ?? []
   const list = all
@@ -28,13 +35,20 @@ export default function Farmers() {
   const owed = all.reduce((n, f) => n + Number(f.stats.unpaid_amount || 0), 0)
   const litres30 = all.reduce((n, f) => n + Number(f.stats.litres_30d || 0), 0)
 
-  const close = () => { setEditing(null); if (params.get('add')) setParams({}) }
+  const close = () => setEditing(null)
 
   return (
     <>
-      <PageHeader title="Farmers" description="The farmers who bring milk to your center, how much they supply and what you owe them.">
-        <button className="btn-primary" onClick={() => setEditing({})}><Icon name="plus" size={17} />Add farmer</button>
-      </PageHeader>
+      <PageHeader title="Farmers" description="The farmers who bring milk to your center. Farmers join from the ApnaDairy app: ApnaDairy checks them, then they ask to sell to you." />
+
+      <div className="mb-5">
+        <Segmented value={tab} onChange={(v) => setParams(v === 'requests' ? { tab: 'requests' } : {})} options={[
+          { value: 'farmers', label: 'Your farmers', count: all.filter((f) => f.is_active).length },
+          { value: 'requests', label: 'Requests', count: waiting || undefined },
+        ]} />
+      </div>
+
+      {tab === 'requests' ? <FarmerRequests rows={requests ?? []} reload={() => { reloadRequests(); reload() }} /> : <>
 
       <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-3">
         <Stat label="Active farmers" value={all.filter((f) => f.is_active).length} />
@@ -53,7 +67,7 @@ export default function Farmers() {
 
       {loading && <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{[1, 2, 3, 4, 5, 6].map((i) => <div key={i} className="skeleton h-[170px] rounded-[20px]" />)}</div>}
       {!loading && all.length === 0 && (
-        <div className="panel"><EmptyState title="No farmers yet" action={<button className="btn-primary btn-sm" onClick={() => setEditing({})}>Add farmer</button>}>Add the farmers who sell milk to you. Then you can record their milk.</EmptyState></div>
+        <div className="panel"><EmptyState title="No farmers yet" action={<button className="btn-secondary btn-sm" onClick={() => setParams({ tab: 'requests' })}>See requests</button>}>Farmers in your city find your center in the ApnaDairy app and ask to sell to you. Accept them, then record their milk.</EmptyState></div>
       )}
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {list.map((f) => {
@@ -85,8 +99,33 @@ export default function Farmers() {
         })}
       </div>
 
+        {(reviews ?? []).length > 0 && <FarmerReviews reviews={reviews} />}
+      </>}
+
       <FarmerForm key={editing ? editing.id ?? 'new' : 'closed'} farmer={editing} onClose={close} onSaved={reload} />
     </>
+  )
+}
+
+// what farmers say about this center (they rate it in the app; other farmers see it when choosing a center)
+function FarmerReviews({ reviews }) {
+  const avg = reviews.reduce((n, r) => n + r.rating, 0) / reviews.length
+  return (
+    <section className="panel mt-6 p-5">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 className="display text-[20px]">What farmers say</h2>
+        <p className="text-[14px]"><span className="num font-semibold">{avg.toFixed(1)}</span> <span className="text-haldi">★</span> <span className="text-muted">from {reviews.length} {reviews.length === 1 ? 'farmer' : 'farmers'}. Farmers see this when they choose a center.</span></p>
+      </div>
+      <ul className="mt-3 grid gap-2 sm:grid-cols-2">
+        {reviews.slice(0, 6).map((r) => (
+          <li key={r.id} className="rounded-2xl bg-cream px-4 py-3 text-[14px]">
+            <span className="text-haldi">{'★'.repeat(r.rating)}</span><span className="text-line">{'★'.repeat(5 - r.rating)}</span>
+            <span className="ml-2 text-[12.5px] text-muted">{relative(r.updated_at)}</span>
+            {r.comment && <p className="mt-1">{r.comment}</p>}
+          </li>
+        ))}
+      </ul>
+    </section>
   )
 }
 
@@ -122,7 +161,7 @@ export function FarmerForm({ farmer, onClose, onSaved }) {
   }
 
   return (
-    <Sheet open={farmer !== null} onClose={onClose} title={farmer?.id ? 'Edit farmer' : 'Add a farmer'} subtitle="They can link the ApnaDairy app later with the same phone number."
+    <Sheet open={farmer !== null} onClose={onClose} title={farmer?.id ? 'Edit farmer' : 'Add a farmer'} subtitle="A farmer added before farmers joined through the app."
       footer={<><button className="btn-secondary" onClick={onClose}>Cancel</button><button className="btn-primary" form="farmer-form" disabled={busy}>{busy ? 'Saving…' : 'Save farmer'}</button></>}>
       <form id="farmer-form" onSubmit={submit} noValidate className="grid gap-4">
         <Alert>{err}</Alert>

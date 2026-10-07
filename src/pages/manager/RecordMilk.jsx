@@ -196,7 +196,7 @@ export default function RecordMilk() {
           <section className="panel p-5 sm:p-6">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <h2 className="display text-[19px] text-forest-deep">Who brought the milk?</h2>
-              <Link to="/manager/farmers?add=1" className="text-[13.5px] font-semibold text-forest hover:underline">New farmer</Link>
+              <Link to="/manager/farmers?tab=requests" className="text-[13.5px] font-semibold text-forest hover:underline">Farmer requests</Link>
             </div>
             <label className="relative mt-4 block">
               <Icon name="search" size={17} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-muted" />

@@ -99,16 +99,16 @@ function Onboarding({ demo, onDone }) {
     <div className="panel grid gap-6 p-6 sm:p-8 lg:grid-cols-[1.2fr_1fr] lg:items-center">
       <div>
         <p className="text-[13px] font-semibold text-amber">Your center is ready</p>
-        <h2 className="display mt-1 text-[28px] text-forest-deep">{demo ? 'Start with your farmers, or explore with sample data' : 'Start by adding your farmers'}</h2>
-        <p className="mt-2 max-w-lg text-muted">Add the farmers who bring milk to you, then record each collection. The dashboard fills in as you buy and sell milk.
+        <h2 className="display mt-1 text-[28px] text-forest-deep">{demo ? 'Start with your farmers, or explore with sample data' : 'Start by accepting your farmers'}</h2>
+        <p className="mt-2 max-w-lg text-muted">Farmers in your city ask to join you from the ApnaDairy app. Accept them, then record each collection. The dashboard fills in as you buy and sell milk.
           {demo && ' This is a demo account, so you can also load a month of sample activity and clear it any time.'}</p>
         <div className="mt-5 flex flex-wrap gap-2">
           {demo && <button className="btn-primary" onClick={load} disabled={busy}>{busy ? 'Loading sample data…' : 'Load sample data'}</button>}
-          <Link to="/manager/farmers?add=1" className={demo ? 'btn-secondary' : 'btn-primary'}>Add your first farmer</Link>
+          <Link to="/manager/farmers?tab=requests" className={demo ? 'btn-secondary' : 'btn-primary'}>See farmer requests</Link>
         </div>
       </div>
       <ol className="grid gap-3">
-        {[['users', 'Add farmers', 'Name, village and the milk they bring'], ['chip', 'Test and buy milk', 'The IoT device reads it, the AI suggests a fair price'], ['cart', 'List and sell', 'List tested milk on the app and bid on bulk orders'], ['chart', 'Watch the numbers', 'Sales, profit, stock and quality at a glance']].map(([ic, t, d], i) => (
+        {[['users', 'Accept farmers', 'They ask to join from the ApnaDairy app'], ['chip', 'Test and buy milk', 'The IoT device reads it, the AI suggests a fair price'], ['cart', 'List and sell', 'List tested milk on the app and bid on bulk orders'], ['chart', 'Watch the numbers', 'Sales, profit, stock and quality at a glance']].map(([ic, t, d], i) => (
           <li key={t} className="flex items-center gap-3 rounded-2xl bg-cream px-4 py-3">
             <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-forest text-cream"><Icon name={ic} size={16} /></span>
             <div><p className="font-semibold">{i + 1}. {t}</p><p className="text-[13px] text-muted">{d}</p></div>

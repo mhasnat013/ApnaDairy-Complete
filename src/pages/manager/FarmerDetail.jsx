@@ -75,7 +75,7 @@ export default function FarmerDetail() {
     <>
       <PageHeader title={f?.full_name ?? ' '} back={{ to: '/manager/farmers', label: 'Farmers' }}
         description={f ? `${milkLabel[f.milk_type]} milk · ${f.village ?? 'No village'} · ${f.cattle_count} animals${f.phone ? ` · ${f.phone}` : ''}` : ''}>
-        {f && <button className="btn-secondary" onClick={() => setEditing(f)}><Icon name="edit" size={16} />Edit</button>}
+        {f && !f.profile_id && <button className="btn-secondary" onClick={() => setEditing(f)}><Icon name="edit" size={16} />Edit</button>}
         {f?.is_active && <Link to={`/manager/collection/new?farmer=${id}`} className="btn-primary"><Icon name="drop" size={17} />Record milk</Link>}
       </PageHeader>
       <Alert>{error}</Alert>

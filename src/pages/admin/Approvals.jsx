@@ -1,4 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
+import { useSearchParams } from 'react-router-dom'
+import FarmerApprovals from './FarmerApprovals'
 import { supabase } from '../../lib/supabase'
 import { useUi } from '../../context/UiContext'
 import { SkeletonRows } from '../../components/Skeleton'
@@ -15,12 +17,14 @@ import { sendAccountEmail, removeRejectedAccount, rejectedApplications } from '.
 const tabs = [
   { id: 'area_manager', label: 'Area Managers', table: 'area_managers', fk: 'area_managers_user_id_fkey' },
   { id: 'business', label: 'Businesses', table: 'business_profiles', fk: 'business_profiles_user_id_fkey' },
+  { id: 'farmer', label: 'Farmers' },
 ]
 const statuses = ['pending', 'active', 'rejected', 'suspended']
 
 
 export default function Approvals() {
-  const [tab, setTab] = useState(tabs[0])
+  const [params] = useSearchParams()
+  const [tab, setTab] = useState(tabs.find((t) => t.id === params.get('tab')) ?? tabs[0])
   const [status, setStatus] = useState('pending')
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
@@ -31,6 +35,7 @@ export default function Approvals() {
   const { toast, confirm } = useUi()
 
   const load = useCallback(async () => {
+    if (!tab.table) return
     setLoading(true)
     const { data, error } = await supabase
       .from(tab.table)
@@ -103,7 +108,7 @@ export default function Approvals() {
 
   return (
     <>
-      <PageHeader title="Approvals" description="Area managers and businesses can only use the portal after you check their details and documents." />
+      <PageHeader title="Approvals" description="Area managers, businesses and farmers can only use ApnaDairy after you check their details." />
 
       <div className="mb-5 flex flex-wrap items-center gap-3">
         <Segmented value={tab.id} onChange={(id) => setTab(tabs.find((t) => t.id === id))}
@@ -111,6 +116,7 @@ export default function Approvals() {
         <Segmented value={status} onChange={setStatus} options={statuses.map((s) => ({ value: s, label: cap(s) }))} />
       </div>
 
+      {tab.id === 'farmer' ? <FarmerApprovals status={status} /> : <>
       <Alert>{error}</Alert>
 
       <div className="panel mt-3 overflow-x-auto">
@@ -209,6 +215,8 @@ export default function Approvals() {
           </table>
         </div>
       )}
+
+      </>}
 
       {viewing && <DocsDrawer row={viewing} onClose={() => setViewing(null)} />}
     </>
