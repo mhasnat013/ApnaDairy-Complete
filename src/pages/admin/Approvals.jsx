@@ -117,12 +117,14 @@ export default function Approvals() {
                 <td>
                   {(() => {
                     const docs = docsByUser[r.user_id] ?? []
-                    const ok = tab.id !== 'area_manager' || hasRequiredDocs(docs)
+                    const ok = hasRequiredDocs(docs, tab.id)
                     return (
-                      <button onClick={() => setViewing(r)} className="flex items-center gap-2 text-left hover:underline">
-                        <span className={`h-2 w-2 rounded-full ${docs.length === 0 ? 'bg-danger' : ok ? 'bg-forest-2' : 'bg-amber'}`} />
-                        <span className="text-xs">{docs.length} file{docs.length === 1 ? '' : 's'}</span>
-                        {!ok && <span className="text-xs text-amber">incomplete</span>}
+                      <button onClick={() => setViewing(r)} className="text-left hover:underline">
+                        <span className="flex items-center gap-2">
+                          <span className={`h-2 w-2 rounded-full ${r.docs_submitted_at && ok ? 'bg-forest-2' : docs.length ? 'bg-amber' : 'bg-danger'}`} />
+                          <span className="text-xs">{docs.length} file{docs.length === 1 ? '' : 's'}</span>
+                        </span>
+                        <span className={`text-xs ${r.docs_submitted_at ? 'text-forest' : 'text-amber'}`}>{r.docs_submitted_at ? 'Submitted' : ok ? 'Uploaded, not submitted' : 'Not submitted yet'}</span>
                       </button>
                     )
                   })()}
@@ -134,7 +136,8 @@ export default function Approvals() {
                 <td>
                   <div className="flex justify-end gap-2">
                     {r.verification_status !== 'active' && (
-                      <button onClick={() => act(r, 'active')} className="btn-primary btn-sm">Approve</button>
+                      <button onClick={() => act(r, 'active')} className="btn-primary btn-sm" disabled={!r.docs_submitted_at}
+                        title={r.docs_submitted_at ? undefined : 'They have not submitted their documents yet'}>Approve</button>
                     )}
                     {r.verification_status === 'pending' && (
                       <button onClick={() => act(r, 'rejected')} className="btn-danger btn-sm">Reject</button>

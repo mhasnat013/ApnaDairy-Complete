@@ -13,28 +13,42 @@ export const docLabel = {
   other: 'Other document',
 }
 
-// which slots each role sees. "group" = at least one of the group is required.
+// which slots each role sees. every slot is required except "other" (supabase/27_document_submit.sql)
 export const docPlan = {
   area_manager: [
     { type: 'cnic_front', required: true },
-    { type: 'cnic_back' },
-    { type: 'business_registration', group: 'proof' },
-    { type: 'utility_bill', group: 'proof' },
-    { type: 'shop_photo', group: 'proof' },
-    { type: 'bank_statement', group: 'proof' },
+    { type: 'cnic_back', required: true },
+    { type: 'business_registration', required: true },
+    { type: 'utility_bill', required: true },
+    { type: 'shop_photo', required: true },
+    { type: 'bank_statement', required: true },
   ],
   business: [
-    { type: 'business_registration' },
-    { type: 'ntn_certificate' },
-    { type: 'cnic_front' },
+    { type: 'cnic_front', required: true },
+    { type: 'cnic_back', required: true },
+    { type: 'business_registration', required: true },
+    { type: 'ntn_certificate', required: true },
     { type: 'other' },
   ],
 }
 
-export const PROOF_TYPES = ['business_registration', 'ntn_certificate', 'bank_statement', 'utility_bill', 'shop_photo']
+export const requiredDocs = (role) => (docPlan[role] ?? []).filter((s) => s.required).map((s) => s.type)
+export const missingDocs = (docs, role) => requiredDocs(role).filter((t) => !docs.some((d) => d.doc_type === t))
+export const hasRequiredDocs = (docs, role = 'area_manager') => missingDocs(docs, role).length === 0
 
-export const hasRequiredDocs = (docs) =>
-  docs.some((d) => d.doc_type === 'cnic_front') && docs.some((d) => PROOF_TYPES.includes(d.doc_type))
+// send the documents for review: only when all required ones are uploaded; then they are locked
+export async function submitDocuments() {
+  const { data, error } = await supabase.rpc('submit_documents')
+  if (error) throw error
+  return data
+}
+// when this user sent their documents (null = not yet)
+export async function mySubmission(role, userId) {
+  const table = role === 'business' ? 'business_profiles' : 'area_managers'
+  const { data, error } = await supabase.from(table).select('docs_submitted_at, rejection_reason').eq('user_id', userId).maybeSingle()
+  if (error) throw error
+  return data
+}
 
 export async function listDocs(userId) {
   const { data, error } = await supabase
