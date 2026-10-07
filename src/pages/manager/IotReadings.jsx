@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useLoad } from '../../lib/useLoad'
-import { readingsSince, settings, myDevice, deviceLog, dayKey, shortDay, weekday, timeOf, milkLabel, gradeLabel, gradeTone, riskLabel, PARAMS, MODELS, inRange } from '../../lib/center'
+import { readingsSince, settings, myDevice, deviceLog, dayKey, shortDay, weekday, timeOf, milkLabel, gradeLabel, gradeTone, riskLabel, modelTone, spoilageBand, PARAMS, MODELS, inRange } from '../../lib/center'
 import { litres, date, relative } from '../../lib/format'
 import PageHeader from '../../components/PageHeader'
 import Segmented from '../../components/Segmented'
@@ -13,7 +13,7 @@ import EmptyState from '../../components/EmptyState'
 import { TrendChart, RangeBar, C } from '../../components/charts'
 
 // a reading is a problem when the ai flagged it: failed, adulteration risk, or milk starting to sour
-const flagged = (r) => !r.quality || r.adulteration_risk !== 'low' || (r.spoilage_risk && r.spoilage_risk !== 'low') || Number(r.ph) < 6.55
+const flagged = (r) => !r.quality || r.model_quality === 'Spoiled' || r.model_quality === 'Poor' || r.adulteration_risk !== 'low' || (r.spoilage_risk && r.spoilage_risk !== 'low') || Number(r.ph) < 6.55
 const avg = (rows, k) => (rows.length ? rows.reduce((n, r) => n + Number(r[k]), 0) / rows.length : null)
 
 export default function IotReadings() {
@@ -64,7 +64,7 @@ export default function IotReadings() {
             {PARAMS.filter((p) => p.sensor !== 'from TDS').map((p) => <li key={p.key} className="rounded-full bg-cream/10 px-2.5 py-1">{p.sensor}</li>)}
           </ul>
           <p className="mt-3 rounded-2xl bg-cream/5 p-3 text-[12.5px] leading-relaxed text-cream/70">{data?.device
-            ? 'The ESP32 tester sends temperature, pH and TDS to the cloud. EC is worked out from TDS (TDS ÷ 640), then both AI models score the sample.'
+            ? 'The ESP32 tester sends temperature, pH and TDS to the cloud. EC is worked out from TDS (TDS ÷ 640). AI Model 1 then predicts quality, freshness, shelf life and spoilage risk, and Model 2 checks purity.'
             : 'ApnaDairy links your tester once it is paid for. Milk can only be tested and bought with the device, so readings cannot be typed in or changed.'}</p>
         </section>
 
@@ -83,10 +83,22 @@ export default function IotReadings() {
               ))}
             </div>
           ) : <EmptyState title="No readings yet">Test a sample to see it here.</EmptyState>}
+          {latest?.model_quality && (
+            <div className="mt-5 rounded-2xl bg-cream px-4 py-3">
+              <p className="flex items-center gap-2 text-[13px] font-semibold text-forest-deep"><Icon name="spark" size={15} className="text-forest" />AI Model 1 prediction</p>
+              <dl className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                {[['Quality', latest.model_quality], ['Freshness', latest.freshness_score != null ? `${latest.freshness_score}/100` : '—'],
+                  ['Shelf life', latest.freshness_hours != null ? `${latest.freshness_hours} h` : '—'],
+                  ['Spoilage risk', latest.spoilage_pct != null ? `${Number(latest.spoilage_pct).toFixed(1)}%` : '—']].map(([k, v]) => (
+                  <div key={k}><dt className="text-[12px] text-muted">{k}</dt><dd className="num text-[17px] font-bold text-ink">{v}</dd></div>
+                ))}
+              </dl>
+            </div>
+          )}
         </Card>
       </div>
 
-      <Card className="mt-4 sm:mt-5" title="From sensors to AI" subtitle="Each reading is sent to two models. Their results decide the grade and the price.">
+      <Card className="mt-4 sm:mt-5" title="From sensors to AI" subtitle="Each reading is sent to two models. Model 1 decides the grade; Model 2 can stop adulterated milk. Together they set the price.">
         <div className="grid gap-3 md:grid-cols-2">
           {MODELS.map((m) => (
             <div key={m.key} className="rounded-2xl border border-line bg-white p-4">
@@ -155,9 +167,13 @@ export default function IotReadings() {
                     return <td key={p.key} className={`num text-right ${r[p.key] == null || inRange(p, v) ? '' : 'font-bold text-danger'}`}>{r[p.key] == null ? '—' : v.toFixed(p.digits)}</td>
                   })}
                   <td>
-                    {r.quality ? <Badge tone={gradeTone[r.quality]} dot={false}>{gradeLabel[r.quality]}</Badge> : <Badge tone="red" dot={false}>Failed</Badge>}
+                    <span className="flex flex-wrap items-center gap-1.5">
+                      {r.model_quality && <Badge tone={modelTone[r.model_quality]} dot={false}>{r.model_quality}</Badge>}
+                      {r.quality ? <Badge tone={gradeTone[r.quality]} dot={false}>{gradeLabel[r.quality]}</Badge> : <Badge tone="red" dot={false}>Not bought</Badge>}
+                    </span>
+                    {r.freshness_score != null && <p className="num mt-1 text-[12px] text-muted">Freshness {r.freshness_score}/100{r.freshness_hours != null ? ` · ${r.freshness_hours} h shelf life` : ''}</p>}
                     {r.adulteration_risk !== 'low' && <p className="mt-1 text-[12px] font-semibold text-danger">{riskLabel[r.adulteration_risk]} adulteration risk{r.suspected ? `, likely ${r.suspected}` : ''}</p>}
-                    {r.spoilage_risk && r.spoilage_risk !== 'low' && <p className="mt-1 text-[12px] font-semibold text-amber">{riskLabel[r.spoilage_risk]} spoilage risk</p>}
+                    {r.spoilage_risk && r.spoilage_risk !== 'low' && <p className="mt-1 text-[12px] font-semibold text-amber">{r.spoilage_pct != null ? `${Math.round(r.spoilage_pct)}% spoilage risk (${spoilageBand(Number(r.spoilage_pct)).toLowerCase()})` : `${riskLabel[r.spoilage_risk]} spoilage risk`}</p>}
                     <p className="mt-0.5 max-w-[240px] text-[12px] text-muted">{r.ai_notes?.[0]}</p>
                   </td>
                 </tr>

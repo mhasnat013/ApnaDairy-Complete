@@ -1,14 +1,15 @@
 -- 36: milk lasts at most 2 days
 -- run after 35_farmer_onboarding.sql (safe to run again).
 --
--- milk can be sold for at most 2 days after it was collected and tested (sooner if the ai test says it spoils sooner).
+-- milk can be sold for 2 days after it was collected and tested. the ai's shelf life is shown as information
+-- (41_model1.sql), it does not shorten the 2 days.
 -- day 1 is the normal price; before it expires the area manager can give any discount (no retest needed any more).
 -- once it expires, the system discards it from stock and ends the listing, so the same milk can never be sold again.
 -- the check runs every hour (pg_cron) and whenever the center opens its shop or inventory.
 
 -- ---------- the 2-day rule ----------
 create or replace function public.shelf_hours(p_ai_hours numeric)
-returns numeric language sql immutable as $$ select least(coalesce(p_ai_hours, 24), 48) $$;
+returns numeric language sql immutable as $$ select 48::numeric $$;
 
 -- every place that works out fresh milk now uses it
 do $$
@@ -131,6 +132,12 @@ update public.products p set listed_at = coalesce(p.listed_at, now()),
  where p.category = 'milk' and (p.milk_expires_at is null or p.milk_from is null) and p.expired_at is null;
 
 -- customers only see milk that has not expired
+-- (41_model1.sql adds the model's columns to this view; running this file again leaves that newer view alone)
+do $do$
+begin
+  if not exists (select 1 from information_schema.columns
+                  where table_schema = 'public' and table_name = 'public_listings' and column_name = 'model_quality') then
+    execute $v$
 create or replace view public.public_listings as
  select pr.id,
     pr.area_manager_id as shop_id,
@@ -161,6 +168,9 @@ create or replace view public.public_listings as
      cross join lateral listing_freshness(pr.area_manager_id, pr.milk_type) f(freshness_score, hours_left, oldest_hours))
   where pr.category = 'milk' and pr.is_available and pr.expired_at is null
     and (pr.milk_expires_at is null or pr.milk_expires_at > now());
+$v$;
+  end if;
+end $do$;
 
 -- ---------- expire and discard ----------
 create or replace function public.expire_milk_for(p_center uuid)
@@ -184,7 +194,7 @@ begin
     select least(expired_l, greatest(public.milk_in_stock(p_center, t), 0)) into v_exp from public.milk_shelf(p_center, t);
     if coalesce(v_exp, 0) >= 0.1 then
       insert into milk_usage (area_manager_id, milk_type, litres, reason, note, is_sample)
-      values (p_center, t, v_exp, 'spoiled', 'Expired: more than 2 days old, or past its tested shelf life (removed automatically)', coalesce(v_sample, false));
+      values (p_center, t, v_exp, 'spoiled', 'Expired: more than 2 days old (removed automatically)', coalesce(v_sample, false));
       v_total := v_total + v_exp;
     end if;
   end loop;
@@ -201,7 +211,7 @@ begin
   if v_total > 0 or cardinality(v_ended) > 0 then
     perform public.notify(v_owner, 'milk_expired',
       case when cardinality(v_ended) > 0 then array_to_string(v_ended, ', ') || ' expired' else public.fmt_qty(v_total) || ' L of milk expired' end,
-      concat_ws(' ', case when v_total > 0 then public.fmt_qty(v_total) || ' L reached its 2-day limit (or its tested shelf life) and was discarded from your stock.' end,
+      concat_ws(' ', case when v_total > 0 then public.fmt_qty(v_total) || ' L reached its 2-day limit and was discarded from your stock.' end,
                      case when cardinality(v_ended) > 0 then 'List fresh milk again to keep selling.' end),
       '/manager/shop');
   end if;

@@ -5,6 +5,13 @@ export const milkLabel = { cow: 'Cow', buffalo: 'Buffalo', mixed: 'Mixed' }
 export const gradeLabel = { premium: 'Premium', fresh: 'Fresh', standard: 'Standard' }
 export const gradeTone = { premium: 'green', fresh: 'blue', standard: 'amber' }
 export const riskLabel = { low: 'Low', medium: 'Medium', high: 'High' }
+// ai model 1's own quality classes. grades: Good = premium, Acceptable = fresh, Poor = standard, Spoiled is not bought
+export const modelTone = { Good: 'green', Acceptable: 'blue', Poor: 'amber', Spoiled: 'red' }
+export const gradeClass = { premium: 'Good', fresh: 'Acceptable', standard: 'Poor' }
+// spoilage risk bands from the model README
+export const spoilageBand = (pct) => (pct == null ? null : pct >= 80 ? 'Very high' : pct >= 60 ? 'High' : pct >= 40 ? 'Moderate' : pct >= 20 ? 'Low' : 'Very low')
+// freshness bands from the model README
+export const freshnessBand = (s) => (s == null ? null : s >= 80 ? 'Very fresh' : s >= 60 ? 'Fairly fresh' : s >= 40 ? 'Reduced freshness' : s >= 20 ? 'Poor freshness' : 'Highly degraded')
 export const orderStatusLabel = {
   pending: 'New', preparing: 'Preparing', out_for_delivery: 'On the way', delivered: 'Delivered', cancelled: 'Cancelled',
 }
@@ -30,8 +37,8 @@ export const PARAMS = [
 ]
 // which sensor feeds which model (matches the device firmware)
 export const MODELS = [
-  { key: 'freshness', name: 'Model 1 · Freshness', inputs: ['temperature_c', 'timestamp', 'ph', 'ec_ms'],
-    outputs: 'Shelf life, freshness score, spoilage and anomaly risk' },
+  { key: 'freshness', name: 'Model 1 · Quality and freshness', inputs: ['temperature_c', 'ph', 'ec_ms'],
+    outputs: 'Quality (SVM), freshness score, shelf life and spoilage risk (random forests)' },
   { key: 'adulteration', name: 'Model 2 · Adulteration', inputs: ['temperature_c', 'ph', 'ec_ms', 'tds_ppm'],
     outputs: 'Adulteration risk, probability and the likely additive' },
 ]
@@ -88,11 +95,11 @@ export const recentCollections = async (limit = 60) =>
 export const farmerCollections = async (farmerId) =>
   must(await supabase.from('milk_collections').select('*').eq('farmer_id', farmerId).order('collected_at', { ascending: false }).limit(200))
 export const stockBatches = async () =>
-  must(await supabase.from('milk_collections').select('id, milk_type, quantity_l, collected_at, reading_at, freshness_hours, freshness_score, quality, test_source, farmer:farmers(full_name)')
+  must(await supabase.from('milk_collections').select('id, milk_type, quantity_l, collected_at, reading_at, freshness_hours, freshness_score, quality, model_quality, spoilage_pct, test_source, farmer:farmers(full_name)')
     .eq('status', 'accepted').gte('collected_at', new Date(Date.now() - 4 * 864e5).toISOString()).order('collected_at', { ascending: false }))
 export const readingsSince = async (days = 14) =>
   must(await supabase.from('milk_collections')
-    .select('id, collected_at, reading_at, milk_type, quantity_l, ph, ec_ms, tds_ppm, temperature_c, test_source, device_serial, quality, freshness_hours, freshness_score, spoilage_risk, adulteration_risk, adulteration_score, suspected, ai_notes, status, reject_reason, farmer:farmers(full_name)')
+    .select('id, collected_at, reading_at, milk_type, quantity_l, ph, ec_ms, tds_ppm, temperature_c, test_source, device_serial, quality, model_quality, spoilage_pct, freshness_hours, freshness_score, spoilage_risk, adulteration_risk, adulteration_score, suspected, ai_notes, status, reject_reason, farmer:farmers(full_name)')
     .gte('collected_at', new Date(Date.now() - days * 864e5).toISOString()).order('collected_at', { ascending: false }).limit(1000))
 export const priceHistory = async (days = 30) =>
   must(await supabase.from('milk_collections').select('collected_at, milk_type, quality, ai_price_per_l, price_per_l, status, reject_reason')
@@ -156,7 +163,10 @@ export const saveSettings = async (centerId, s) =>
 // ---------- stock: which collections are still on the shelf (first in, first out) ----------
 // milk sells for at most 2 days after it was collected and tested, sooner if the ai test says so (supabase/36)
 export const MILK_DAYS = 2
-export const shelfHours = (aiHours) => Math.min(aiHours ?? 24, MILK_DAYS * 24)
+// milk always sells for 2 days from collection; the ai's shelf life is shown, it does not shorten that
+export const shelfHours = () => MILK_DAYS * 24
+// hours left of model 1's predicted shelf life for a tested batch (negative once it has passed)
+export const modelShelfLeft = (b) => (b.freshness_hours == null ? null : (new Date(b.reading_at ?? b.collected_at).getTime() + Number(b.freshness_hours) * 36e5 - Date.now()) / 36e5)
 // day 1, day 2 or expired, from when the milk was collected
 export const milkDay = (collectedAt) => Math.floor((Date.now() - new Date(collectedAt).getTime()) / 864e5) + 1
 // the oldest milk is sold first, so what is left in stock is the newest milk
@@ -167,7 +177,7 @@ export function shelfBatches(batches, stockRows) {
     const remaining = Math.min(Number(b.quantity_l), left[b.milk_type] ?? 0)
     if (remaining < 0.1) continue
     left[b.milk_type] -= remaining
-    const expires = new Date(b.reading_at ?? b.collected_at).getTime() + shelfHours(b.freshness_hours) * 36e5
+    const expires = new Date(b.reading_at ?? b.collected_at).getTime() + shelfHours() * 36e5
     out.push({ ...b, remaining, expiresAt: expires, hoursLeft: (expires - Date.now()) / 36e5 })
   }
   return out.sort((a, b) => a.expiresAt - b.expiresAt)
@@ -329,6 +339,10 @@ export const resendAdminInvite = (userId) => callFunction('admin-users', { actio
 export const cancelAdminInvite = (userId) => callFunction('admin-users', { action: 'cancel', user_id: userId })
 export const adminInvites = async () => must(await supabase.from('admin_invites').select('*').is('accepted_at', null).order('invited_at', { ascending: false }))
 export const removeAdmin = (id) => rpc('set_admin', { p_user: id, p_make_admin: false })
+// ask ai model 1 directly (the try-it sliders); the answer is saved so assessMilk uses it
+export const predictModel1 = (temperature, ph, ec) => iot({ action: 'predict', temperature, ph, ec }).then((d) => d.prediction)
+// wake the model server before a test finishes (a free server sleeps when unused)
+export const wakeModel1 = () => iot({ action: 'wake' })
 export const takeDeviceSample = (session) => iot({ action: 'sample', session }).then((d) => d.sample)
 export const finishDeviceTest = (session) => iot({ action: 'finish', session }).then((d) => d.reading)
 // ---------- any date, listings, bulk capacity, admin ----------
@@ -341,6 +355,7 @@ export const deviceActivity = () => rpc('device_activity')
 export const allDevices = async () => must(await supabase.from('iot_devices').select('*, center:area_managers(id, center_name, city)').order('serial'))
 export const saveDevice = async (d) => must(await supabase.from('iot_devices').upsert({
   serial: d.serial.trim().toUpperCase(), db_url: d.db_url.trim().replace(/\/$/, ''), path: 'Result', label: d.label?.trim() || null, is_active: d.is_active ?? true,
+  tds_at_25c: !!d.tds_at_25c,
 }).select().single())
 export const assignDevice = (serial, centerId) => rpc('assign_device', { p_serial: serial, p_center: centerId })
 export const activeCenters = async () => must(await supabase.from('area_managers').select('id, center_name, city').eq('type', 'milk_center').eq('verification_status', 'active').order('center_name'))

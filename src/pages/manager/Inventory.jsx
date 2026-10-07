@@ -4,7 +4,7 @@ import { useUi } from '../../context/UiContext'
 import { Link } from 'react-router-dom'
 import {
   milkStock, myMilkShelf, stockBatches, usageLog, recordUsage, undoUsage, shelfBatches, stockLeft, milkLabel, usageLabel, timeOf,
-  dayBook, myFirstDay, todayKey, runMilkExpiry, shelfHours, milkDay, gradeLabel, dateTimeShort,
+  dayBook, myFirstDay, todayKey, runMilkExpiry, shelfHours, modelShelfLeft, milkDay, gradeLabel, dateTimeShort,
 } from '../../lib/center'
 import { litres, date, relative, rs } from '../../lib/format'
 import PageHeader from '../../components/PageHeader'
@@ -82,11 +82,12 @@ function MilkStock({ data, onChanged }) {
       </div>
 
       <div className="grid gap-4 sm:gap-5 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
-        <Card title="Milk in stock" subtitle="Each tested batch still on your shelf, the one that expires first at the top. Day 1 is full price; on day 2 you can give a discount in My shop.">
+        <Card title="Milk in stock" subtitle="Each tested batch still on your shelf, the one that expires first at the top. Milk sells for 2 days. AI Model 1's quality and shelf life are shown for each batch.">
           {data && shelf.length === 0 && <EmptyState title="The shelf is empty">Accepted milk shows up here until it is sold.</EmptyState>}
           <ul className="grid grid-cols-[minmax(0,1fr)] gap-3">
             {shelf.slice(0, 8).map((b) => {
-              const life = Math.max(0, Math.min(1, b.hoursLeft / shelfHours(b.freshness_hours)))
+              const life = Math.max(0, Math.min(1, b.hoursLeft / shelfHours()))
+              const m1Left = modelShelfLeft(b)
               const tone = b.hoursLeft <= 0 ? 'bg-danger' : b.hoursLeft < 6 ? 'bg-danger' : b.hoursLeft < 12 ? 'bg-haldi' : 'bg-forest-2'
               const day = milkDay(b.collected_at)
               return (
@@ -94,8 +95,11 @@ function MilkStock({ data, onChanged }) {
                   <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0">
                       <p className="truncate font-semibold">{litres(+b.remaining.toFixed(1))} {milkLabel[b.milk_type].toLowerCase()}
-                        {b.quality && <span className="ml-2 rounded-full bg-mint-soft px-2 py-0.5 text-[11.5px] font-semibold text-forest">{gradeLabel[b.quality]}</span>}</p>
-                      <p className="truncate text-[12.5px] text-muted">from {b.farmer?.full_name} · tested {dateTimeShort(b.reading_at ?? b.collected_at)}{b.freshness_score != null ? ` · freshness ${b.freshness_score}/100` : ''}</p>
+                        {b.quality && <span className="ml-2 rounded-full bg-mint-soft px-2 py-0.5 text-[11.5px] font-semibold text-forest">{gradeLabel[b.quality]}{b.model_quality ? ` · ${b.model_quality}` : ''}</span>}</p>
+                      <p className="truncate text-[12.5px] text-muted">from {b.farmer?.full_name} · tested {dateTimeShort(b.reading_at ?? b.collected_at)}{b.freshness_score != null ? ` · freshness ${b.freshness_score}/100` : ''}{b.spoilage_pct != null ? ` · ${Math.round(b.spoilage_pct)}% spoilage risk` : ''}</p>
+                      {m1Left != null && b.hoursLeft > 0 && (m1Left > 0
+                        ? <p className="truncate text-[12px] text-muted">AI shelf life: about {Math.max(1, Math.round(m1Left))} h left</p>
+                        : <p className="truncate text-[12px] font-medium text-amber">Past the AI's predicted shelf life. Still usable for its 2 days, sell it first.</p>)}
                     </div>
                     {b.hoursLeft <= 0 ? (
                       <span className="shrink-0 rounded-full bg-[#f8e2dc] px-2.5 py-1 text-[12px] font-semibold text-danger">Expired</span>

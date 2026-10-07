@@ -4,8 +4,12 @@
 //   { action: 'finish', session }     averages the samples on the server and stores the final reading
 // only the final, averaged reading is used by the ai models and the collection.
 // deploy: supabase dashboard → edge functions → deploy a new function → via editor, name "iot-reading".
+//   { action: 'predict', temperature, ph, ec }   asks ai model 1 directly (the try-it sliders)
+//   { action: 'wake' }                wakes the model 1 server (called when the test page opens), also for admins
 // secret needed: FIREBASE_SECRET (edge functions → secrets). SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY
 // are provided by supabase automatically. optional: TEST_SECONDS (default 60), SAMPLE_EVERY (default 3).
+// ai model 1: MODEL1_URL (the fastapi service in ai/model1, e.g. https://name-apnadairy-model1.hf.space)
+// and MODEL1_KEY (its X-API-Key). without them every test uses the backup rules (supabase/41_model1.sql).
 import { createClient } from 'npm:@supabase/supabase-js@2'
 
 const cors = {
@@ -98,6 +102,55 @@ function averageSamples(samples: Sample[], seconds: number) {
 }
 // --- reading-logic-end ---
 
+// ai model 1 (ai/model1/app/main.py): temperature, ph and ec at the milk's own temperature in,
+// quality, freshness score, shelf life and spoilage risk out
+type Model1 = { quality: string; freshness_score: number; remaining_shelf_life_hours: number; spoilage_risk_percent: number; warnings: string[] }
+const model1Url = () => (Deno.env.get('MODEL1_URL') ?? '').trim().replace(/\/$/, '')
+async function askModel1(temperature: number, ph: number, ec: number): Promise<Model1> {
+  const url = model1Url()
+  if (!url) throw new Error('MODEL1_URL is not set')
+  const stop = new AbortController()
+  const timer = setTimeout(() => stop.abort(), 30000)   // a sleeping free server can take a while to wake up
+  try {
+    const res = await fetch(`${url}/predict`, {
+      method: 'POST', signal: stop.signal,
+      headers: { 'Content-Type': 'application/json', 'X-API-Key': Deno.env.get('MODEL1_KEY') ?? '' },
+      body: JSON.stringify({ temperature, ph, ec }),
+    })
+    const out = await res.json().catch(() => ({}))
+    if (!res.ok) throw new Error(typeof out.detail === 'string' ? out.detail : `model 1 answered ${res.status}`)
+    if (!['Good', 'Acceptable', 'Poor', 'Spoiled'].includes(out.quality)) throw new Error('model 1 gave an unknown quality')
+    return out as Model1
+  } catch (e) {
+    throw new Error((e as Error).name === 'AbortError' ? 'model 1 did not answer in 30 seconds' : (e as Error).message)
+  } finally {
+    clearTimeout(timer)
+  }
+}
+// keep every answer, so the database uses it for this test (and the same values are never asked twice)
+async function saveModel1(admin: ReturnType<typeof createClient>, t: number, ph: number, ec: number, m: Model1) {
+  const { error } = await admin.from('model1_predictions').upsert({
+    temperature_c: t, ph, ec_ms: ec, quality: m.quality, freshness_score: m.freshness_score,
+    shelf_life_h: m.remaining_shelf_life_hours, spoilage_pct: m.spoilage_risk_percent, warnings: m.warnings ?? [],
+  })
+  if (error) throw new Error(error.message)
+}
+// a free server sleeps when unused: ask it something small so it is awake when the test finishes
+async function wakeModel1() {
+  const url = model1Url()
+  if (!url) return { ok: false, error: 'MODEL1_URL is not set' }
+  const stop = new AbortController()
+  const timer = setTimeout(() => stop.abort(), 55000)
+  try {
+    const res = await fetch(`${url}/health`, { signal: stop.signal })
+    return res.ok ? { ok: true } : { ok: false, error: `model 1 answered ${res.status}` }
+  } catch (e) {
+    return { ok: false, error: (e as Error).name === 'AbortError' ? 'model 1 did not wake up in 55 seconds' : (e as Error).message }
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors })
   try {
@@ -109,12 +162,33 @@ Deno.serve(async (req) => {
     const jwt = (req.headers.get('Authorization') ?? '').replace('Bearer ', '')
     const { data: { user } } = await admin.auth.getUser(jwt)
     if (!user) return reply({ error: 'Sign in again.' }, 401)
+
+    // waking the model needs no device: an approved center or an admin
+    if (body.action === 'wake') {
+      const { data: me } = await admin.from('profiles').select('role, status').eq('id', user.id).maybeSingle()
+      if (!me || me.status !== 'active' || !['area_manager', 'super_admin'].includes(me.role)) return reply({ error: 'Not allowed.' }, 403)
+      return reply(await wakeModel1())
+    }
+
     const { data: center } = await admin.from('area_managers').select('id, verification_status')
       .eq('user_id', user.id).eq('type', 'milk_center').maybeSingle()
     if (!center || center.verification_status !== 'active') return reply({ error: 'Only an approved milk center can take readings.' }, 403)
     const { data: device } = await admin.from('iot_devices').select('*').eq('area_manager_id', center.id).maybeSingle()
     if (!device) return reply({ error: 'No IoT device is linked to your center yet. Ask ApnaDairy to assign one.' })
     if (!device.is_active) return reply({ error: `Device ${device.serial} is switched off by ApnaDairy.` })
+
+    if (body.action === 'predict') {
+      const t = Math.round(Number(body.temperature) * 100) / 100, ph = Math.round(Number(body.ph) * 100) / 100
+      const ec = Math.round(Number(body.ec) * 1000) / 1000
+      if (![t, ph, ec].every(Number.isFinite)) return reply({ error: 'Send temperature, ph and ec.' }, 400)
+      try {
+        const m = await askModel1(t, ph, ec)
+        await saveModel1(admin, t, ph, ec, m)
+        return reply({ prediction: m })
+      } catch (e) {
+        return reply({ error: `AI model 1 could not be reached: ${(e as Error).message}` })
+      }
+    }
 
     if (body.action === 'start') {
       const { data: s, error } = await admin.from('reading_sessions')
@@ -151,9 +225,27 @@ Deno.serve(async (req) => {
       const { data: samples } = await admin.from('device_samples').select('*').eq('session_id', s.id).order('taken_at')
       const list = (samples ?? []).map((x) => ({ ...x, temperature_c: num(x.temperature_c), ph: num(x.ph), tds_ppm: num(x.tds_ppm) }))
       const r = averageSamples(list, s.seconds)
+      // a tds sensor that already corrects to 25 °C: work back to ec at the milk's own temperature for the model
+      if (device.tds_at_25c && r.tds_ppm !== null && r.temperature_c !== null) {
+        const ec25 = r.tds_ppm / 640
+        r.ec25_ms = Math.round(ec25 * 1000) / 1000
+        r.ec_ms = Math.round(ec25 * (1 + 0.022 * (r.temperature_c - 25)) * 1000) / 1000
+      }
+      // ai model 1 on the averaged reading. if it cannot answer, the database uses the backup rules
+      let m1: Record<string, unknown> = {}
+      if (r.status === 'ok' && r.temperature_c !== null && r.ph !== null && r.ec_ms !== null) {
+        try {
+          const m = await askModel1(r.temperature_c, r.ph, r.ec_ms)
+          await saveModel1(admin, r.temperature_c, r.ph, r.ec_ms, m)
+          m1 = { m1_quality: m.quality, m1_freshness: m.freshness_score, m1_shelf_life_h: m.remaining_shelf_life_hours,
+                 m1_spoilage_pct: m.spoilage_risk_percent, m1_warnings: m.warnings ?? [] }
+        } catch (e) {
+          m1 = { m1_error: (e as Error).message.slice(0, 300) }
+        }
+      }
       const { data: row, error } = await admin.from('device_readings').insert({
         device_serial: device.serial, area_manager_id: center.id, session_id: s.id,
-        raw: { samples: list.length, last: samples?.at(-1)?.raw ?? null }, reading_at: new Date().toISOString(), ...r,
+        raw: { samples: list.length, last: samples?.at(-1)?.raw ?? null }, reading_at: new Date().toISOString(), ...r, ...m1,
       }).select().single()
       if (error) return reply({ error: error.message }, 500)
       await admin.from('reading_sessions').update({ finished_at: new Date().toISOString(), reading_id: row.id }).eq('id', s.id)

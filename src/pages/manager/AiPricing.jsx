@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useLoad } from '../../lib/useLoad'
-import { priceHistory, platformSettings, myMarketRates, assessMilk, milkLabel, gradeLabel, riskLabel, PARAMS, inRange } from '../../lib/center'
+import { priceHistory, platformSettings, myMarketRates, assessMilk, predictModel1, wakeModel1, milkLabel, gradeLabel, riskLabel, spoilageBand, PARAMS, inRange } from '../../lib/center'
 import { date, plural } from '../../lib/format'
 import { rs } from '../../lib/format'
 import PageHeader from '../../components/PageHeader'
@@ -18,16 +18,19 @@ export default function AiPricing() {
     return { rates, hist, platform }
   })
   const [type, setType] = useState('buffalo')
-  const [r, setR] = useState({ temperature_c: 34.5, ph: 6.7, ec_ms: 4.3, tds_ppm: 2150 })
+  const [r, setR] = useState({ temperature_c: 32, ph: 6.7, ec_ms: 5.5, tds_ppm: 3100 })
   const [ai, setAi] = useState(null)
 
   const rates = data?.rates ?? { cow: 170, buffalo: 200, mixed: 185 }
   const pf = data?.platform ?? { farmer_min_pct: 90, farmer_default_pct: 95, markup_suggest_pct: 20, markup_max_pct: 30 }
 
-  // live result while the sliders move
+  useEffect(() => { wakeModel1().catch(() => {}) }, [])
+  // live result while the sliders move: ai model 1 first (its answer is saved), then the database prices it.
+  // waits for the slider to rest, so the model is not asked for every step
   useEffect(() => {
     let live = true
-    const t = setTimeout(() => assessMilk(type, { ...r, reading_at: new Date().toISOString() }).then((x) => live && setAi(x)).catch(() => {}), 180)
+    const t = setTimeout(() => predictModel1(r.temperature_c, r.ph, r.ec_ms).catch(() => null)
+      .then(() => assessMilk(type, { ...r, reading_at: new Date().toISOString() })).then((x) => live && setAi(x)).catch(() => {}), 450)
     return () => { live = false; clearTimeout(t) }
   }, [type, r])
 
@@ -53,7 +56,7 @@ export default function AiPricing() {
         <Kpi accent label="Farmers’ share of market rate" value={data ? `${Math.round(share * 100)}%` : null} note={`average over ${plural(offers.length, 'offers')}, 30 days`} />
         <Kpi label="Farmers accepted" value={data ? `${answered.length ? Math.round((acceptedOffers / answered.length) * 100) : 0}%` : null} note="of offers they answered" />
         <Kpi label="Bad milk caught" value={data ? caught : null} note="samples the models rejected" />
-        <Kpi label="Models" value="2" note="quality and freshness" />
+        <Kpi label="AI model" value="Model 1" note="SVM + 3 random forests, trained" />
       </div>
 
       <Card className="mt-4 sm:mt-5" title={`One litre of ${milkLabel[type].toLowerCase()} milk`} subtitle="Who gets what, for the sample in Try it below">
@@ -93,9 +96,9 @@ export default function AiPricing() {
           <h3 className="mt-7 text-[14px] font-semibold">How the offer is worked out</h3>
           <ol className="mt-3 grid gap-2 text-[13.5px]">
             {[
-              ['Model 1 reads freshness', 'temperature, time, pH and EC give shelf life and spoilage risk'],
+              ['Model 1 grades the milk', 'temperature, pH and EC give quality, freshness score, shelf life and spoilage risk'],
               ['Model 2 checks purity', 'temperature, pH, EC and TDS give adulteration risk'],
-              ['Grade and market rate', 'Premium +6%, Fresh as is, Standard −8% on your base rate'],
+              ['Grade and market rate', 'Good = Premium +6%, Acceptable = Fresh as is, Poor = Standard −8% on your base rate'],
               ['Offer to the farmer', `${Number(pf.farmer_default_pct)}% of market, at least ${Number(pf.farmer_min_pct)}%. Spoiled or adulterated milk gets no offer`],
             ].map(([t, d], i) => (
               <li key={t} className="flex items-start gap-3 rounded-xl border border-line px-3 py-2.5">
@@ -106,7 +109,7 @@ export default function AiPricing() {
           </ol>
         </Card>
 
-        <Card title="Try it" subtitle="Move the sensor values and watch both models respond"
+        <Card title="Try it" subtitle="Move the sensor values and watch AI Model 1 respond"
           action={<Segmented size="sm" value={type} onChange={setType} options={TYPES.map((t) => ({ value: t, label: milkLabel[t] }))} />}>
           <div className="grid gap-4">
             {PARAMS.map((p) => {
@@ -128,15 +131,15 @@ export default function AiPricing() {
             <div className={`mt-5 rounded-[20px] p-5 ${ai.accept ? 'bg-forest-deep text-cream' : 'bg-[#f8e2dc] text-danger'}`}>
               <div className="flex flex-wrap items-end justify-between gap-3">
                 <div>
-                  <p className={`text-[12.5px] ${ai.accept ? 'text-cream/70' : ''}`}>{ai.accept ? `${gradeLabel[ai.quality]} · offer the farmer` : 'Result'}</p>
+                  <p className={`text-[12.5px] ${ai.accept ? 'text-cream/70' : ''}`}>{ai.accept ? `${ai.model_quality}, ${gradeLabel[ai.quality].toLowerCase()} grade · offer the farmer` : ai.model_quality === 'Spoiled' ? 'Model 1: spoiled' : 'Result'}</p>
                   <p className="display num text-[34px]">{ai.accept ? `${rs(ai.offer_price)} / L` : 'Do not buy'}</p>
                   {ai.accept && <p className="text-[12.5px] text-cream/70">market rate {rs(ai.market_price)}</p>}
                 </div>
               </div>
               <div className="mt-4 grid gap-2 sm:grid-cols-2">
                 <div className={`rounded-2xl px-4 py-3 ${ai.accept ? 'bg-cream/10' : 'bg-white/60'}`}>
-                  <p className="text-[12px] font-semibold">Model 1 · Freshness</p>
-                  <p className="mt-1 text-[14px]">{ai.freshness_hours} h shelf life · {riskLabel[ai.spoilage_risk].toLowerCase()} spoilage risk</p>
+                  <p className="text-[12px] font-semibold">Model 1 · Quality and freshness</p>
+                  <p className="mt-1 text-[14px]"><b>{ai.model_quality}</b> · freshness {ai.score}/100 · {Number(ai.shelf_life_h ?? ai.freshness_hours).toFixed(1)} h shelf life · {Number(ai.spoilage_pct ?? 0).toFixed(1)}% spoilage risk ({spoilageBand(Number(ai.spoilage_pct ?? 0)).toLowerCase()})</p>
                 </div>
                 <div className={`rounded-2xl px-4 py-3 ${ai.accept ? 'bg-cream/10' : 'bg-white/60'}`}>
                   <p className="text-[12px] font-semibold">Model 2 · Adulteration</p>

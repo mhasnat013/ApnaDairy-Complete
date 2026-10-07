@@ -5,7 +5,7 @@ import { useUi } from '../../context/UiContext'
 import { useLoad } from '../../lib/useLoad'
 import {
   myCenter, milkListings, myPublicListings, myPublicShop, shopProfile, saveShopProfile, shopPhotos, uploadShopPhoto, deleteShopPhoto,
-  setCoverPhoto, photoUrl, myReviews, runMilkExpiry, dateTimeShort, milkDay, myBulkReviews, myPublicProducts, replyReview, createListing, saveListing, myMilkShelf, stockGrade, milkCost, platformSettings, milkLabel, gradeLabel,
+  setCoverPhoto, photoUrl, myReviews, runMilkExpiry, dateTimeShort, milkDay, myBulkReviews, myPublicProducts, replyReview, createListing, saveListing, myMilkShelf, stockGrade, milkCost, platformSettings, milkLabel, gradeLabel, spoilageBand,
 } from '../../lib/center'
 import { rs, litres, date, relative } from '../../lib/format'
 import PageHeader from '../../components/PageHeader'
@@ -190,6 +190,7 @@ function ListingCard({ listing, pub, fresh, grade, reload, onEdit }) {
         <Stat label={expired ? 'Expired' : 'Sells until'} value={listing.milk_expires_at ? dateTimeShort(listing.milk_expires_at) : '—'}
           hint={expired ? 'list fresh milk again' : hoursLeft == null ? 'no fresh milk' : `${day ? `day ${Math.min(day, 2)} · ` : ''}${Math.max(1, Math.round(hoursLeft))} h left`} />
       </div>
+      {!expired && pub?.model_quality && <ModelLine pub={pub} />}
       {!expired && day >= 2 && !Number(listing.discount_pct) && (
         <button className="mt-3 text-left text-[13.5px] font-semibold text-amber underline" onClick={onEdit}>Day 2: give a discount to sell it before it expires</button>
       )}
@@ -197,6 +198,24 @@ function ListingCard({ listing, pub, fresh, grade, reload, onEdit }) {
         <button className="mt-3 text-[13.5px] font-semibold text-forest underline" onClick={onEdit}>Add litres: {litres(fresh)} of fresh milk is in stock</button>
       )}
     </section>
+  )
+}
+
+// what ai model 1 found in the milk this listing sells (customers see the same)
+function ModelLine({ pub }) {
+  const left = pub.model_shelf_left_h == null ? null : Number(pub.model_shelf_left_h)
+  return (
+    <div className="mt-3 rounded-2xl border border-line px-4 py-3 text-[13px]">
+      <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
+        <span className="flex items-center gap-1.5 font-semibold text-forest-deep"><Icon name="spark" size={14} className="text-forest" />AI Model 1</span>
+        <span className="font-semibold">{pub.model_quality}</span>
+        {pub.freshness_score != null && <span className="num text-muted">· freshness {pub.freshness_score}/100</span>}
+        {pub.spoilage_pct != null && <span className="num text-muted">· {Math.round(pub.spoilage_pct)}% spoilage risk ({spoilageBand(Number(pub.spoilage_pct)).toLowerCase()})</span>}
+      </p>
+      {left != null && (left > 0
+        ? <p className="mt-1 text-muted">AI shelf life of the oldest milk: about {Math.max(1, Math.round(left))} h left</p>
+        : <p className="mt-1 font-medium text-amber">The oldest milk is past the AI's predicted shelf life. It is still usable until its 2 days are up, so sell it first.</p>)}
+    </div>
   )
 }
 
@@ -573,7 +592,7 @@ function PhonePreview({ data }) {
                   <ProductImage category="milk" size={38} />
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-[13.5px] font-semibold">{l.name}</p>
-                    <p className="text-[11.5px] text-muted">{Number(l.available_l) > 0 ? `${Math.floor(l.available_l)} L available` : 'Sold out for now'}{l.quality ? ` · ${l.quality[0].toUpperCase()}${l.quality.slice(1)}` : ''}</p>
+                    <p className="text-[11.5px] text-muted">{Number(l.available_l) > 0 ? `${Math.floor(l.available_l)} L available` : 'Sold out for now'}{l.quality ? ` · ${gradeLabel[l.quality]}` : ''}{l.model_quality ? ` · AI: ${l.model_quality}` : ''}</p>
                   </div>
                   <div className="text-right">
                     <p className="num text-[14px] font-bold">{rs(l.price_per_l)}<span className="text-[11px] font-medium text-muted">/L</span></p>
@@ -584,6 +603,7 @@ function PhonePreview({ data }) {
                   <span className="h-1.5 flex-1 rounded-full bg-cream-2"><span className="block h-1.5 rounded-full bg-forest-2" style={{ width: `${l.freshness_score}%` }} /></span>
                   <span className="text-[11px] font-semibold text-forest">Freshness {l.freshness_score}</span>
                 </div>
+                {l.spoilage_pct != null && <p className="num mt-1 text-[11px] text-muted">{Math.round(l.spoilage_pct)}% spoilage risk{l.expires_at ? ` · sells until ${dateTimeShort(l.expires_at)}` : ''}</p>}
               </li>
             ))}
           </ul>

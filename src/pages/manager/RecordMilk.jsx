@@ -5,7 +5,7 @@ import { useAuth } from '../../context/AuthContext'
 import { useUi } from '../../context/UiContext'
 import {
   farmersWithStats, settings, assessMilk, recordCollection, recordFarmerAnswer, collectionById, myCenter, myDevice, startDeviceTest, takeDeviceSample, finishDeviceTest, farmerUsual, OFFER_HOURS, currentShift, billingOverview, milkListings,
-  milkLabel, gradeLabel, riskLabel, PARAMS, inRange,
+  wakeModel1, milkLabel, gradeLabel, riskLabel, spoilageBand, freshnessBand, PARAMS, inRange,
 } from '../../lib/center'
 import { rs, litres, plural } from '../../lib/format'
 import PageHeader from '../../components/PageHeader'
@@ -58,6 +58,8 @@ export default function RecordMilk() {
   const [, setTick] = useState(0)
   const cancelTest = useRef(false)
   useEffect(() => () => { cancelTest.current = true }, [])
+  // the ai model's server sleeps when unused: wake it now, so it answers as soon as the test finishes
+  useEffect(() => { wakeModel1().catch(() => {}) }, [])
   useEffect(() => {
     if (!test) return
     const i = setInterval(() => setTick((n) => n + 1), 250)
@@ -68,6 +70,7 @@ export default function RecordMilk() {
     setAi(null); setErr(''); setReading(null)
     cancelTest.current = false
     let t
+    wakeModel1().catch(() => {})
     try { t = await startDeviceTest() } catch (e) { return setErr(e.message) }
     const started = Date.now(), end = started + t.seconds * 1000, samples = []
     let fails = 0
@@ -362,14 +365,26 @@ export default function RecordMilk() {
           <section className={`panel p-5 sm:p-6 ${ai.accept ? '' : 'border-[#efc6bb]'}`}>
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="flex items-center gap-2 text-[13px] font-semibold text-muted"><Icon name="spark" size={16} />AI assessment</p>
-              <span className="rounded-full bg-cream-2 px-2.5 py-0.5 text-[11.5px] text-muted">quality and freshness models</span>
+              <span className="rounded-full bg-mint-soft px-2.5 py-0.5 text-[11.5px] font-semibold text-forest">AI Model 1 · trained SVM + random forests</span>
             </div>
-            <h2 className={`display mt-3 text-[30px] ${ai.accept ? 'text-forest-deep' : 'text-danger'}`}>{ai.accept ? `${gradeLabel[ai.quality]} milk` : 'Do not buy this milk'}</h2>
-            <p className="mt-1 text-[14px] text-muted">Quality score {ai.score}/100</p>
+            <h2 className={`display mt-3 text-[30px] ${ai.accept ? 'text-forest-deep' : 'text-danger'}`}>{ai.accept ? `${gradeLabel[ai.quality]} milk` : ai.model_quality === 'Spoiled' ? 'Spoiled: do not buy' : 'Do not buy this milk'}</h2>
+            <p className="mt-1 text-[14px] text-muted">Model 1 rates it <b className="text-ink">{ai.model_quality}</b>{ai.accept ? `, so it is bought as ${gradeLabel[ai.quality].toLowerCase()} grade` : ''}</p>
 
-            <div className="mt-5 grid gap-3 sm:grid-cols-2">
-              <ModelCard title="Model 1 · Freshness" inputs="temperature, time, pH, EC" bad={ai.spoilage_risk === 'high'} warn={ai.spoilage_risk === 'medium'}
-                facts={[['Shelf life', `${ai.freshness_hours} h`, 'once chilled'], ['Spoilage risk', riskLabel[ai.spoilage_risk]]]} />
+            <div className="mt-4 flex flex-wrap gap-2 text-[12.5px]">
+              <span className="text-muted">Model inputs from the device:</span>
+              {[['Temperature', `${Number(reading.temperature_c).toFixed(1)} °C`], ['pH', Number(reading.ph).toFixed(2)], ['EC', `${Number(reading.ec_ms).toFixed(2)} mS/cm`]].map(([k, v]) => (
+                <span key={k} className="num rounded-full bg-cream px-2.5 py-0.5"><span className="text-muted">{k}</span> <b>{v}</b></span>
+              ))}
+            </div>
+
+            <div className="mt-4 grid gap-3">
+              <ModelCard title="Model 1 · Quality and freshness" inputs="temperature, pH, EC" cols={4} bad={ai.model_quality === 'Spoiled' || ai.spoilage_risk === 'high'} warn={ai.model_quality === 'Poor' || ai.spoilage_risk === 'medium'}
+                facts={[
+                  ['Quality', ai.model_quality, ai.accept ? `${gradeLabel[ai.quality]} grade` : 'not bought'],
+                  ['Freshness', `${ai.score}/100`, freshnessBand(ai.score)],
+                  ['Shelf life', `${Number(ai.shelf_life_h ?? ai.freshness_hours).toFixed(1)} h`, `at ${Number(reading.temperature_c).toFixed(0)} °C`],
+                  ['Spoilage risk', `${Number(ai.spoilage_pct ?? 0).toFixed(1)}%`, spoilageBand(Number(ai.spoilage_pct))],
+                ]} />
               <ModelCard title="Model 2 · Adulteration" inputs="temperature, pH, EC, TDS" bad={ai.adulteration_risk === 'high'} warn={ai.adulteration_risk === 'medium'}
                 facts={[['Risk', riskLabel[ai.adulteration_risk], `${ai.adulteration_score}% probability`], ['Likely additive', ai.suspected ? ai.suspected.charAt(0).toUpperCase() + ai.suspected.slice(1) : 'None']]} />
             </div>
@@ -431,12 +446,12 @@ export default function RecordMilk() {
 }
 
 // one ai model's result: which sensors it used and what it concluded
-function ModelCard({ title, inputs, facts, bad, warn }) {
+function ModelCard({ title, inputs, facts, bad, warn, cols = 2 }) {
   return (
     <div className={`rounded-2xl border p-4 ${bad ? 'border-[#efc6bb] bg-[#fbeee9]' : warn ? 'border-[#efd59a] bg-haldi-soft/60' : 'border-line bg-cream'}`}>
       <p className="text-[13px] font-semibold text-forest-deep">{title}</p>
       <p className="text-[11.5px] text-muted">from {inputs}</p>
-      <dl className="mt-3 grid grid-cols-2 gap-2">
+      <dl className={`mt-3 grid grid-cols-2 gap-x-3 gap-y-3 ${cols === 4 ? 'sm:grid-cols-4' : ''}`}>
         {facts.map(([label, value, hint]) => (
           <div key={label}>
             <dt className="text-[12px] text-muted">{label}</dt>
