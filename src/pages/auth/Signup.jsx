@@ -70,7 +70,7 @@ export default function Signup() {
     return (
       <AuthShell title="Check your email" subtitle={`We sent a confirmation link to ${form.email.trim().toLowerCase()}.`}>
         <Alert type="success">
-          Open the link to confirm your email. Then upload your documents; the ApnaDairy admin reviews your account before it opens.
+          Open the link to confirm your email. Then upload your documents; the ApnaDairy admin reviews your account before it opens. Not in your inbox? Check Spam and mark it "Not spam".
         </Alert>
         <ResendConfirmation email={form.email.trim().toLowerCase()} className="mt-4 text-[14px]" />
         <Link to="/login" className="btn-primary mt-6 w-full">Go to sign in</Link>

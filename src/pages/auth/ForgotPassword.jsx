@@ -23,7 +23,7 @@ export default function ForgotPassword() {
     <AuthShell title="Forgot your password?" subtitle="We will email you a link to set a new one.">
       {sent ? (
         <div className="panel p-5 text-[15px] leading-relaxed">
-          If an account exists for <span className="font-semibold">{email}</span>, a reset link is on its way. Open it on this device.
+          If an account exists for <span className="font-semibold">{email}</span>, a reset link is on its way. Open it on this device. Not in your inbox? Check Spam.
         </div>
       ) : (
         <form onSubmit={onSubmit} className="flex flex-col gap-4">
