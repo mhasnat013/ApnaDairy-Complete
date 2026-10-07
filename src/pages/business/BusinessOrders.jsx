@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import { useState } from 'react'
 import { businessOrders, updateBulkOrder, myDeliveryCodes, rateOrder, milkLabel, qtyText, perUnit, isMilk, productLabel } from '../../lib/b2b'
 import { useLoad } from '../../lib/useLoad'
@@ -66,6 +67,7 @@ export default function BusinessOrders() {
                   {o.status === 'delivered' && (o.review
                     ? <button className="text-[13.5px] font-semibold text-forest hover:underline" onClick={() => setRating(o)} title="Change your rating"><span className="text-haldi">{'★'.repeat(o.review.rating)}</span><span className="text-line">{'★'.repeat(5 - o.review.rating)}</span></button>
                     : <button className="btn-secondary btn-sm" onClick={() => setRating(o)}>Rate</button>)}
+                  <Link to={`/business/support?new=1&order=${o.id}`} className="mt-1.5 block text-[12.5px] text-muted hover:text-forest hover:underline">Report a problem</Link>
                 </td>
               </tr>
             ))}

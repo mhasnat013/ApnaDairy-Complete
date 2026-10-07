@@ -1,4 +1,4 @@
-import { useOutletContext } from 'react-router-dom'
+import { Link, useOutletContext } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import PageHeader from '../components/PageHeader'
 import Icon from '../components/Icon'
@@ -50,6 +50,13 @@ export default function Help() {
             <p className="px-5 pb-5 text-[14.5px] leading-relaxed text-muted">{a}</p>
           </details>
         ))}
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-4 rounded-[20px] bg-forest-deep px-5 py-5 text-cream">
+          <div>
+            <p className="display text-[19px]">Still stuck?</p>
+            <p className="mt-0.5 text-[14px] text-cream/75">Open a ticket and ApnaDairy will reply on the Support page.</p>
+          </div>
+          <Link to={`${profile.role === 'business' ? '/business' : '/manager'}/support?new=1`} className="btn-haldi">Contact support</Link>
+        </div>
       </div>
     </>
   )

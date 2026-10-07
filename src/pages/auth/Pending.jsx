@@ -45,7 +45,7 @@ export default function Pending() {
           <Badge status={profile.status} />
           <p className="mt-3 text-[15px] leading-relaxed text-ink">{rejected ? 'Your application was not approved.' : 'Your account is suspended, so you cannot use the portal right now.'}</p>
           {sub?.rejection_reason || rejected
-            ? <p className="mt-3 rounded-2xl bg-cream px-4 py-3 text-[14px] text-ink"><span className="font-semibold">Reason: </span>{sub?.rejection_reason || 'No reason was given.'} Contact ApnaDairy support if you think this is a mistake.</p>
+            ? <p className="mt-3 rounded-2xl bg-cream px-4 py-3 text-[14px] text-ink"><span className="font-semibold">Reason: </span>{sub?.rejection_reason || 'No reason was given.'} If you think this is a mistake, reply to the email we sent you.</p>
             : null}
         </div>
         {actions}

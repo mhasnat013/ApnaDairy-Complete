@@ -1,9 +1,10 @@
 import { useState, Suspense } from 'react'
-import { NavLink, Outlet } from 'react-router-dom'
+import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { navFor } from '../lib/nav'
 import { useLoad } from '../lib/useLoad'
 import { myCenter } from '../lib/center'
+import { supportWaiting } from '../lib/support'
 import { roleLabel } from '../lib/roles'
 import Logo from '../components/Logo'
 import Icon from '../components/Icon'
@@ -19,6 +20,8 @@ export default function DashboardLayout() {
   const items = nav.filter((i) => i.ready)
   const later = nav.filter((i) => !i.ready)
   const base = profile.role === 'super_admin' ? '/admin' : profile.role === 'business' ? '/business' : '/manager'
+  const { pathname } = useLocation()
+  const { data: waiting, reload: refreshSupport } = useLoad(() => supportWaiting(), [pathname, profile.id])
   const initials = profile.full_name.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase()
 
   const sidebar = (
@@ -35,7 +38,8 @@ export default function DashboardLayout() {
                 <span className={`grid h-7 w-7 place-items-center rounded-full transition-colors ${isActive ? 'bg-haldi text-forest-deep' : 'bg-cream/5 group-hover:bg-cream/10'}`}>
                   <Icon name={i.icon} size={15} />
                 </span>
-                {i.label}
+                <span className="flex-1">{i.label}</span>
+                {i.support && waiting > 0 && <span className="num grid h-5 min-w-5 place-items-center rounded-full bg-haldi px-1.5 text-[11.5px] font-bold text-forest-deep" aria-label={`${waiting} waiting`}>{waiting}</span>}
               </>
             )}
           </NavLink>
@@ -82,7 +86,7 @@ export default function DashboardLayout() {
           <button onClick={() => setOpen(true)} aria-label="Open menu" className="btn-ghost h-10 w-10 p-0"><Icon name="menu" /></button>
           <Logo />
         </header>
-        <main className="mx-auto max-w-[1180px] px-4 py-8 sm:px-8 lg:py-10"><Suspense fallback={<Loader />}><Outlet context={{ center }} /></Suspense></main>
+        <main className="mx-auto max-w-[1180px] px-4 py-8 sm:px-8 lg:py-10"><Suspense fallback={<Loader />}><Outlet context={{ center, refreshSupport }} /></Suspense></main>
       </div>
     </div>
   )

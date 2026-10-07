@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import { centerOrders, updateBulkOrder, milkLabel, qualityLabel, qtyText, perUnit, isMilk, productLabel, gradeRule, gradeOk } from '../../lib/b2b'
 import { useLoad } from '../../lib/useLoad'
@@ -79,6 +80,7 @@ export default function BulkOrders() {
                       ? <span className="text-right text-[13px]" title={o.review.comment ?? ''}><span className="text-haldi">{'★'.repeat(o.review.rating)}</span><span className="text-line">{'★'.repeat(5 - o.review.rating)}</span>{o.review.comment && <p className="max-w-[200px] truncate text-[12px] text-muted">“{o.review.comment}”</p>}</span>
                       : <span className="text-[12.5px] text-muted">Not rated yet</span>)}
                   </div>
+                  <Link to={`/manager/support?new=1&order=${o.id}`} className="mt-1.5 block text-right text-[12.5px] text-muted hover:text-forest hover:underline">Report a problem</Link>
                 </td>
               </tr>
             ))}

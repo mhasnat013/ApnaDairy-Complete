@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { useUi } from '../../context/UiContext'
 import { useLoad } from '../../lib/useLoad'
@@ -372,7 +372,7 @@ function Profile({ data, reload }) {
           <div className="field"><label htmlFor="dr">Delivery area</label>
             <div className="flex items-center gap-2"><input id="dr" className="input num w-24" type="number" inputMode="decimal" min="0" max="50" step="0.5" value={p.delivery_radius_km ?? ''} onChange={set('delivery_radius_km')} /><span className="text-[13px] text-muted">km around the shop</span></div></div>
         </div>
-        <p className="mt-4 text-[12.5px] text-muted">Your shop name, city and address come from registration. Contact support to change them.</p>
+        <p className="mt-4 text-[12.5px] text-muted">Your shop name, city and address come from registration. <Link to="/manager/support?new=1" className="font-semibold text-forest hover:underline">Ask support</Link> to change them.</p>
         <button className="btn-primary mt-4" onClick={save} disabled={busy}>{busy ? 'Saving…' : 'Save profile'}</button>
       </Card>
     </div>

@@ -1,4 +1,5 @@
 // sidebar items per role. "ready: false" items are listed under "coming next" until built.
+// "support: true" items show the number of tickets waiting for this person.
 export const navFor = {
   super_admin: [
     { to: '/admin', label: 'Overview', icon: 'grid', end: true, ready: true },
@@ -11,7 +12,7 @@ export const navFor = {
     { to: '/admin/iot-devices', label: 'IoT devices', icon: 'chip', ready: true },
     { to: '/admin/analytics', label: 'Analytics', icon: 'chart', ready: true },
     { to: '/admin/audit', label: 'Audit log', icon: 'file', ready: true },
-    { to: '/admin/complaints', label: 'Complaints & support', icon: 'chat' },
+    { to: '/admin/complaints', label: 'Complaints & support', icon: 'inbox', ready: true, support: true },
   ],
   area_manager: [
     { to: '/manager', label: 'Overview', icon: 'grid', end: true, ready: true },
@@ -25,6 +26,7 @@ export const navFor = {
     { to: '/manager/iot', label: 'IoT readings', icon: 'chip', ready: true },
     { to: '/manager/ai-pricing', label: 'AI price engine', icon: 'spark', ready: true },
     { to: '/manager/billing', label: 'Billing', icon: 'wallet', ready: true },
+    { to: '/manager/support', label: 'Support', icon: 'inbox', ready: true, support: true },
     { to: '/manager/help', label: 'Help', icon: 'chat', ready: true },
   ],
   // dairy products sellers: no milk collection and no iot device
@@ -36,12 +38,14 @@ export const navFor = {
     { to: '/manager/bulk-orders', label: 'Bulk orders', icon: 'truck', ready: true },
     { to: '/manager/shop', label: 'My shop', icon: 'store', ready: true },
     { to: '/manager/billing', label: 'Billing', icon: 'wallet', ready: true },
+    { to: '/manager/support', label: 'Support', icon: 'inbox', ready: true, support: true },
     { to: '/manager/help', label: 'Help', icon: 'chat', ready: true },
   ],
   business: [
     { to: '/business', label: 'Overview', icon: 'grid', end: true, ready: true },
     { to: '/business/requirements', label: 'My requirements', icon: 'box', ready: true },
     { to: '/business/orders', label: 'Bulk orders', icon: 'truck', ready: true },
+    { to: '/business/support', label: 'Support', icon: 'inbox', ready: true, support: true },
     { to: '/business/help', label: 'Help', icon: 'chat', ready: true },
   ],
 }

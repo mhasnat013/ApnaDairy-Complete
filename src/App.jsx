@@ -48,6 +48,9 @@ const Admins = lazy(() => import('./pages/admin/Admins'))
 const Help = lazy(() => import('./pages/Help'))
 const Account = lazy(() => import('./pages/Account'))
 const Products = lazy(() => import('./pages/seller/Products'))
+const Support = lazy(() => import('./pages/support/Support'))
+const TicketDetail = lazy(() => import('./pages/support/TicketDetail'))
+const Complaints = lazy(() => import('./pages/admin/Complaints'))
 import MilkOnly from './components/MilkOnly'
 
 
@@ -84,6 +87,8 @@ export default function App() {
               <Route path="iot-devices" element={<IotDevices />} />
               <Route path="analytics" element={<Analytics />} />
               <Route path="admins" element={<Admins />} />
+              <Route path="complaints" element={<Complaints />} />
+              <Route path="complaints/:id" element={<TicketDetail />} />
               <Route path="account" element={<Account />} />
               <Route path="*" element={<ModuleSoon />} />
             </Route>
@@ -107,6 +112,8 @@ export default function App() {
               <Route path="shop" element={<MyShop />} />
               <Route path="help" element={<Help />} />
               <Route path="products" element={<MilkOnly products><Products /></MilkOnly>} />
+              <Route path="support" element={<Support />} />
+              <Route path="support/:id" element={<TicketDetail />} />
               <Route path="account" element={<Account />} />
               <Route path="*" element={<ModuleSoon />} />
             </Route>
@@ -120,6 +127,8 @@ export default function App() {
               <Route path="requirements/:id" element={<RequirementDetail />} />
               <Route path="orders" element={<BusinessOrders />} />
               <Route path="help" element={<Help />} />
+              <Route path="support" element={<Support />} />
+              <Route path="support/:id" element={<TicketDetail />} />
               <Route path="account" element={<Account />} />
               <Route path="*" element={<ModuleSoon />} />
             </Route>
