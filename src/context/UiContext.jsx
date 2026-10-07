@@ -17,6 +17,7 @@ export function UiProvider({ children }) {
 
   // usage: if (!(await confirm({ title, body, confirmLabel, danger }))) return
   // with input: 'placeholder' the promise resolves to the typed text (or true if left empty)
+  // inputRequired: n  makes the text required, at least n characters
   const confirm = useCallback((opts) => new Promise((resolve) => {
     resolver.current = resolve
     setDialog(opts)
@@ -48,11 +49,14 @@ export function UiProvider({ children }) {
             <h2 id="dlg-title" className="display text-[24px]">{dialog.title}</h2>
             {dialog.body && <p className="mt-2 text-muted">{dialog.body}</p>}
             {dialog.input && (
-              <textarea className="input mt-4 w-full" rows={3} maxLength={300} placeholder={dialog.input} value={text} onChange={(e) => setText(e.target.value)} />
+              <>
+                <textarea className="input mt-4 w-full" rows={3} maxLength={300} placeholder={dialog.input} value={text} onChange={(e) => setText(e.target.value)} />
+                {dialog.inputRequired && <p className={`mt-1 text-[12.5px] ${text.trim().length >= dialog.inputRequired ? 'text-muted' : 'text-danger'}`}>Required, at least {dialog.inputRequired} characters.</p>}
+              </>
             )}
             <div className="mt-6 flex justify-end gap-2">
               <button className="btn-secondary" onClick={() => close(false)} autoFocus>{dialog.cancelLabel ?? 'Go back'}</button>
-              <button className={dialog.danger ? 'btn-danger' : 'btn-primary'} onClick={() => close(true)}>{dialog.confirmLabel ?? 'Confirm'}</button>
+              <button className={dialog.danger ? 'btn-danger' : 'btn-primary'} disabled={!!dialog.inputRequired && text.trim().length < dialog.inputRequired} onClick={() => close(true)}>{dialog.confirmLabel ?? 'Confirm'}</button>
             </div>
           </div>
         </div>

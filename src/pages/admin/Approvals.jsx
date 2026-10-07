@@ -10,6 +10,7 @@ import EmptyState from '../../components/EmptyState'
 import { date, cap } from '../../lib/format'
 import DocsDrawer from '../../components/DocsDrawer'
 import { hasRequiredDocs } from '../../lib/docs'
+import { sendAccountEmail } from '../../lib/center'
 
 const tabs = [
   { id: 'area_manager', label: 'Area Managers', table: 'area_managers', fk: 'area_managers_user_id_fkey' },
@@ -55,18 +56,30 @@ export default function Approvals() {
     const name = row.center_name ?? row.business_name
     let reason = null
     if (next !== 'active') {
+      const rejecting = next === 'rejected'
       const answer = await confirm({
-        title: next === 'rejected' ? `Reject ${name}?` : `Suspend ${name}?`,
-        body: next === 'rejected' ? 'They will see that their application was not approved.' : 'They lose access to the portal until you reactivate them.',
-        input: 'Reason (optional, shown to them)',
-        confirmLabel: next === 'rejected' ? 'Reject' : 'Suspend', danger: true,
+        title: rejecting ? `Reject ${name}?` : `Suspend ${name}?`,
+        body: rejecting ? 'Say why. They see the reason when they sign in, and it is emailed to them.' : 'They lose access to the portal until you reactivate them.',
+        input: rejecting ? 'e.g. The CNIC photo is not clear. Please sign up again with a clear photo.' : 'Reason (optional, shown to them)',
+        inputRequired: rejecting ? 10 : undefined,
+        confirmLabel: rejecting ? 'Reject' : 'Suspend', danger: true,
       })
       if (!answer) return
       reason = typeof answer === 'string' ? answer : null
     }
     const { error } = await supabase.rpc('set_verification', { p_kind: tab.id, p_id: row.id, p_status: next, p_reason: reason })
     if (error) return toast(error.message, 'error')
-    toast(next === 'active' ? `${name} approved.` : next === 'rejected' ? `${name} rejected.` : `${name} suspended.`)
+    if (next === 'rejected') {
+      // tell them by email too; the rejection stands even if the email cannot be sent
+      try {
+        const sent = await sendAccountEmail(row.user_id, 'account_rejected')
+        toast(`${name} rejected. Email sent to ${sent.to}.`)
+      } catch (e) {
+        toast(`${name} rejected, but the email was not sent: ${e.message}`, 'error')
+      }
+    } else {
+      toast(next === 'active' ? `${name} approved.` : `${name} suspended.`)
+    }
     load()
   }
 

@@ -291,6 +291,8 @@ async function callFunction(name, body) {
 export const startDeviceTest = () => iot({ action: 'start' })
 // ---------- super admins ----------
 export const allAdmins = async () => must(await supabase.from('profiles').select('id, full_name, email, phone, status, created_at').eq('role', 'super_admin').order('created_at'))
+// emails an account holder about their account (send-email edge function). kind: 'account_rejected'
+export const sendAccountEmail = (userId, kind) => callFunction('send-email', { user_id: userId, kind })
 export const createAdmin = (a) => callFunction('admin-users', { full_name: a.full_name, email: a.email, password: a.password }).then((d) => d.admin)
 export const removeAdmin = (id) => rpc('set_admin', { p_user: id, p_make_admin: false })
 // ask ai model 1 directly (the try-it sliders); the answer is saved so assessMilk can use it
