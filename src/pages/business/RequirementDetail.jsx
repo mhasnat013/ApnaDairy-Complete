@@ -132,9 +132,15 @@ export default function RequirementDetail() {
         {isOpen && <button className="btn-danger" onClick={onCancel} disabled={busy}>{covered > 0 ? 'Stop taking bids' : 'Cancel requirement'}</button>}
       </PageHeader>
 
+      {req.removed_at && (
+        <div className="mb-5 rounded-[20px] bg-[#f8e2dc] px-5 py-4 text-[14px] text-danger" role="status">
+          <p className="font-semibold">ApnaDairy removed this request on {date(req.removed_at)}.</p>
+          <p className="mt-0.5">Reason: {req.removed_reason} Bids on it are closed. If you think this is a mistake, contact ApnaDairy from Support.</p>
+        </div>
+      )}
       <div className="mb-8 flex flex-wrap items-center gap-2">
         <ProductImage category={req.product ?? 'milk'} size={44} className="mr-1" />
-        <Badge status={expired ? 'closed' : req.status} tone={expired ? 'grey' : undefined}>{expired ? 'Date passed' : biddingLive ? 'Taking bids' : isOpen ? 'Bidding closed, pick a bid' : req.status === 'closed' ? 'Stopped' : req.status === 'awarded' ? 'Covered' : undefined}</Badge>
+        {req.removed_at ? <Badge tone="red">Removed by ApnaDairy</Badge> : <Badge status={expired ? 'closed' : req.status} tone={expired ? 'grey' : undefined}>{expired ? 'Date passed' : biddingLive ? 'Taking bids' : isOpen ? 'Bidding closed, pick a bid' : req.status === 'closed' ? 'Stopped' : req.status === 'awarded' ? 'Covered' : undefined}</Badge>}
         {isMilk(req) && <span className="rounded-full bg-cream-2 px-3 py-1 text-[13px] font-medium">{qualityLabel[req.quality]}</span>}
         <span className="num rounded-full bg-cream-2 px-3 py-1 text-[13px] font-medium">Target {req.target_price ? `${rs(req.target_price)} / ${per}` : 'best offer'}</span>
         <span className="num rounded-full bg-cream-2 px-3 py-1 text-[13px] font-medium">
@@ -162,7 +168,7 @@ export default function RequirementDetail() {
       )}
 
       {ladderRows.length === 0 ? (
-        (isOpen || accepted.length === 0) && (
+        !req.removed_at && (isOpen || accepted.length === 0) && (
           <div className="panel">
             <EmptyState title={accepted.length ? 'No other bids waiting' : biddingLive ? 'Waiting for the first bid' : 'No bids came in'}>
               {biddingLive ? `Centers can bid until ${dateTime(req.bid_deadline)}. Bids show up here as soon as they're sent.` : accepted.length ? 'Bidding has closed. You can stop taking bids, or post a new requirement for what is still needed.' : 'Try posting again with a later date or a different target price.'}

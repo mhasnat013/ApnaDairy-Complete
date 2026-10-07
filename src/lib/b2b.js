@@ -59,7 +59,7 @@ export function rankBids(bids, req) {
   return { top, others }
 }
 
-const BID_FIELDS = 'id, price_per_l, quantity_l, make_qty, delivery_date, max_age_hours, notes, status, created_at, updated_at, area_manager_id, offered_quality'
+const BID_FIELDS = 'id, price_per_l, quantity_l, make_qty, delivery_date, max_age_hours, notes, status, created_at, updated_at, area_manager_id, offered_quality, removed_at, removed_reason'
 
 // ---------- business ----------
 export async function myRequirements() {
@@ -136,6 +136,21 @@ export async function centerOrders() {
     .order('created_at', { ascending: false })
   if (error) throw error
   return data.map((o) => ({ ...o, review: one(o.review) }))
+}
+
+// ---------- admin: the whole bulk market, and removing a request or a bid (soft, with a reason) ----------
+export async function adminBulkMarket() {
+  const { data, error } = await supabase.rpc('admin_bulk_market')
+  if (error) throw error
+  return data ?? []
+}
+export async function adminRemoveRequirement(id, reason) {
+  const { error } = await supabase.rpc('admin_remove_requirement', { p_id: id, p_reason: reason })
+  if (error) throw error
+}
+export async function adminRemoveBid(id, reason) {
+  const { error } = await supabase.rpc('admin_remove_bid', { p_id: id, p_reason: reason })
+  if (error) throw error
 }
 
 // ---------- open offers (visible to everyone) ----------

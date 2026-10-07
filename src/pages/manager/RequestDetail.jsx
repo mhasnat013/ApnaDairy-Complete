@@ -267,10 +267,17 @@ export default function RequestDetail() {
         <aside className="lg:sticky lg:top-10 lg:self-start">
           <div className="panel animate-rise p-6">
             <div className="mb-5 flex items-center justify-between gap-3">
-              <h2 className="display text-[26px]">{mine?.status === 'submitted' || mine?.status === 'accepted' ? 'Your bid' : 'Place your bid'}</h2>
-              {mine && mine.status !== 'withdrawn' && <Badge status={mine.status}>{mine.status === 'submitted' ? 'Sent' : mine.status === 'accepted' ? 'Won' : undefined}</Badge>}
+              <h2 className="display text-[26px]">{mine?.status === 'submitted' || mine?.status === 'accepted' || mine?.removed_at ? 'Your bid' : 'Place your bid'}</h2>
+              {mine?.removed_at ? <Badge tone="red">Removed</Badge>
+                : mine && mine.status !== 'withdrawn' && <Badge status={mine.status}>{mine.status === 'submitted' ? 'Sent' : mine.status === 'accepted' ? 'Won' : undefined}</Badge>}
             </div>
-            {mine?.status === 'accepted' ? (
+            {mine?.removed_at ? (
+              <div className="rounded-2xl bg-[#f8e2dc] px-4 py-3 text-[14px] text-danger">
+                <p className="font-semibold">ApnaDairy removed your bid of {rs(mine.price_per_l)}/{perUnit(req.unit)}.</p>
+                <p className="mt-1">Reason: {mine.removed_reason}</p>
+                <p className="mt-2 text-[13px]">You cannot bid on this request again. If you think this is a mistake, contact ApnaDairy from Support.</p>
+              </div>
+            ) : mine?.status === 'accepted' ? (
               <p className="text-[15.5px] text-forest">The buyer picked you at <strong className="num">{rs(mine.price_per_l)}/{perUnit(req.unit)}</strong>. It's in your bulk orders now.</p>
             ) : !open ? (
               <p className="text-muted">Bidding on this request has closed.</p>

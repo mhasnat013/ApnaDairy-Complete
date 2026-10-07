@@ -69,7 +69,7 @@ export default function Requirements() {
                 <td className="num text-right">{r.target_price ? rs(r.target_price) : <span className="text-muted">Open</span>}</td>
                 <td className="text-right"><span className={`num inline-grid h-7 min-w-7 place-items-center rounded-full px-2 text-[13px] font-semibold ${r.bid_count ? 'bg-haldi-soft text-amber' : 'bg-cream-2 text-muted'}`}>{r.bid_count}</span></td>
                 <td className="text-muted">{r.status === 'open' && !isExpired(r) ? (new Date(r.bid_deadline) > new Date() ? relative(r.bid_deadline) : 'Closed, choose a bid') : '—'}</td>
-                <td>{isExpired(r) ? <Badge tone="grey">Date passed</Badge>
+                <td>{r.removed_at ? <Badge tone="red">Removed</Badge> : isExpired(r) ? <Badge tone="grey">Date passed</Badge>
                   : <Badge status={r.status}>{r.status === 'open' ? (coveredL(r) > 0 ? 'Part ordered' : 'Receiving bids') : r.status === 'awarded' ? 'Covered' : r.status === 'closed' ? 'Stopped' : undefined}</Badge>}</td>
               </tr>
             ))}

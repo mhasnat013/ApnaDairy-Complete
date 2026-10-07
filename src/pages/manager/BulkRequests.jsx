@@ -1,5 +1,4 @@
-import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../context/AuthContext'
 import ProductImage from '../../components/ProductImage'
@@ -16,7 +15,9 @@ import { SkeletonRows } from '../../components/Skeleton'
 export default function BulkRequests() {
   const { profile } = useAuth()
   const nav = useNavigate()
-  const [tab, setTab] = useState('board')
+  const [params, setParams] = useSearchParams()
+  const tab = params.get('tab') === 'mine' ? 'mine' : 'board'
+  const setTab = (v) => setParams(v === 'mine' ? { tab: 'mine' } : {})
 
   const { data, error, loading } = useLoad(async () => {
     const { data: center } = await supabase.from('area_managers').select('type').eq('user_id', profile.id).single()
@@ -95,7 +96,9 @@ export default function BulkRequests() {
                   <td className="num text-right font-semibold">{rs(b.price_per_l)}<span className="text-[12px] font-normal text-muted"> / {perUnit(b.requirement?.unit)}</span></td>
                   <td className="num text-right">{qtyText(b.quantity_l, b.requirement?.unit)}</td>
                   <td className="num">{date(b.delivery_date)}</td>
-                  <td><Badge status={b.status}>{b.status === 'submitted' ? 'Waiting for buyer' : b.status === 'accepted' ? 'Won' : undefined}</Badge></td>
+                  <td>{b.removed_at
+                    ? <><Badge tone="red">Removed by ApnaDairy</Badge><p className="mt-1 max-w-[240px] text-[12px] text-muted">{b.removed_reason}</p></>
+                    : <Badge status={b.status}>{b.status === 'submitted' ? 'Waiting for buyer' : b.status === 'accepted' ? 'Won' : undefined}</Badge>}</td>
                 </tr>
               ))}
             </tbody>
