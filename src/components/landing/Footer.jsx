@@ -16,6 +16,8 @@ export default function Footer() {
           <Link to="/signup" className="text-muted hover:text-ink">Join</Link>
           <Link to="/login" className="text-muted hover:text-ink">Sign in</Link>
           <a href="/#who" className="text-muted hover:text-ink">Who it's for</a>
+          <Link to="/privacy" className="text-muted hover:text-ink">Privacy</Link>
+          <Link to="/terms" className="text-muted hover:text-ink">Terms</Link>
         </nav>
       </div>
     </footer>

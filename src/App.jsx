@@ -48,6 +48,7 @@ const Admins = lazy(() => import('./pages/admin/Admins'))
 const Help = lazy(() => import('./pages/Help'))
 const Account = lazy(() => import('./pages/Account'))
 const Products = lazy(() => import('./pages/seller/Products'))
+const Legal = lazy(() => import('./pages/Legal'))
 const Support = lazy(() => import('./pages/support/Support'))
 const TicketDetail = lazy(() => import('./pages/support/TicketDetail'))
 const Complaints = lazy(() => import('./pages/admin/Complaints'))
@@ -70,6 +71,8 @@ export default function App() {
           <Route path="/set-password" element={<ResetPassword invite />} />
           <Route path="/welcome" element={<Welcome />} />
           <Route path="/requests" element={<PublicRequests />} />
+          <Route path="/privacy" element={<Legal kind="privacy" />} />
+          <Route path="/terms" element={<Legal kind="terms" />} />
 
           <Route element={<ProtectedRoute allow={['farmer', 'customer']} />}>
             <Route path="/mobile-only" element={<MobileOnly />} />
