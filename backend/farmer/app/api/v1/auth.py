@@ -25,6 +25,7 @@
 
 import logging
 import os
+import re
 import time
 
 from fastapi import APIRouter, Header, HTTPException
@@ -99,8 +100,13 @@ def _demo_guard() -> None:
 def _auth_user_id_of(created) -> str:
     """Extract the user id from a GoTrue admin create_user result.
 
-    supabase-py returns a User object (.id); tolerate dict-shaped fakes.
+    supabase-py 2.x returns a UserResponse wrapping the user in `.user`
+    (i.e. created.user.id); tolerate dict-shaped fakes too.
     """
+    # supabase-py 2.x UserResponse shape
+    user = getattr(created, "user", None)
+    if user is not None:
+        return str(getattr(user, "id", ""))
     if isinstance(created, dict):
         user = created.get("user", created)
         return user.get("id") if isinstance(user, dict) else str(user)
@@ -127,6 +133,8 @@ def real_signup(payload: RealSignupIn) -> RealSignupOut:
     'pending' (SuperAdmin verifies the farmer profile later).
     Duplicate email or phone -> 409 with a clear message.
     """
+    # Normalize phone to digits-only: DB trigger requires 11-digit format
+    phone = re.sub(r"\D", "", payload.phone)
     client = get_web_client()
 
     # Phone uniqueness is enforced app-side (pre-check) so a duplicate phone
@@ -134,7 +142,7 @@ def real_signup(payload: RealSignupIn) -> RealSignupOut:
     phone_taken = first_row(
         table(client, "profiles")
         .select("id")
-        .eq("phone", payload.phone)
+        .eq("phone", phone)
         .limit(1)
         .execute()
     )
@@ -153,7 +161,7 @@ def real_signup(payload: RealSignupIn) -> RealSignupOut:
                 "user_metadata": {
                     "role": "farmer",
                     "full_name": payload.full_name,
-                    "phone": payload.phone,
+                    "phone": phone,
                 },
             }
         )
@@ -177,7 +185,7 @@ def real_signup(payload: RealSignupIn) -> RealSignupOut:
         "id": user_id,  # profiles.id IS the auth user id (1:1 link)
         "full_name": payload.full_name,
         "email": payload.email,
-        "phone": payload.phone,
+        "phone": phone,
         "role": "farmer",
         "status": "pending",
     }
@@ -240,11 +248,13 @@ def google_link(
             created=False,
         )
 
+    # Normalize phone to digits-only: DB trigger requires 11-digit format
+    phone = re.sub(r"\D", "", payload.phone) if payload.phone else None
     row = {
         "id": auth_user_id,  # profiles.id IS the auth user id (1:1 link)
         "full_name": payload.full_name,
         "email": claims.get("email"),
-        "phone": payload.phone,
+        "phone": phone,
         "role": "farmer",
         "status": "pending",
     }
