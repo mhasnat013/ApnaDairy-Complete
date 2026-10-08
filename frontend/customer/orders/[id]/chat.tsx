@@ -12,6 +12,7 @@ import {
   ActivityIndicator,
   Pressable,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams } from 'expo-router';
 import { Screen } from '../../../../src/components/common/Screen';
 import { Card } from '../../../../src/components/common/Card';
@@ -103,7 +104,8 @@ export default function RiderChatScreen() {
   }
 
   return (
-    <Screen
+    <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+<Screen
       title="Rider chat"
       subtitle={riderName ? `with ${Array.isArray(riderName) ? riderName[0] : riderName}` : undefined}
     >
@@ -162,6 +164,7 @@ export default function RiderChatScreen() {
         </View>
       </KeyboardAvoidingView>
     </Screen>
+    </SafeAreaView>
   );
 }
 
