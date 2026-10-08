@@ -7,6 +7,7 @@
 import React, { useCallback, useState } from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
+import { shouldRefetch } from '../../../src/utils/focusCache';
 import { Screen } from '../../../src/components/common/Screen';
 import { Card } from '../../../src/components/common/Card';
 import { AppButton } from '../../../src/components/common/AppButton';
@@ -64,11 +65,12 @@ export default function MilkTab() {
     }
   }, []);
 
-  // Reload every time the tab gains focus.
-  useFocusEffect(useCallback(() => { load(); }, [load]));
+  // Reload when the tab gains focus (skipped if fetched <30s ago).
+  useFocusEffect(useCallback(() => { if (shouldRefetch('milk')) load(); }, [load]));
 
-  /** Pull-to-refresh handler. */
+  /** Pull-to-refresh handler (always reloads). */
   const onRefresh = () => {
+    shouldRefetch('milk', true);
     setRefreshing(true);
     load();
   };

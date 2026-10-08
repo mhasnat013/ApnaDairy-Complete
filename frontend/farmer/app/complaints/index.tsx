@@ -2,6 +2,7 @@
 import React, { useCallback, useState } from 'react';
 import { View, Text, FlatList, Pressable, StyleSheet, ActivityIndicator } from 'react-native';
 import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { shouldRefetch } from '../../src/utils/focusCache';
 import { Screen } from '../../src/components/common/Screen';
 import { Card } from '../../src/components/common/Card';
 import { AppButton } from '../../src/components/common/AppButton';
@@ -58,10 +59,10 @@ export default function ComplaintsScreen() {
     }
   }, []);
 
-  // Refresh on focus; show the success banner when arriving with ?created=1.
+  // Refresh on focus (skipped if fetched <30s ago); show the success banner when arriving with ?created=1.
   useFocusEffect(
     useCallback(() => {
-      load();
+      if (shouldRefetch('complaints')) load();
       if (params.created === '1') {
         setShowCreated(true);
         router.setParams({ created: undefined });

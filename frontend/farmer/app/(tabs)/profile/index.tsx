@@ -4,6 +4,7 @@ import {
   View, Text, Pressable, StyleSheet, Alert, ActivityIndicator, ScrollView,
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
+import { shouldRefetch } from '../../../src/utils/focusCache';
 import { Screen } from '../../../src/components/common/Screen';
 import { Card } from '../../../src/components/common/Card';
 import { StatusBadge } from '../../../src/components/common/StatusBadge';
@@ -66,6 +67,7 @@ export default function ProfileScreen() {
 
   useFocusEffect(
     useCallback(() => {
+      if (!shouldRefetch('profile')) return; // 30s cache: skip refetch spam
       let alive = true;
       setLoading(true);
       setError(null);

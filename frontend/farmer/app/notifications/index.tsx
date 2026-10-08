@@ -12,6 +12,7 @@ import {
   View,
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
+import { shouldRefetch } from '../../src/utils/focusCache';
 import { Screen } from '../../src/components/common/Screen';
 import { Card } from '../../src/components/common/Card';
 import { ErrorRetry } from '../../src/components/common/ErrorRetry';
@@ -85,9 +86,9 @@ export default function NotificationsScreen() {
     }
   }, []);
 
-  // Refresh every time the screen gains focus.
+  // Refresh when the screen gains focus (skipped if fetched <30s ago).
   useFocusEffect(useCallback(() => {
-    load();
+    if (shouldRefetch('notifications')) load();
   }, [load]));
 
   // Tap: mark read, then follow the type's deep link.

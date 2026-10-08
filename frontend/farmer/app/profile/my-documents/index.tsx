@@ -2,6 +2,7 @@
 import React, { useCallback, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
 import { useFocusEffect } from 'expo-router';
+import { shouldRefetch } from '../../../src/utils/focusCache';
 import { Screen } from '../../../src/components/common/Screen';
 import { Card } from '../../../src/components/common/Card';
 import { StatusBadge } from '../../../src/components/common/StatusBadge';
@@ -52,7 +53,7 @@ export default function MyDocumentsScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      load();
+      if (shouldRefetch('my-documents')) load(); // 30s cache: skip refetch spam
     }, [load]),
   );
 

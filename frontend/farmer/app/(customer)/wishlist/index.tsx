@@ -12,6 +12,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
+import { shouldRefetch } from '../../../src/utils/focusCache';
 import { Screen } from '../../../src/components/common/Screen';
 import { Card } from '../../../src/components/common/Card';
 import { AppButton } from '../../../src/components/common/AppButton';
@@ -64,7 +65,7 @@ export default function WishlistScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      load();
+      if (shouldRefetch('wishlist')) load(); // 30s cache: skip refetch spam
     }, [load]),
   );
 
@@ -142,7 +143,7 @@ export default function WishlistScreen() {
           renderItem={renderItem}
           contentContainerStyle={styles.list}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={() => load(true)} colors={[colors.forest]} />
+            <RefreshControl refreshing={refreshing} onRefresh={() => { shouldRefetch('wishlist', true); load(true); }} colors={[colors.forest]} />
           }
           ListEmptyComponent={
             <View style={styles.center}>

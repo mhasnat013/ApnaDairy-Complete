@@ -27,7 +27,6 @@ import {
   getManagersByCity,
   requestManager,
   type AreaManager,
-  type CityInfo,
   type ManagerRequest,
 } from '../../../src/services/linkingService';
 
@@ -45,7 +44,7 @@ function initials(name: string): string {
 export default function ManagersScreen() {
   const [phase, setPhase] = useState<Phase>('loading');
   const [request, setRequest] = useState<ManagerRequest | null>(null);
-  const [cities, setCities] = useState<CityInfo[]>([]);
+  const [cities, setCities] = useState<string[]>([]);
   const [city, setCity] = useState<string | null>(null);
   const [managers, setManagers] = useState<AreaManager[]>([]);
   const [loadingCities, setLoadingCities] = useState(false);
@@ -61,14 +60,19 @@ export default function ManagersScreen() {
   const [browsing, setBrowsing] = useState(false);
 
   // Load the farmer's registration request and decide which phase to show.
+  // getManagerRequest() and getCities() are independent, so they load in
+  // parallel instead of one after another. getFarmerStats() stays a
+  // conditional fallback (only fetched when no request row exists).
   const load = useCallback(async (isRefresh = false) => {
     try {
       if (isRefresh) setRefreshing(true);
       setError(null);
       setNotice(null);
-      const req = await getManagerRequest();
-      setRequest(req);
       setBrowsing(false);
+      setLoadingCities(true);
+      const [req, cityList] = await Promise.all([getManagerRequest(), getCities()]);
+      setRequest(req);
+      setCities(cityList);
       if (req && req.status === 'accepted') {
         setPhase('linked');
       } else if (req && req.status === 'pending') {
@@ -93,14 +97,10 @@ export default function ManagersScreen() {
           return;
         }
         setPhase('pick');
-        setLoadingCities(true);
-        setCities(await getCities());
       } else {
         // The last request was declined: pick a city.
         setNotice('Your last request was declined. You can send a request to another manager.');
         setPhase('pick');
-        setLoadingCities(true);
-        setCities(await getCities());
       }
     } catch {
       setError('Could not load your manager details. Pull down to try again.');
@@ -270,36 +270,14 @@ export default function ManagersScreen() {
           <EmptyState title="No cities available" message="Please check back later." />
         ) : (
           <View style={styles.cityList}>
-            {cities.map((c) => {
-              const hasManagers = c.manager_count !== 0;
-              const label =
-                c.manager_count < 0
-                  ? c.city
-                  : c.manager_count === 0
-                    ? `${c.city} (No managers yet)`
-                    : `${c.city} (${c.manager_count} manager${c.manager_count === 1 ? '' : 's'})`;
-              return (
-                <Pressable
-                  key={c.city}
-                  onPress={() => pickCity(c.city)}
-                  style={[
-                    styles.cityRow,
-                    city === c.city && styles.cityRowSelected,
-                    !hasManagers && styles.cityRowEmpty,
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.cityText,
-                      city === c.city && styles.cityTextSelected,
-                      !hasManagers && styles.cityTextEmpty,
-                    ]}
-                  >
-                    {label}
-                  </Text>
-                </Pressable>
-              );
-            })}
+            {cities.map((c) => (
+              <AppButton
+                key={c}
+                label={c}
+                variant={city === c ? 'primary' : 'outline'}
+                onPress={() => pickCity(c)}
+              />
+            ))}
           </View>
         )}
 
@@ -310,8 +288,8 @@ export default function ManagersScreen() {
               <ActivityIndicator size="large" color={colors.forest} />
             ) : managers.length === 0 ? (
               <EmptyState
-                title={`No managers in ${city} yet`}
-                message="No area manager serves this city right now. Try another city, or check back later."
+                title={`No managers in ${city}`}
+                message="Try another city."
               />
             ) : (
               managers.map((m) => (
@@ -381,15 +359,6 @@ const styles = StyleSheet.create({
   sub: { fontSize: font.small, color: colors.sage, fontFamily: font.regular, marginTop: 4 },
   sectionTitle: { fontSize: font.h3, color: colors.ink, fontFamily: font.bold, marginTop: 16, marginBottom: 12 },
   cityList: { gap: 12 },
-  cityRow: {
-    borderWidth: 1.5, borderColor: colors.forest, borderRadius: 12,
-    paddingVertical: 14, paddingHorizontal: 16, backgroundColor: colors.ivory,
-  },
-  cityRowSelected: { backgroundColor: colors.forest },
-  cityRowEmpty: { opacity: 0.55 },
-  cityText: { fontSize: font.body, color: colors.forest, fontFamily: font.bold },
-  cityTextSelected: { color: colors.ivory },
-  cityTextEmpty: { color: colors.sage },
   heroTitle: { fontSize: font.h1, color: colors.ink, fontFamily: font.extrabold, marginTop: 8 },
   heroSub: { fontSize: font.body, color: colors.sage, fontFamily: font.regular, marginTop: 6 },
   linkText: { fontSize: font.body, color: colors.forest, fontFamily: font.bold, textDecorationLine: 'underline' },

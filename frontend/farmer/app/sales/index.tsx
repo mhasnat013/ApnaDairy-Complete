@@ -17,6 +17,7 @@ import {
   View,
 } from 'react-native';
 import { useFocusEffect } from 'expo-router';
+import { shouldRefetch } from '../../src/utils/focusCache';
 import { Screen } from '../../src/components/common/Screen';
 import { Card } from '../../src/components/common/Card';
 import { ErrorRetry } from '../../src/components/common/ErrorRetry';
@@ -70,12 +71,14 @@ export default function FarmerSaleScreen(): React.JSX.Element {
   }, []);
 
   // Loads on focus — the manager may send a new offer at any time.
+  // Skipped if fetched <30s ago; pull-to-refresh always reloads.
   useFocusEffect(useCallback(() => {
-    load().finally(() => setLoading(false));
+    if (shouldRefetch('sales')) load().finally(() => setLoading(false));
   }, [load]));
 
-  // Pull-to-refresh handler.
+  // Pull-to-refresh handler (always reloads).
   const onRefresh = useCallback(async () => {
+    shouldRefetch('sales', true);
     setRefreshing(true);
     await load();
     setRefreshing(false);

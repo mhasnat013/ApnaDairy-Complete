@@ -5,6 +5,7 @@
 import React, { useCallback, useState } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, Pressable, Alert } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
+import { shouldRefetch } from '../../src/utils/focusCache';
 import { Screen } from '../../src/components/common/Screen';
 import { AppButton } from '../../src/components/common/AppButton';
 import { Card } from '../../src/components/common/Card';
@@ -62,7 +63,7 @@ export default function CustomerHomeScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      load();
+      if (shouldRefetch('customer-home')) load(); // 30s cache: skip refetch spam
     }, [load])
   );
 
