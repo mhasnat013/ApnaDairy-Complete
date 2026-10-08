@@ -23,8 +23,11 @@ SETTLED_PAYMENT_STATUSES = ("paid", "verified")
 
 
 def test_mode_enabled() -> bool:
-    """True only when the server explicitly enables the dev-only demo card."""
-    return os.environ.get("PAYMENTS_TEST_MODE", "").strip().lower() == "true"
+    """True only when the server explicitly enables the dev-only demo card.
+
+    Default is False: production must never process demo card charges.
+    """
+    return os.environ.get("PAYMENTS_TEST_MODE", "false").strip().lower() == "true"
 
 
 def get_order(client, order_id: str):
