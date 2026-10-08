@@ -3,6 +3,7 @@
 // carousel, nearby manager cards, and value picks.
 // Data: GET /home/feed/me via homeService (falls back to public feed).
 import React, { useCallback, useEffect, useState } from 'react';
+import { formatRs } from '../../src/utils/format';
 import {
   ActivityIndicator,
   RefreshControl,
@@ -11,6 +12,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { getHomeFeed } from '../../../src/services/customer/homeService';
 import type { HomeFeed, Product } from '../../../src/types/customerModels';
@@ -26,10 +28,6 @@ function getInitials(name: string | null): string {
   return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
 }
 
-function formatRs(value: number | null | undefined): string {
-  if (value == null) return '—';
-  return `Rs ${Number(value).toLocaleString('en-PK')}`;
-}
 
 // Category values double as API filter parameters (sent via
 // goMarketplace → marketplace screen → listProducts({ category })) — keep
@@ -58,16 +56,16 @@ function ProductCard({ item, onPress }: { item: Product; onPress: () => void }):
     >
       <View
         style={{
-          height: 84, borderRadius: 14, backgroundColor: colors.cream,
+          height: 84, borderRadius: 16, backgroundColor: colors.cream,
           alignItems: 'center', justifyContent: 'center', marginBottom: 8,
         }}
       >
-        <Text style={{ fontFamily: 'BricolageGrotesque_400Regular', fontSize: 12, color: colors.sage }}>Photo</Text>
+        <Text style={{ fontFamily: F, fontSize: 12, color: colors.sage }}>Photo</Text>
       </View>
       <Text style={{ fontFamily: 'BricolageGrotesque_700Bold', fontSize: 14, color: colors.ink }} numberOfLines={1}>
         {item.name ?? 'Product'}
       </Text>
-      <Text style={{ fontFamily: 'BricolageGrotesque_400Regular', fontSize: 12, color: colors.sage, marginTop: 2 }} numberOfLines={1}>
+      <Text style={{ fontFamily: F, fontSize: 12, color: colors.sage, marginTop: 2 }} numberOfLines={1}>
         {item.manager?.center_name ?? ''}
       </Text>
       <Text style={{ fontFamily: 'BricolageGrotesque_700Bold', fontSize: 15, color: colors.forest, marginTop: 4 }}>
@@ -91,7 +89,7 @@ function ManagerCard({ manager }: { manager: Record<string, unknown> }): React.J
     >
       <View
         style={{
-          width: 48, height: 48, borderRadius: 24, backgroundColor: colors.forest,
+          width: 48, height: 48, borderRadius: 20, backgroundColor: colors.forest,
           alignItems: 'center', justifyContent: 'center', marginRight: 12,
         }}
       >
@@ -103,7 +101,7 @@ function ManagerCard({ manager }: { manager: Record<string, unknown> }): React.J
         <Text style={{ fontFamily: 'BricolageGrotesque_700Bold', fontSize: 16, color: colors.ink }} numberOfLines={1}>
           {name}
         </Text>
-        <Text style={{ fontFamily: 'BricolageGrotesque_400Regular', fontSize: 13, color: colors.sage, marginTop: 2 }}>
+        <Text style={{ fontFamily: F, fontSize: 13, color: colors.sage, marginTop: 2 }}>
           {city}
         </Text>
       </View>
@@ -165,7 +163,7 @@ export default function CustomerHomeScreen(): React.JSX.Element {
     return (
       <View style={{ flex: 1, backgroundColor: colors.cream, alignItems: 'center', justifyContent: 'center' }}>
         <ActivityIndicator size="large" color={colors.forest} />
-        <Text style={{ fontFamily: 'BricolageGrotesque_400Regular', fontSize: 14, color: colors.sage, marginTop: 12 }}>Loading...</Text>
+        <Text style={{ fontFamily: F, fontSize: 14, color: colors.sage, marginTop: 12 }}>Loading...</Text>
       </View>
     );
   }
@@ -173,7 +171,7 @@ export default function CustomerHomeScreen(): React.JSX.Element {
   if (error && !feed) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.cream, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 }}>
-        <Text style={{ fontFamily: 'BricolageGrotesque_400Regular', fontSize: 16, color: colors.ink, textAlign: 'center', marginBottom: 16 }}>
+        <Text style={{ fontFamily: F, fontSize: 16, color: colors.ink, textAlign: 'center', marginBottom: 16 }}>
           {error}
         </Text>
         <TouchableOpacity
@@ -200,14 +198,15 @@ export default function CustomerHomeScreen(): React.JSX.Element {
   const managers = feed.nearby_managers ?? [];
 
   return (
-    <ScrollView
+    <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+<ScrollView
       style={{ flex: 1, backgroundColor: colors.cream }}
       contentContainerStyle={{ padding: 16, paddingBottom: 32 }}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.forest} />}
     >
       {error ? (
         <View style={{ backgroundColor: colors.dangerTint, borderRadius: 16, padding: 14, marginBottom: 12 }}>
-          <Text style={{ fontFamily: 'BricolageGrotesque_400Regular', fontSize: 14, color: colors.ink }}>{error}</Text>
+          <Text style={{ fontFamily: F, fontSize: 14, color: colors.ink }}>{error}</Text>
           <TouchableOpacity onPress={onRefresh} style={{ marginTop: 8 }}>
             <Text style={{ fontFamily: 'BricolageGrotesque_700Bold', fontSize: 14, color: colors.forest }}>
               Please try again
@@ -220,7 +219,7 @@ export default function CustomerHomeScreen(): React.JSX.Element {
       <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
         <View
           style={{
-            width: 52, height: 52, borderRadius: 26, backgroundColor: colors.forest,
+            width: 52, height: 52, borderRadius: 20, backgroundColor: colors.forest,
             alignItems: 'center', justifyContent: 'center',
           }}
         >
@@ -229,7 +228,7 @@ export default function CustomerHomeScreen(): React.JSX.Element {
           </Text>
         </View>
         <View style={{ flex: 1, marginLeft: 12 }}>
-          <Text style={{ fontFamily: 'BricolageGrotesque_400Regular', fontSize: 13, color: colors.sage }}>
+          <Text style={{ fontFamily: F, fontSize: 13, color: colors.sage }}>
             {feed.greeting || 'Hello,'}
           </Text>
           <Text style={{ fontFamily: 'BricolageGrotesque_700Bold', fontSize: 20, color: colors.ink }}>
@@ -249,7 +248,7 @@ export default function CustomerHomeScreen(): React.JSX.Element {
           <Text style={{ fontFamily: 'BricolageGrotesque_700Bold', fontSize: 14, color: colors.ink }}>
             Outstanding dues: {formatRs(feed.pending_dues)}
           </Text>
-          <Text style={{ fontFamily: 'BricolageGrotesque_400Regular', fontSize: 12, color: colors.ink, marginTop: 2 }}>
+          <Text style={{ fontFamily: F, fontSize: 12, color: colors.ink, marginTop: 2 }}>
             Please clear your outstanding dues to keep placing new orders.
           </Text>
         </View>
@@ -314,5 +313,6 @@ export default function CustomerHomeScreen(): React.JSX.Element {
         </View>
       ) : null}
     </ScrollView>
+    </SafeAreaView>
   );
 }
