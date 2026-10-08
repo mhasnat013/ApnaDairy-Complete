@@ -32,13 +32,18 @@ def create_app() -> FastAPI:
         version="0.1.0",
         description="Farmer dashboard endpoints for the ApnaDairy mobile app.",
     )
-    # CORS: the Expo app runs on a different origin/port during development.
-    # DEV ONLY: allow all origins. Before any public deployment, replace "*"
-    # with your exact app origins, e.g. ["http://192.168.1.10:8081"].
+    # CORS: restricted to known ApnaDairy origins (production-safe).
+    # The API authenticates via Authorization: Bearer headers, not cookies,
+    # so credentials are not needed.
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
-        allow_credentials=True,
+        allow_origins=[
+            "https://apna-dairy-complete.vercel.app",
+            "https://apnadairy-psi.vercel.app",
+            "http://localhost:5173",
+            "http://localhost:8081",
+        ],
+        allow_credentials=False,
         allow_methods=["*"],
         allow_headers=["*"],
     )
