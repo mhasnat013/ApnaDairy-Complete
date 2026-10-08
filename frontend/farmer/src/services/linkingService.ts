@@ -42,8 +42,21 @@ export interface ManagerRequest {
 }
 
 /** Cities that have area managers. */
-export async function getCities(): Promise<string[]> {
-  return get<string[]>('/api/v1/farmer/cities');
+/** A city with its area-manager availability count. */
+export interface CityInfo {
+  city: string;
+  manager_count: number;
+}
+
+/** All cities with manager availability. Backwards-compatible: accepts the
+ *  old string[] shape too (treated as cities with unknown counts). */
+export async function getCities(): Promise<CityInfo[]> {
+  const raw = await get<string[] | CityInfo[]>('/api/v1/farmer/cities');
+  if (!Array.isArray(raw) || raw.length === 0) return [];
+  if (typeof raw[0] === 'string') {
+    return (raw as string[]).map((city) => ({ city, manager_count: -1 }));
+  }
+  return raw as CityInfo[];
 }
 
 /** Area managers serving a city. */
