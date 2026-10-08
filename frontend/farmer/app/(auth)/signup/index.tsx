@@ -1,8 +1,7 @@
-// Signup screen for the ApnaDairy farmer app (v2).
+// Signup screen for the ApnaDairy unified app (v2).
 // Same role-first pattern as login. Role hint card changes with selection.
 // Farmer success -> onboarding (detail entry). Google -> Continue-as.
-// The Customer option is selectable only (yellow selected state); customer
-// signup is not part of this farmer build, so it shows a notice instead.
+// Customer success -> email OTP verification, then customer home.
 import React, { useState } from 'react';
 import {
   View,
@@ -21,6 +20,7 @@ import { Card } from '../../../src/components/common/Card';
 import { Logo } from '../../../src/components/common/Logo';
 import { colors } from '../../../src/theme/colors';
 import { signupWithSupabase, Role } from '../../../src/services/authService';
+import { signupCustomer } from '../../../src/services/customerAuthService';
 import { startGoogleOAuth } from '../../../src/api/googleAuth';
 
 /** Two-option segmented control: Farmer | Customer. Nothing pre-selected.
@@ -67,14 +67,10 @@ export default function SignupScreen() {
   const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  /** Validate all fields, create the farmer account, go to onboarding. */
+  /** Validate all fields, create the account for the chosen role. */
   const handleSignup = async () => {
     if (!role) {
       setError('Please select Farmer or Customer first.');
-      return;
-    }
-    if (role === 'customer') {
-      setError('Customer signup is not available in this farmer app. Please select Farmer.');
       return;
     }
     if (!name.trim()) {
@@ -105,6 +101,23 @@ export default function SignupScreen() {
     setError(null);
     setLoading(true);
     try {
+      if (role === 'customer') {
+        // Real customer signup via the B2C backend. The backend sends a
+        // 6-digit email OTP; verify it on the next screen.
+        const nameParts = name.trim().split(/\s+/);
+        await signupCustomer({
+          firstName: nameParts[0] || '',
+          lastName: nameParts.slice(1).join(' ') || '',
+          email: email.trim(),
+          phone: digits,
+          password,
+        });
+        router.push({
+          pathname: '/(auth)/verify-customer-email',
+          params: { email: email.trim() },
+        });
+        return;
+      }
       // Real farmer signup: the backend creates the Supabase Auth user AND
       // the farmer profile row, then signs in directly. Next: onboarding.
       await signupWithSupabase(name.trim(), email.trim(), digits, password, role);
@@ -117,6 +130,7 @@ export default function SignupScreen() {
   };
 
   /** Real Google sign-in (Supabase PKCE). Existing farmer -> home directly;
+   *  existing customer -> customer home directly;
    *  new Google user -> Continue-as screen to pick the role (immutable). */
   const handleGoogle = async () => {
     setError(null);
@@ -124,7 +138,7 @@ export default function SignupScreen() {
     try {
       const outcome = await startGoogleOAuth();
       if (outcome.kind === 'customer') {
-        setError('This Google account is registered as a Customer. Customer access is not available in this farmer app.');
+        router.replace('/(customer)/home');
       } else if (outcome.kind === 'farmer') {
         router.replace('/(tabs)/home');
       } else {
@@ -155,7 +169,7 @@ export default function SignupScreen() {
               <Text style={styles.hintText}>
                 {role === 'farmer'
                   ? 'Farmer: sell your milk to area managers at fair prices.'
-                  : 'Customer: the customer app is not part of this farmer build.'}
+                  : 'Customer: buy pure milk from verified area managers.'}
               </Text>
             </Card>
           ) : null}
