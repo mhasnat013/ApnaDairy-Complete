@@ -1,6 +1,7 @@
 // Customer verification: status + CNIC/profile-photo upload + submit.
 import React, { useCallback, useState } from 'react';
 import { View, Text, StyleSheet, Pressable, ScrollView, ActivityIndicator, Alert, TextInput } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
 import { Screen } from '../../../src/components/common/Screen';
 import { Card } from '../../../src/components/common/Card';
@@ -98,7 +99,8 @@ export default function VerificationScreen() {
   const readonly = status?.status === 'approved' || status?.status === 'in_review';
 
   return (
-    <Screen title="Verification" subtitle="Account verification">
+    <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+<Screen title="Verification" subtitle="Account verification">
       {loading ? (
         <View style={styles.center}><ActivityIndicator size="large" color={colors.forest} /></View>
       ) : (
@@ -147,6 +149,7 @@ export default function VerificationScreen() {
         </ScrollView>
       )}
     </Screen>
+    </SafeAreaView>
   );
 }
 
@@ -164,7 +167,7 @@ const styles = StyleSheet.create({
   uploadedBtn: { backgroundColor: colors.success },
   uploadText: { color: colors.ivory, fontSize: 14, fontWeight: '700' },
   input: {
-    backgroundColor: colors.ivory, borderRadius: 12, padding: 14, marginBottom: 10,
+    backgroundColor: colors.ivory, borderRadius: 16, padding: 14, marginBottom: 10,
     fontSize: 16, color: colors.ink, borderWidth: 1, borderColor: colors.line,
   },
   multiline: { minHeight: 80 },
