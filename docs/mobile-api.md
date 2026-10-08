@@ -82,7 +82,7 @@ The admin never assigns farmers to centers.
 
 The farmer can read their own rows (row level security does the filtering):
 
-- `supabase.from('milk_collections').select('*').order('collected_at', { ascending: false })` shows each can, with its test result (`quality`, `freshness_score`, `ph`, `temperature_c`, `tds_ppm`), price and `status` (`offered`, `accepted`, `rejected`, …).
+- `supabase.from('milk_collections').select('*').order('collected_at', { ascending: false })` shows each can, with its test result (`quality`, `freshness_score`, `ph`, `temperature_c`, `tds_ppm`, and `adulteration_score`: AI Model 2's chance of added water in %, 50 or more means water), price and `status` (`offered`, `accepted`, `rejected`, …).
 - `rpc('decide_collection', { p_id, p_accept, p_reason })` answers a price offer. It returns `accepted`, `refused` or `expired`. An offer expires 2 hours after it is made.
 - `supabase.from('farmer_payouts').select('*')` lists payments the center has sent.
 - `rpc('farmer_answer_payout', { p_id, p_confirm, p_note })` confirms that money arrived, or disputes it with a note.
@@ -114,6 +114,7 @@ Farmer kinds:
 - `public_listings` also carries what AI Model 1 found in that milk: `model_quality` (Good, Acceptable, Poor), `spoilage_pct`, `model_shelf_left_h` and `tested_at`.
 - The website's view-only marketplace reads two catalog views, which the app can use too:
   - `marketplace_milk`: milk listings with litres available, plus `listed_at`, `test_ph` and `test_temperature_c`.
+    - `water_check` is `clear` (AI Model 2 found no added water in any batch on sale) or `suspected`.
   - `marketplace_products`: dairy products from product sellers.
 - `rpc('place_shop_order', { p_items: [{ listing_id, quantity }], p_address, p_phone })` places an order from one shop and returns the order id. The website never calls this: its "Order" buttons point people to the app.
 - The customer's orders are in `shop_orders`, with their items in `shop_order_items`.

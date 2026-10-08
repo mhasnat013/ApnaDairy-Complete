@@ -4,14 +4,15 @@
 //   { action: 'finish', session }     averages the samples on the server and stores the final reading
 // only the final, averaged reading is used by the ai models and the collection.
 // deploy: supabase dashboard → edge functions → deploy a new function → via editor, name "iot-reading".
-//   { action: 'predict', temperature, ph, ec }   asks ai model 1 directly (the try-it sliders)
-//   { action: 'wake' }                loads ai model 1 ahead of a test (called when the test page opens), also for admins
+//   { action: 'predict', temperature, ph, ec, tds }   asks ai models 1 and 2 directly (the try-it sliders)
+//   { action: 'wake' }                loads both ai models ahead of a test (called when the test page opens), also for admins
 // secret needed: FIREBASE_SECRET (edge functions → secrets). SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY
 // are provided by supabase automatically. optional: TEST_SECONDS (default 60), SAMPLE_EVERY (default 3).
 // ai model 1 runs inside this function: the team's trained models (ai/model1/models/*.joblib) exported by
 // ai/model1/export_for_supabase.py into public/model1/apnadairy-model1-v1.bin, which the website serves.
-// it is downloaded once per cold start and checked against MODEL1_SHA256. optional secret MODEL1_FILE_URL
-// to load it from somewhere else. if it cannot be loaded, the test uses the backup rules (supabase/41_model1.sql).
+// ai model 2 (added water) runs the same way: ai/model2/export_for_supabase.py → public/model2/apnadairy-model2-v1.bin.
+// each file is downloaded once per cold start and checked against its sha256. optional secrets MODEL1_FILE_URL and
+// MODEL2_FILE_URL load them from somewhere else.
 import { createClient } from 'npm:@supabase/supabase-js@2'
 
 const cors = {
@@ -200,34 +201,116 @@ function runModel1(m: M1Model, temperature: number, ph: number, ec: number): Mod
 }
 // --- model1-end ---
 
-// the model file: downloaded once per cold start, then kept in memory
+// --- model2-start ---
+// ai model 2: temperature, ph, ec (at the milk's own temperature) and tds in; whether water was added, with a
+// confidence. gives the same answers as ai/model2/src/predict.py (checked by ai/model2/test_parity.mjs).
+// the model: 5 calibrated folds of boosted trees; P(water) is the mean of 1 / (1 + exp(a * raw + b)).
+type Model2 = { water_detected: boolean; adulteration_type: 'Water' | 'None'; confidence: number; water_probability: number; warnings: string[] }
+type M2Fold = { a: number; b: number; baseline: number; trees: number; start: Int32Array; left: Int16Array; right: Int16Array; feature: Int8Array; missLeft: Uint8Array; value: Float64Array }
+type M2Model = { folds: M2Fold[]; ranges: Record<string, [number, number]> }
+const M2_NAMES: Record<string, string> = { temperature_c: 'temperature', ph: 'pH', ec_ms_cm: 'EC', tds_ppm: 'TDS' }
+
+function parseModel2(bytes: Uint8Array): M2Model {
+  const n = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).getUint32(0, true)
+  const head = JSON.parse(new TextDecoder().decode(bytes.subarray(4, 4 + n)))
+  if (head.format !== 'apnadairy-model2' || head.version !== 1 || head.classes?.[1] !== 'Water') throw new Error('unknown model file')
+  let at = 4 + n
+  while (at % 8) at++
+  const buf = bytes.slice(at).buffer   // a fresh copy, so every array is aligned
+  type Part = { offset: number; length: number }
+  const folds = head.folds.map((h: { a: number; b: number; baseline: number; trees: number; nodes: number[]; left: Part; right: Part; feature: Part; missing_left: Part; value: Part }) => {
+    const start = new Int32Array(h.trees + 1)
+    for (let t = 0; t < h.trees; t++) start[t + 1] = start[t] + h.nodes[t]
+    return { a: h.a, b: h.b, baseline: h.baseline, trees: h.trees, start,
+             left: new Int16Array(buf, h.left.offset, h.left.length), right: new Int16Array(buf, h.right.offset, h.right.length),
+             feature: new Int8Array(buf, h.feature.offset, h.feature.length), missLeft: new Uint8Array(buf, h.missing_left.offset, h.missing_left.length),
+             value: new Float64Array(buf, h.value.offset, h.value.length) }
+  })
+  return { folds, ranges: head.train_ranges }
+}
+
+// one fold's raw score: the baseline plus every tree's leaf, trees walked like scikit-learn (x <= threshold goes left)
+function m2Raw(f: M2Fold, x: number[]) {
+  let raw = f.baseline
+  for (let t = 0; t < f.trees; t++) {
+    const b = f.start[t]
+    let node = 0
+    while (f.feature[b + node] !== -1) {
+      const v = x[f.feature[b + node]]
+      node = Number.isNaN(v) ? (f.missLeft[b + node] ? f.left[b + node] : f.right[b + node]) : v <= f.value[b + node] ? f.left[b + node] : f.right[b + node]
+    }
+    raw += f.value[b + node]
+  }
+  return raw
+}
+
+// the chance of each class, averaged over the folds the way CalibratedClassifierCV does
+function m2Proba(m: M2Model, x: number[]) {
+  let water = 0, none = 0
+  for (const f of m.folds) {
+    const p = 1 / (1 + Math.exp(f.a * m2Raw(f, x) + f.b))
+    water += p; none += 1 - p
+  }
+  return { water: water / m.folds.length, none: none / m.folds.length }
+}
+
+function runModel2(m: M2Model, temperature: number, ph: number, ec: number, tds: number): Model2 {
+  const inputs: Record<string, number> = { temperature_c: temperature, ph, ec_ms_cm: ec, tds_ppm: tds }
+  if (![temperature, ph, ec, tds].every(Number.isFinite) || ec <= 0 || tds <= 0 || ph < 0 || ph > 14) throw new Error('these are not possible sensor values')
+  // the same engineered features as training (BackendFeatures in ai/model2/src/train_models.py)
+  const x = [temperature, ph, ec, tds, ec / (1 + 0.022 * (temperature - 25.0)), tds / (ec * 1000.0)]
+  const p = m2Proba(m, x)
+  const water = p.water > p.none
+  return {
+    water_detected: water, adulteration_type: water ? 'Water' : 'None',
+    confidence: Math.round((water ? p.water : p.none) * 1000) / 10,
+    water_probability: Math.round(p.water * 10000) / 100,
+    warnings: Object.entries(m.ranges).filter(([k, [lo, hi]]) => !(lo <= inputs[k] && inputs[k] <= hi))
+      .map(([k, [lo, hi]]) => `${M2_NAMES[k] ?? k} ${inputs[k]} is outside what the model was trained on (${lo} to ${hi})`),
+  }
+}
+// --- model2-end ---
+
+// the model files: downloaded once per cold start, checked, then kept in memory
 const MODEL1_SHA256 = 'ad3229e9f4a5232e79458f68e77f6a1081f49d890d2685846a0803b8f70de352'
+const MODEL2_SHA256 = '17a7f4ce32352a6c23d69b1ac933fb33454171bd57dd3059ffe6f1f512a1a7c7'
+async function fetchModelFile(path: string, override: string, sha: string) {
+  const site = (Deno.env.get('SITE_URL') ?? 'https://apnadairy-psi.vercel.app').trim().replace(/\/$/, '')
+  const url = (Deno.env.get(override) ?? `${site}/${path}`).trim()
+  const stop = new AbortController()
+  const timer = setTimeout(() => stop.abort(), 20000)
+  try {
+    const res = await fetch(url, { signal: stop.signal })
+    if (!res.ok) throw new Error(`model file answered ${res.status}`)
+    const gz = new Uint8Array(await res.arrayBuffer())
+    const hash = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', gz))).map((b) => b.toString(16).padStart(2, '0')).join('')
+    if (hash !== sha) throw new Error('the model file does not match this version')
+    return new Uint8Array(await new Response(new Blob([gz]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer())
+  } finally {
+    clearTimeout(timer)
+  }
+}
 let model1: Promise<M1Model> | null = null
 function loadModel1(): Promise<M1Model> {
   if (!model1) {
-    model1 = (async () => {
-      const site = (Deno.env.get('SITE_URL') ?? 'https://apnadairy-psi.vercel.app').trim().replace(/\/$/, '')
-      const url = (Deno.env.get('MODEL1_FILE_URL') ?? `${site}/model1/apnadairy-model1-v1.bin`).trim()
-      const stop = new AbortController()
-      const timer = setTimeout(() => stop.abort(), 20000)
-      try {
-        const res = await fetch(url, { signal: stop.signal })
-        if (!res.ok) throw new Error(`model file answered ${res.status}`)
-        const gz = new Uint8Array(await res.arrayBuffer())
-        const hash = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', gz))).map((b) => b.toString(16).padStart(2, '0')).join('')
-        if (hash !== MODEL1_SHA256) throw new Error('the model file does not match this version')
-        const raw = new Uint8Array(await new Response(new Blob([gz]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer())
-        return parseModel1(raw)
-      } finally {
-        clearTimeout(timer)
-      }
-    })()
+    model1 = fetchModelFile('model1/apnadairy-model1-v1.bin', 'MODEL1_FILE_URL', MODEL1_SHA256).then(parseModel1)
     model1.catch(() => { model1 = null })   // try again on the next test
   }
   return model1
 }
+let model2: Promise<M2Model> | null = null
+function loadModel2(): Promise<M2Model> {
+  if (!model2) {
+    model2 = fetchModelFile('model2/apnadairy-model2-v1.bin', 'MODEL2_FILE_URL', MODEL2_SHA256).then(parseModel2)
+    model2.catch(() => { model2 = null })
+  }
+  return model2
+}
 async function askModel1(temperature: number, ph: number, ec: number): Promise<Model1> {
   return runModel1(await loadModel1(), temperature, ph, ec)
+}
+async function askModel2(temperature: number, ph: number, ec: number, tds: number): Promise<Model2> {
+  return runModel2(await loadModel2(), temperature, ph, ec, tds)
 }
 // keep every answer, so the database uses it for this test (and the same values are never asked twice)
 async function saveModel1(admin: ReturnType<typeof createClient>, t: number, ph: number, ec: number, m: Model1) {
@@ -237,15 +320,19 @@ async function saveModel1(admin: ReturnType<typeof createClient>, t: number, ph:
   })
   if (error) throw new Error(error.message)
 }
-// loads the model ahead of the test (the test page calls this when it opens), and says whether it works
-async function wakeModel1() {
-  try {
-    const m = await loadModel1()
-    runModel1(m, 6, 6.7, 4.4)
-    return { ok: true }
-  } catch (e) {
-    return { ok: false, error: (e as Error).message }
-  }
+async function saveModel2(admin: ReturnType<typeof createClient>, t: number, ph: number, ec: number, tds: number, m: Model2) {
+  const { error } = await admin.from('model2_predictions').upsert({
+    temperature_c: t, ph, ec_ms: ec, tds_ppm: tds, water_detected: m.water_detected, confidence: m.confidence,
+    water_probability: m.water_probability, warnings: m.warnings ?? [],
+  })
+  if (error) throw new Error(error.message)
+}
+// loads both models ahead of the test (the test page calls this when it opens), and says whether they work
+async function wakeModels() {
+  const out: Record<string, unknown> = { ok: true }
+  try { runModel1(await loadModel1(), 6, 6.7, 4.4) } catch (e) { out.ok = false; out.error = `Model 1: ${(e as Error).message}` }
+  try { runModel2(await loadModel2(), 6, 6.7, 4.4, 2800) } catch (e) { out.ok = false; out.error2 = `Model 2: ${(e as Error).message}` }
+  return out
 }
 
 Deno.serve(async (req) => {
@@ -264,7 +351,7 @@ Deno.serve(async (req) => {
     if (body.action === 'wake') {
       const { data: me } = await admin.from('profiles').select('role, status').eq('id', user.id).maybeSingle()
       if (!me || me.status !== 'active' || !['area_manager', 'super_admin'].includes(me.role)) return reply({ error: 'Not allowed.' }, 403)
-      return reply(await wakeModel1())
+      return reply(await wakeModels())
     }
 
     const { data: center } = await admin.from('area_managers').select('id, verification_status')
@@ -277,14 +364,26 @@ Deno.serve(async (req) => {
     if (body.action === 'predict') {
       const t = Math.round(Number(body.temperature) * 100) / 100, ph = Math.round(Number(body.ph) * 100) / 100
       const ec = Math.round(Number(body.ec) * 1000) / 1000
+      const tds = body.tds == null ? null : Math.round(Number(body.tds) * 10) / 10
       if (![t, ph, ec].every(Number.isFinite)) return reply({ error: 'Send temperature, ph and ec.' }, 400)
+      const out: Record<string, unknown> = {}
       try {
         const m = await askModel1(t, ph, ec)
         await saveModel1(admin, t, ph, ec, m)
-        return reply({ prediction: m })
+        out.prediction = m
       } catch (e) {
-        return reply({ error: `AI model 1 could not be reached: ${(e as Error).message}` })
+        out.error = (e as Error).message
       }
+      if (tds !== null && Number.isFinite(tds)) {
+        try {
+          const m = await askModel2(t, ph, ec, tds)
+          await saveModel2(admin, t, ph, ec, tds, m)
+          out.prediction2 = m
+        } catch (e) {
+          out.error2 = (e as Error).message
+        }
+      }
+      return reply(out)
     }
 
     if (body.action === 'start') {
@@ -328,8 +427,8 @@ Deno.serve(async (req) => {
         r.ec25_ms = Math.round(ec25 * 1000) / 1000
         r.ec_ms = Math.round(ec25 * (1 + 0.022 * (r.temperature_c - 25)) * 1000) / 1000
       }
-      // ai model 1 on the averaged reading. if it cannot answer, the database uses the backup rules
-      let m1: Record<string, unknown> = {}
+      // ai models 1 and 2 on the averaged reading; the database reads their answers for this test
+      let m1: Record<string, unknown> = {}, m2: Record<string, unknown> = {}
       if (r.status === 'ok' && r.temperature_c !== null && r.ph !== null && r.ec_ms !== null) {
         try {
           const m = await askModel1(r.temperature_c, r.ph, r.ec_ms)
@@ -340,9 +439,18 @@ Deno.serve(async (req) => {
           m1 = { m1_error: (e as Error).message.slice(0, 300) }
         }
       }
+      if (r.status === 'ok' && r.temperature_c !== null && r.ph !== null && r.ec_ms !== null && r.tds_ppm !== null) {
+        try {
+          const m = await askModel2(r.temperature_c, r.ph, r.ec_ms, r.tds_ppm)
+          await saveModel2(admin, r.temperature_c, r.ph, r.ec_ms, r.tds_ppm, m)
+          m2 = { m2_water: m.water_detected, m2_confidence: m.confidence, m2_water_pct: m.water_probability, m2_warnings: m.warnings ?? [] }
+        } catch (e) {
+          m2 = { m2_error: (e as Error).message.slice(0, 300) }
+        }
+      }
       const { data: row, error } = await admin.from('device_readings').insert({
         device_serial: device.serial, area_manager_id: center.id, session_id: s.id,
-        raw: { samples: list.length, last: samples?.at(-1)?.raw ?? null }, reading_at: new Date().toISOString(), ...r, ...m1,
+        raw: { samples: list.length, last: samples?.at(-1)?.raw ?? null }, reading_at: new Date().toISOString(), ...r, ...m1, ...m2,
       }).select().single()
       if (error) return reply({ error: error.message }, 500)
       await admin.from('reading_sessions').update({ finished_at: new Date().toISOString(), reading_id: row.id }).eq('id', s.id)

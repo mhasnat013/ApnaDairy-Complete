@@ -5,7 +5,7 @@ import { useAuth } from '../../context/AuthContext'
 import { useUi } from '../../context/UiContext'
 import {
   farmersWithStats, settings, assessMilk, recordCollection, recordFarmerAnswer, collectionById, myCenter, myDevice, startDeviceTest, takeDeviceSample, finishDeviceTest, farmerUsual, OFFER_HOURS, currentShift, billingOverview, milkListings,
-  wakeModel1, milkLabel, gradeLabel, riskLabel, spoilageBand, freshnessBand, PARAMS, inRange,
+  wakeModels, waterLabel, waterConfidence, milkLabel, gradeLabel, spoilageBand, freshnessBand, PARAMS, inRange,
 } from '../../lib/center'
 import { rs, litres, plural } from '../../lib/format'
 import PageHeader from '../../components/PageHeader'
@@ -58,8 +58,8 @@ export default function RecordMilk() {
   const [, setTick] = useState(0)
   const cancelTest = useRef(false)
   useEffect(() => () => { cancelTest.current = true }, [])
-  // load ai model 1 now, so it answers as soon as the test finishes
-  useEffect(() => { wakeModel1().catch(() => {}) }, [])
+  // load the ai models now, so they answer as soon as the test finishes
+  useEffect(() => { wakeModels().catch(() => {}) }, [])
   useEffect(() => {
     if (!test) return
     const i = setInterval(() => setTick((n) => n + 1), 250)
@@ -70,7 +70,7 @@ export default function RecordMilk() {
     setAi(null); setErr(''); setReading(null)
     cancelTest.current = false
     let t
-    wakeModel1().catch(() => {})
+    wakeModels().catch(() => {})
     try { t = await startDeviceTest() } catch (e) { return setErr(e.message) }
     const started = Date.now(), end = started + t.seconds * 1000, samples = []
     let fails = 0
@@ -365,14 +365,14 @@ export default function RecordMilk() {
           <section className={`panel p-5 sm:p-6 ${ai.accept ? '' : 'border-[#efc6bb]'}`}>
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="flex items-center gap-2 text-[13px] font-semibold text-muted"><Icon name="spark" size={16} />AI assessment</p>
-              <span className="rounded-full bg-mint-soft px-2.5 py-0.5 text-[11.5px] font-semibold text-forest">AI Model 1 · trained SVM + random forests</span>
+              <span className="rounded-full bg-mint-soft px-2.5 py-0.5 text-[11.5px] font-semibold text-forest">AI Models 1 and 2</span>
             </div>
             <h2 className={`display mt-3 text-[30px] ${ai.accept ? 'text-forest-deep' : 'text-danger'}`}>{ai.accept ? `${gradeLabel[ai.quality]} milk` : ai.model_quality === 'Spoiled' ? 'Spoiled: do not buy' : 'Do not buy this milk'}</h2>
             <p className="mt-1 text-[14px] text-muted">Model 1 rates it <b className="text-ink">{ai.model_quality}</b>{ai.accept ? `, so it is bought as ${gradeLabel[ai.quality].toLowerCase()} grade` : ''}</p>
 
             <div className="mt-4 flex flex-wrap gap-2 text-[12.5px]">
               <span className="text-muted">Model inputs from the device:</span>
-              {[['Temperature', `${Number(reading.temperature_c).toFixed(1)} °C`], ['pH', Number(reading.ph).toFixed(2)], ['EC', `${Number(reading.ec_ms).toFixed(2)} mS/cm`]].map(([k, v]) => (
+              {[['Temperature', `${Number(reading.temperature_c).toFixed(1)} °C`], ['pH', Number(reading.ph).toFixed(2)], ['EC', `${Number(reading.ec_ms).toFixed(2)} mS/cm`], ...(reading.tds_ppm != null ? [['TDS', `${Math.round(reading.tds_ppm)} ppm`]] : [])].map(([k, v]) => (
                 <span key={k} className="num rounded-full bg-cream px-2.5 py-0.5"><span className="text-muted">{k}</span> <b>{v}</b></span>
               ))}
             </div>
@@ -385,8 +385,11 @@ export default function RecordMilk() {
                   ['Shelf life', `${Number(ai.shelf_life_h ?? ai.freshness_hours).toFixed(1)} h`, `at ${Number(reading.temperature_c).toFixed(0)} °C`],
                   ['Spoilage risk', `${Number(ai.spoilage_pct ?? 0).toFixed(1)}%`, spoilageBand(Number(ai.spoilage_pct))],
                 ]} />
-              <ModelCard title="Model 2 · Adulteration" inputs="temperature, pH, EC, TDS" bad={ai.adulteration_risk === 'high'} warn={ai.adulteration_risk === 'medium'}
-                facts={[['Risk', riskLabel[ai.adulteration_risk], `${ai.adulteration_score}% probability`], ['Likely additive', ai.suspected ? ai.suspected.charAt(0).toUpperCase() + ai.suspected.slice(1) : 'None']]} />
+              <ModelCard title="Model 2 · Added water" inputs="temperature, pH, EC, TDS" bad={ai.adulteration_risk === 'high'} warn={ai.adulteration_risk === 'medium'}
+                facts={[
+                  ['Added water', ai.water_detected ? (ai.adulteration_risk === 'high' ? 'Detected' : 'Suspected') : 'Not detected', `${Number(ai.water_confidence ?? waterConfidence(ai.adulteration_score)).toFixed(1)}% confidence`],
+                  ['Chance of water', `${Number(ai.water_pct ?? ai.adulteration_score).toFixed(1)}%`, waterLabel(ai.water_pct ?? ai.adulteration_score)],
+                ]} />
             </div>
             <ul className="mt-4 grid gap-2">
               {ai.notes.map((n) => (

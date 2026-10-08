@@ -29,9 +29,9 @@ IoT device → Firebase "Result" → iot-reading edge function (averages 1 minut
 
 1. Run `supabase/41_model1.sql` in the SQL editor.
 2. Edge Functions → `iot-reading` → paste `supabase/functions/iot-reading/index.ts` → **Deploy**.
-3. Admin → IoT devices → **Check the model**. It should say the model is loaded and answering.
+3. Admin → IoT devices → **Check the models**. It should say both models are ready.
 
-If the model file cannot be loaded, the backup rules give the same four results, so recording never stops. The admin IoT page shows how many tests the trained model answered.
+If the model file cannot be loaded, the database gives the same four outputs, so recording never stops. Nothing on screen says which one answered; `device_readings.m1_error` keeps the reason for the team.
 
 ## If the ML team retrains the models
 

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useLoad } from '../../lib/useLoad'
-import { priceHistory, platformSettings, myMarketRates, assessMilk, predictModel1, wakeModel1, milkLabel, gradeLabel, riskLabel, spoilageBand, PARAMS, inRange } from '../../lib/center'
+import { priceHistory, platformSettings, myMarketRates, assessMilk, predictModels, wakeModels, waterLabel, milkLabel, gradeLabel, spoilageBand, PARAMS, inRange } from '../../lib/center'
 import { date, plural } from '../../lib/format'
 import { rs } from '../../lib/format'
 import PageHeader from '../../components/PageHeader'
@@ -24,12 +24,12 @@ export default function AiPricing() {
   const rates = data?.rates ?? { cow: 170, buffalo: 200, mixed: 185 }
   const pf = data?.platform ?? { farmer_min_pct: 90, farmer_default_pct: 95, markup_suggest_pct: 20, markup_max_pct: 30 }
 
-  useEffect(() => { wakeModel1().catch(() => {}) }, [])
-  // live result while the sliders move: ai model 1 first (its answer is saved), then the database prices it.
+  useEffect(() => { wakeModels().catch(() => {}) }, [])
+  // live result while the sliders move: the ai models first (their answers are saved), then the database prices it.
   // waits for the slider to rest, so the model is not asked for every step
   useEffect(() => {
     let live = true
-    const t = setTimeout(() => predictModel1(r.temperature_c, r.ph, r.ec_ms).catch(() => null)
+    const t = setTimeout(() => predictModels(r.temperature_c, r.ph, r.ec_ms, r.tds_ppm).catch(() => null)
       .then(() => assessMilk(type, { ...r, reading_at: new Date().toISOString() })).then((x) => live && setAi(x)).catch(() => {}), 450)
     return () => { live = false; clearTimeout(t) }
   }, [type, r])
@@ -56,7 +56,7 @@ export default function AiPricing() {
         <Kpi accent label="Farmers’ share of market rate" value={data ? `${Math.round(share * 100)}%` : null} note={`average over ${plural(offers.length, 'offers')}, 30 days`} />
         <Kpi label="Farmers accepted" value={data ? `${answered.length ? Math.round((acceptedOffers / answered.length) * 100) : 0}%` : null} note="of offers they answered" />
         <Kpi label="Bad milk caught" value={data ? caught : null} note="samples the models rejected" />
-        <Kpi label="AI model" value="Model 1" note="SVM + 3 random forests, trained" />
+        <Kpi label="AI models" value="2" note="SVM + random forests, gradient boosting" />
       </div>
 
       <Card className="mt-4 sm:mt-5" title={`One litre of ${milkLabel[type].toLowerCase()} milk`} subtitle="Who gets what, for the sample in Try it below">
@@ -97,9 +97,9 @@ export default function AiPricing() {
           <ol className="mt-3 grid gap-2 text-[13.5px]">
             {[
               ['Model 1 grades the milk', 'temperature, pH and EC give quality, freshness score, shelf life and spoilage risk'],
-              ['Model 2 checks purity', 'temperature, pH, EC and TDS give adulteration risk'],
+              ['Model 2 checks for added water', 'temperature, pH, EC and TDS show whether water was added, with a confidence. It is shown with the result and does not change the offer'],
               ['Grade and market rate', 'Good = Premium +6%, Acceptable = Fresh as is, Poor = Standard −8% on your base rate'],
-              ['Offer to the farmer', `${Number(pf.farmer_default_pct)}% of market, at least ${Number(pf.farmer_min_pct)}%. Spoiled or adulterated milk gets no offer`],
+              ['Offer to the farmer', `${Number(pf.farmer_default_pct)}% of market, at least ${Number(pf.farmer_min_pct)}%. Spoiled milk gets no offer`],
             ].map(([t, d], i) => (
               <li key={t} className="flex items-start gap-3 rounded-xl border border-line px-3 py-2.5">
                 <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-forest text-[12px] font-bold text-cream">{i + 1}</span>
@@ -109,7 +109,7 @@ export default function AiPricing() {
           </ol>
         </Card>
 
-        <Card title="Try it" subtitle="Move the sensor values and watch AI Model 1 respond"
+        <Card title="Try it" subtitle="Move the sensor values and watch both AI models respond"
           action={<Segmented size="sm" value={type} onChange={setType} options={TYPES.map((t) => ({ value: t, label: milkLabel[t] }))} />}>
           <div className="grid gap-4">
             {PARAMS.map((p) => {
@@ -142,8 +142,8 @@ export default function AiPricing() {
                   <p className="mt-1 text-[14px]"><b>{ai.model_quality}</b> · freshness {ai.score}/100 · {Number(ai.shelf_life_h ?? ai.freshness_hours).toFixed(1)} h shelf life · {Number(ai.spoilage_pct ?? 0).toFixed(1)}% spoilage risk ({spoilageBand(Number(ai.spoilage_pct ?? 0)).toLowerCase()})</p>
                 </div>
                 <div className={`rounded-2xl px-4 py-3 ${ai.accept ? 'bg-cream/10' : 'bg-white/60'}`}>
-                  <p className="text-[12px] font-semibold">Model 2 · Adulteration</p>
-                  <p className="mt-1 text-[14px]">{riskLabel[ai.adulteration_risk]} risk · {ai.adulteration_score}%{ai.suspected ? ` · likely ${ai.suspected}` : ''}</p>
+                  <p className="text-[12px] font-semibold">Model 2 · Added water</p>
+                  <p className="mt-1 text-[14px]"><b>{waterLabel(ai.water_pct ?? ai.adulteration_score)}</b> · {Number(ai.water_confidence ?? 0).toFixed(1)}% confidence · {Number(ai.water_pct ?? ai.adulteration_score).toFixed(1)}% chance of water</p>
                 </div>
               </div>
               <ul className="mt-3 grid gap-1 text-[13.5px]">

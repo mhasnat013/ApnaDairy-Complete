@@ -99,6 +99,12 @@ create or replace view public.public_listings as
   where pr.category = 'milk' and pr.is_available and pr.expired_at is null
     and (pr.milk_expires_at is null or pr.milk_expires_at > now());
 
+-- (44_model2.sql adds the water check to this view; running this file again leaves that newer view alone)
+do $do$
+begin
+  if not exists (select 1 from information_schema.columns
+                  where table_schema = 'public' and table_name = 'marketplace_milk' and column_name = 'water_check') then
+    execute $v$
 create or replace view public.marketplace_milk as
  select l.id, l.shop_id, l.shop_name, l.city, l.rating, l.review_count, l.cover_path,
         l.name, l.milk_type, l.quality, l.description, l.list_price, l.discount_pct, l.price_per_l, l.available_l,
@@ -110,6 +116,9 @@ create or replace view public.marketplace_milk as
    join products p on p.id = l.id
    cross join lateral listing_tests(l.shop_id, l.milk_type) t
   where l.available_l > 0;
+$v$;
+  end if;
+end $do$;
 
 grant select on public.public_listings, public.marketplace_milk to anon, authenticated;
 revoke insert, update, delete, truncate, references, trigger on public.public_listings, public.marketplace_milk from anon, authenticated;

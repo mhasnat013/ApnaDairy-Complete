@@ -18,7 +18,7 @@ const TERMS = [
   ['Using ApnaDairy', 'ApnaDairy is a student project offered as is, for testing and demonstration. By creating an account you agree to give true details and to use the platform only for genuine dairy trade.'],
   ['Accounts', 'Area managers and businesses can use the portal only after ApnaDairy checks their documents. We may refuse, suspend or remove any account that gives false information or misuses the platform.'],
   ['Orders and payments', 'Buyers pay sellers directly. ApnaDairy does not take a share of orders and is not a party to the sale. Sellers pay ApnaDairy their monthly platform fee and device fee as shown on their Billing page.'],
-  ['Milk quality', 'Quality grades come from IoT sensor readings and rule-based checks. They help both sides but are not a laboratory certificate.'],
+  ['Milk quality', 'Quality grades and the added-water check come from IoT sensor readings and ApnaDairy’s AI models. They help both sides but are not a laboratory certificate.'],
   ['Complaints', 'Problems with an order can be reported on the Support page. ApnaDairy will look into them but is not responsible for losses between buyers and sellers.'],
   ['Changes', `We may update these terms. The date at the top shows the latest version. Contact: ${CONTACT}.`],
 ]

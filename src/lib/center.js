@@ -39,9 +39,12 @@ export const PARAMS = [
 export const MODELS = [
   { key: 'freshness', name: 'Model 1 · Quality and freshness', inputs: ['temperature_c', 'ph', 'ec_ms'],
     outputs: 'Quality (SVM), freshness score, shelf life and spoilage risk (random forests)' },
-  { key: 'adulteration', name: 'Model 2 · Adulteration', inputs: ['temperature_c', 'ph', 'ec_ms', 'tds_ppm'],
-    outputs: 'Adulteration risk, probability and the likely additive' },
+  { key: 'adulteration', name: 'Model 2 · Added water', inputs: ['temperature_c', 'ph', 'ec_ms', 'tds_ppm'],
+    outputs: 'Whether water was added, with a confidence (calibrated gradient boosting)' },
 ]
+// ai model 2's answer from the chance of added water (adulteration_score, %): 50% and over is water, 80% and over is sure
+export const waterLabel = (pct) => (pct == null ? null : pct >= 80 ? 'Added water detected' : pct >= 50 ? 'Added water suspected' : 'No added water')
+export const waterConfidence = (pct) => (pct == null ? null : Math.round(Math.max(Number(pct), 100 - Number(pct))))
 export const inRange = (p, v) => v >= p.low && v <= p.high
 
 // ---------- dates (pakistan time, same as the database views) ----------
@@ -343,9 +346,10 @@ export const cancelAdminInvite = (userId) => callFunction('admin-users', { actio
 export const adminInvites = async () => must(await supabase.from('admin_invites').select('*').is('accepted_at', null).order('invited_at', { ascending: false }))
 export const removeAdmin = (id) => rpc('set_admin', { p_user: id, p_make_admin: false })
 // ask ai model 1 directly (the try-it sliders); the answer is saved so assessMilk uses it
-export const predictModel1 = (temperature, ph, ec) => iot({ action: 'predict', temperature, ph, ec }).then((d) => d.prediction)
-// load ai model 1 in the server function ahead of a test, so the result is ready when the test finishes
-export const wakeModel1 = () => iot({ action: 'wake' })
+// asks both ai models for these values (their answers are saved, then assessMilk reads them)
+export const predictModels = (temperature, ph, ec, tds) => iot({ action: 'predict', temperature, ph, ec, tds })
+// load both ai models ahead of a test, so the result is ready when the test finishes
+export const wakeModels = () => iot({ action: 'wake' })
 export const takeDeviceSample = (session) => iot({ action: 'sample', session }).then((d) => d.sample)
 export const finishDeviceTest = (session) => iot({ action: 'finish', session }).then((d) => d.reading)
 // ---------- any date, listings, bulk capacity, admin ----------

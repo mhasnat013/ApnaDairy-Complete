@@ -1,0 +1,22 @@
+{
+  "model": "APNADAIRY Model 2",
+  "purpose": "Water adulteration detection",
+  "inputs": [
+    "temperature_c",
+    "ph",
+    "ec_ms_cm",
+    "tds_ppm"
+  ],
+  "outputs": [
+    "Water",
+    "No Water"
+  ],
+  "dataset_rows": 5000,
+  "training_type": "Synthetic prototype",
+  "final_model": "HistGradientBoosting + sigmoid calibration",
+  "test_accuracy": 0.895,
+  "test_balanced_accuracy": 0.727,
+  "water_precision": 0.833,
+  "water_recall": 0.472,
+  "water_f1": 0.603
+}

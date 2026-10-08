@@ -165,6 +165,14 @@ function Actions({ r, milk, business, onBuy, compact = false }) {
   )
 }
 
+// ai model 2's water check on the milk a listing sells
+function WaterChip({ v }) {
+  if (!v) return null
+  return v === 'clear'
+    ? <span className="rounded-full bg-mint-soft px-2.5 py-1 text-[12.5px] font-semibold text-forest"><Icon name="check" size={12} className="mr-1 inline" />AI: no added water</span>
+    : <span className="rounded-full bg-haldi-soft px-2.5 py-1 text-[12.5px] font-semibold text-amber"><Icon name="alert" size={12} className="mr-1 inline" />AI: water suspected</span>
+}
+
 function MilkCard({ r, i, business, onBuy }) {
   const h = hoursLeft(r.expires_at)
   const aiLeft = r.model_shelf_left_h == null ? null : Number(r.model_shelf_left_h)
@@ -186,6 +194,7 @@ function MilkCard({ r, i, business, onBuy }) {
       <div className="mt-4 flex flex-wrap items-center gap-1.5">
         {r.quality && <span className={`rounded-full px-2.5 py-1 text-[12.5px] font-semibold ${gradeTone[r.quality]}`}>{qualityLabel[r.quality]}</span>}
         {r.model_quality && <span className="rounded-full bg-cream px-2.5 py-1 text-[12.5px] font-medium"><Icon name="spark" size={12} className="mr-1 inline text-forest" />AI: {r.model_quality}</span>}
+        <WaterChip v={r.water_check} />
         {Number(r.discount_pct) > 0 && <span className="rounded-full bg-haldi px-2.5 py-1 text-[12.5px] font-bold text-forest-deep">{r.discount_pct}% off</span>}
         {stage && <span className="rounded-full bg-mint-soft px-2.5 py-1 text-[12.5px] font-semibold text-forest"><Icon name="clock" size={12} className="mr-1 inline" />{stage.label}</span>}
       </div>
@@ -249,7 +258,7 @@ function MilkTable({ rows, business, onBuy }) {
             <td><div className="flex items-center gap-2.5"><ProductImage category="milk" size={34} /><span className="font-semibold">{milkLabel[r.milk_type]}</span></div></td>
             <td><p className="font-medium">{r.shop_name}</p><p className="text-[12.5px] text-muted">{r.city}</p></td>
             <td className="num text-right font-semibold">{qtyText(r.available_l)}</td>
-            <td>{r.quality && <span className={`rounded-full px-2 py-0.5 text-[12px] font-semibold ${gradeTone[r.quality]}`}>{qualityLabel[r.quality]}</span>}{r.model_quality && <p className="mt-1 text-[12px] text-muted">AI: {r.model_quality}</p>}</td>
+            <td>{r.quality && <span className={`rounded-full px-2 py-0.5 text-[12px] font-semibold ${gradeTone[r.quality]}`}>{qualityLabel[r.quality]}</span>}{r.model_quality && <p className="mt-1 text-[12px] text-muted">AI: {r.model_quality}</p>}{r.water_check && <p className={`text-[12px] ${r.water_check === 'clear' ? 'text-forest' : 'text-amber'}`}>{r.water_check === 'clear' ? 'No added water' : 'Water suspected'}</p>}</td>
             <td className="num text-right">{r.freshness_score ?? '—'}</td>
             <td className="num text-right">{r.spoilage_pct != null ? `${Math.round(r.spoilage_pct)}%` : '—'}</td>
             <td className="num text-[13px]">{r.test_ph != null ? `pH ${Number(r.test_ph).toFixed(2)}` : '—'}{r.test_temperature_c != null ? ` · ${Number(r.test_temperature_c).toFixed(0)} °C` : ''}</td>

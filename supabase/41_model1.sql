@@ -139,6 +139,11 @@ end;
 $$;
 
 -- ---------- 4. adulteration (rules until model 2): ec at 25 °C comes from tds ----------
+-- (44_model2.sql replaces ai_adulteration with ai model 2; running this file again leaves that newer version alone)
+do $do$
+begin
+  if to_regprocedure('public.model2_lookup(numeric, numeric, numeric, numeric)') is null then
+    execute $v$
 create or replace function public.ai_adulteration(p_temperature numeric, p_ph numeric, p_ec numeric, p_tds numeric)
 returns jsonb
 language plpgsql stable set search_path = public
@@ -176,8 +181,16 @@ begin
     'suspected', v_sus, 'notes', to_jsonb(v_notes));
 end;
 $$;
+$v$;
+  end if;
+end $do$;
 
 -- ---------- 5. the assessment used by recording, retests and the try-it sliders ----------
+-- (44_model2.sql replaces assess_milk with ai model 2; running this file again leaves that newer version alone)
+do $do$
+begin
+  if to_regprocedure('public.model2_lookup(numeric, numeric, numeric, numeric)') is null then
+    execute $v$
 create or replace function public.assess_milk(p_milk_type milk_kind, p_temperature numeric, p_ph numeric, p_ec numeric, p_tds numeric,
                                               p_reading_at timestamptz default now())
 returns jsonb
@@ -224,6 +237,9 @@ begin
   );
 end;
 $$;
+$v$;
+  end if;
+end $do$;
 
 -- a collection keeps the model's class, spoilage risk and which engine answered, from its own device test
 create or replace function public.collection_model_fields()

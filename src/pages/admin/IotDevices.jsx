@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useLoad } from '../../lib/useLoad'
 import { useUi } from '../../context/UiContext'
-import { allDevices, deviceActivity, saveDevice, assignDevice, activeCenters, wakeModel1 } from '../../lib/center'
+import { allDevices, deviceActivity, saveDevice, assignDevice, activeCenters, wakeModels } from '../../lib/center'
 import { relative } from '../../lib/format'
 import PageHeader from '../../components/PageHeader'
 import Card, { Kpi } from '../../components/Card'
@@ -26,9 +26,6 @@ export default function IotDevices() {
   const tests = (data?.activity ?? []).reduce((n, a) => n + Number(a.tests_7d), 0)
   const failed = (data?.activity ?? []).reduce((n, a) => n + Number(a.failed_7d), 0)
   const without = (data?.centers ?? []).filter((c) => !devices.some((d) => d.area_manager_id === c.id))
-  const okTests = tests - failed
-  const byModel = (data?.activity ?? []).reduce((n, a) => n + Number(a.model_7d ?? 0), 0)
-  const lastError = (data?.activity ?? []).map((a) => a.last_model_error).find(Boolean)
 
   return (
     <>
@@ -44,7 +41,7 @@ export default function IotDevices() {
         <Kpi label="Tests in 7 days" value={data ? tests : null} note={data ? `${failed} needed a re-test` : ''} />
       </div>
 
-      <ModelServer okTests={okTests} byModel={byModel} lastError={lastError} />
+      <AiModels />
 
       <Card className="mt-5" title="All devices" bodyClass="pt-3">
         {data && devices.length === 0 && <EmptyState title="No devices yet">Add the serial printed on each tester.</EmptyState>}
@@ -61,8 +58,7 @@ export default function IotDevices() {
                       <td>{d.center ? <><p className="font-medium">{d.center.center_name}</p><p className="text-[12.5px] text-muted">{d.center.city}</p></> : <span className="text-muted">Not given yet</span>}</td>
                       <td><span className={`rounded-full px-2.5 py-1 text-[12px] font-semibold ${d.path === 'Result' ? 'bg-mint-soft text-forest' : 'bg-haldi-soft text-amber'}`}>{d.path === 'Result' ? 'Live device' : `/${d.path}`}</span></td>
                       <td className="text-[13.5px]">{a?.last_test ? relative(a.last_test) : <span className="text-muted">Never</span>}</td>
-                      <td className="num text-right">{a ? Number(a.tests_7d) : 0}{Number(a?.failed_7d) > 0 && <p className="text-[12px] text-amber">{Number(a.failed_7d)} re-test</p>}
-                        {Number(a?.tests_7d) - Number(a?.failed_7d) > 0 && <p className="text-[12px] text-muted" title={a.last_model_error ?? ''}>Model 1: {Number(a.model_7d ?? 0)}</p>}</td>
+                      <td className="num text-right">{a ? Number(a.tests_7d) : 0}{Number(a?.failed_7d) > 0 && <p className="text-[12px] text-amber">{Number(a.failed_7d)} re-test</p>}</td>
                       <td>{d.is_active ? <Badge tone="green">On</Badge> : <Badge tone="grey">Off</Badge>}</td>
                       <td className="text-right"><button className="btn-secondary btn-sm" onClick={() => setEditing(d)}>Manage</button></td>
                     </tr>
@@ -88,25 +84,27 @@ export default function IotDevices() {
   )
 }
 
-// only the admin sees whether the trained model answered each test, or the backup rules did
-function ModelServer({ okTests, byModel, lastError }) {
+// the two ai models every finished device test goes through
+function AiModels() {
   const [check, setCheck] = useState(null)
   const run = async () => {
     setCheck({ busy: true })
-    try { setCheck(await wakeModel1()) } catch (e) { setCheck({ ok: false, error: e.message }) }
+    try { setCheck(await wakeModels()) } catch (e) { setCheck({ ok: false, error: e.message }) }
   }
   return (
-    <Card className="mt-5" title="AI Model 1" subtitle="The team's trained model runs inside ApnaDairy's server function and grades every finished device test. If it cannot be loaded, the backup rules give the result instead.">
+    <Card className="mt-5" title="AI models" subtitle="Every finished device test goes through both models. Model 1 grades quality, freshness, shelf life and spoilage risk. Model 2 checks for added water.">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-[14px]"><b className="num">{byModel}</b> of <b className="num">{okTests}</b> device tests in the last 7 days were answered by the trained model{okTests > byModel ? `, ${okTests - byModel} by the backup rules` : ''}.</p>
-        <button className="btn-secondary btn-sm" onClick={run} disabled={check?.busy}><Icon name="spark" size={14} />{check?.busy ? 'Checking…' : 'Check the model'}</button>
+        <div className="flex flex-wrap gap-2 text-[13px]">
+          <span className="rounded-full bg-cream px-3 py-1.5"><b>Model 1</b> · SVM + 3 random forests</span>
+          <span className="rounded-full bg-cream px-3 py-1.5"><b>Model 2</b> · calibrated gradient boosting</span>
+        </div>
+        <button className="btn-secondary btn-sm" onClick={run} disabled={check?.busy}><Icon name="spark" size={14} />{check?.busy ? 'Checking…' : 'Check the models'}</button>
       </div>
       {check && !check.busy && (
         <p className={`mt-3 rounded-2xl px-4 py-3 text-[13px] ${check.ok ? 'bg-mint-soft text-forest' : 'bg-[#f8e2dc] text-danger'}`}>
-          {check.ok ? 'The model is loaded and answering.' : `The model could not be loaded: ${check.error}. Check that the iot-reading function is deployed and the website is online.`}
+          {check.ok ? 'Both models are ready.' : `${[check.error, check.error2].filter(Boolean).join(' ')} Redeploy the iot-reading function and check the website is online.`}
         </p>
       )}
-      {!check && lastError && okTests > byModel && <p className="mt-3 text-[12.5px] text-muted">Last problem: {lastError}</p>}
     </Card>
   )
 }
@@ -166,7 +164,7 @@ function DeviceSheet({ device, devices, centers, onClose, onSaved }) {
           </select>
           {holder && <span className="hint text-amber">This center already has {holder.serial}. It will be taken back and this one given instead.</span>}</div>
         <div className="flex items-center justify-between gap-3 rounded-2xl bg-cream px-4 py-3">
-          <span><span className="block text-[14px] font-semibold">TDS sensor corrects to 25 °C</span><span className="text-[12.5px] text-muted">Turn on if the firmware passes the temperature to the TDS sensor. EC for AI Model 1 is then worked back to the milk’s own temperature. Off: EC = TDS ÷ 640.</span></span>
+          <span><span className="block text-[14px] font-semibold">TDS sensor corrects to 25 °C</span><span className="text-[12.5px] text-muted">Turn on if the firmware passes the temperature to the TDS sensor. EC for the AI models is then worked back to the milk’s own temperature. Off: EC = TDS ÷ 640.</span></span>
           <button type="button" role="switch" aria-checked={!!f.tds_at_25c} aria-label="TDS sensor corrects to 25 °C" onClick={() => set('tds_at_25c')(!f.tds_at_25c)}
             className={`relative h-7 w-[52px] shrink-0 rounded-full transition-colors ${f.tds_at_25c ? 'bg-forest' : 'bg-line'}`}>
             <span className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-all ${f.tds_at_25c ? 'left-[26px]' : 'left-0.5'}`} />
