@@ -1,9 +1,11 @@
 // Customer global search — products + managers, with recent searches.
 // Route: /customer/search (pushed from home header search bar).
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { font } from './src/theme/theme';
 import {
   View, Text, FlatList, Pressable, StyleSheet, ActivityIndicator, Keyboard,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import { Screen } from '../../src/components/common/Screen';
@@ -13,6 +15,8 @@ import { ErrorRetry } from '../../src/components/common/ErrorRetry';
 import { colors } from '../../src/theme/colors';
 import { listProducts } from '../../src/services/customer/marketplaceService';
 import type { Product } from '../../src/types/customerModels';
+
+const F = font.family;
 
 const RECENT_KEY = 'ad_recent_searches';
 const MAX_RECENT = 8;
@@ -116,7 +120,8 @@ export default function CustomerSearch() {
   }, []);
 
   return (
-    <Screen title="Search" subtitle="Find milk, ghee and shops">
+    <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+<Screen title="Search" subtitle="Find milk, ghee and shops">
       <SearchBar value={query} onChange={onChange} onSubmit={onSubmit} autoFocus />
       {loading ? (
         <View style={styles.center}>
@@ -170,6 +175,7 @@ export default function CustomerSearch() {
         </View>
       )}
     </Screen>
+    </SafeAreaView>
   );
 }
 
@@ -181,22 +187,22 @@ const styles = StyleSheet.create({
     borderRadius: 16, padding: 12, marginBottom: 10,
   },
   thumb: {
-    width: 48, height: 48, borderRadius: 12, backgroundColor: colors.cream,
+    width: 48, height: 48, borderRadius: 16, backgroundColor: colors.cream,
     alignItems: 'center', justifyContent: 'center', marginRight: 12,
   },
   thumbText: { fontSize: 20, color: colors.forest, fontFamily: 'BricolageGrotesque_700Bold' },
   col: { flex: 1, marginRight: 8 },
   name: { fontSize: 15, color: colors.ink, fontFamily: 'BricolageGrotesque_700Bold' },
-  sub: { fontSize: 12, color: colors.sage, marginTop: 2, fontFamily: 'BricolageGrotesque_400Regular' },
+  sub: { fontSize: 12, color: colors.sage, marginTop: 2, fontFamily: F },
   price: { fontSize: 14, color: colors.forest, fontFamily: 'BricolageGrotesque_700Bold' },
   recentWrap: { paddingHorizontal: 20, paddingTop: 8 },
   recentHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
   recentTitle: { fontSize: 16, color: colors.ink, fontFamily: 'BricolageGrotesque_700Bold' },
-  clearAll: { fontSize: 14, color: colors.danger, fontFamily: 'BricolageGrotesque_400Regular' },
-  recentEmpty: { fontSize: 14, color: colors.sage, fontFamily: 'BricolageGrotesque_400Regular' },
+  clearAll: { fontSize: 14, color: colors.danger, fontFamily: F },
+  recentEmpty: { fontSize: 14, color: colors.sage, fontFamily: F },
   recentRow: {
-    backgroundColor: colors.ivory, borderRadius: 12, paddingVertical: 12,
+    backgroundColor: colors.ivory, borderRadius: 16, paddingVertical: 12,
     paddingHorizontal: 16, marginBottom: 8,
   },
-  recentText: { fontSize: 15, color: colors.ink, fontFamily: 'BricolageGrotesque_400Regular' },
+  recentText: { fontSize: 15, color: colors.ink, fontFamily: F },
 });
