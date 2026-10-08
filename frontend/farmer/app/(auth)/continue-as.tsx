@@ -1,18 +1,18 @@
 // Continue-as screen: shown ONCE after a real Google sign-in when the Google
-// user has NO role yet (no farmer profile row).
+// user has NO role yet (no farmer profile row and no customer profile row).
 // The user picks Farmer or Customer; the role is IMMUTABLE once saved.
 // Back signs the Google session out and returns to login WITHOUT saving.
-// The Customer card is selectable (yellow selected state) but the customer
-// app is not part of this farmer build, so continuing as Customer shows a
-// notice instead of creating anything.
+// Farmer links via the farmer backend; Customer links via the customer (B2C)
+// backend — both are real API calls, no mock data.
 import React, { useEffect, useState } from 'react';
 import { View, Text, TextInput, Pressable, StyleSheet, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Screen } from '../../src/components/common/Screen';
 import { AppButton } from '../../src/components/common/AppButton';
 import { colors } from '../../src/theme/colors';
-import { clearSession } from '../../src/api/client';
+import { clearSession, saveSession } from '../../src/api/client';
 import { linkGoogleProfile } from '../../src/api/googleAuth';
+import { linkCustomerGoogleProfile } from '../../src/services/customerAuthService';
 import { Role, getWebSupabaseClient } from '../../src/services/authService';
 
 /** One big selectable role card. The selected card uses the landing-page
@@ -77,13 +77,26 @@ export default function ContinueAsScreen() {
       setError('Select Farmer or Customer to continue.');
       return;
     }
-    if (selected === 'customer') {
-      setError('The Customer app is not part of this farmer build yet. Please select Farmer to continue.');
-      return;
-    }
     setError(null);
     setSaving(true);
     try {
+      if (selected === 'customer') {
+        // Real customer linking via the B2C backend: the Supabase access
+        // token proves the Google identity; the backend reads the email
+        // from the validated JWT. Then save the session as customer.
+        const { data } = await getWebSupabaseClient().auth.getSession();
+        const session = data.session;
+        if (!session) {
+          throw new Error('Google session is missing. Please sign in with Google again.');
+        }
+        const nameParts = fullName.trim().split(/\s+/);
+        const firstName = nameParts[0] || 'Customer';
+        const lastName = nameParts.slice(1).join(' ') || '';
+        await linkCustomerGoogleProfile(firstName, lastName, phone.trim(), session.access_token);
+        await saveSession(session.access_token, 'customer', session.refresh_token ?? undefined);
+        router.replace('/(customer)/home');
+        return;
+      }
       const { created } = await linkGoogleProfile(selected, { fullName, phone });
       router.replace(created ? '/onboarding/personal' : '/(tabs)/home');
     } catch (e) {
