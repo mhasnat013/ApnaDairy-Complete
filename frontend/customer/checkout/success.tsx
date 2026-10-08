@@ -1,6 +1,8 @@
 // Order confirmation after a successful checkout.
 import React from 'react';
+import { formatRs } from '../../src/utils/format';
 import { View, Text, StyleSheet } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Screen } from '../../../src/components/common/Screen';
 import { Card } from '../../../src/components/common/Card';
@@ -14,12 +16,13 @@ export default function CheckoutSuccessScreen() {
   const total = typeof params.total === 'string' ? params.total : '0';
 
   return (
-    <Screen title="Order placed">
+    <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+<Screen title="Order placed">
       <View style={styles.wrap}>
         <Card style={styles.card}>
           <Text style={styles.heading}>Thank you! Order received.</Text>
           <Text style={styles.body}>
-            {count} order{count === '1' ? '' : 's'} placed for Rs {Number(total).toFixed(2)}.
+            {count} order{count === '1' ? '' : 's'} placed for {formatRs(Number(total))}.
             The area manager will confirm shortly.
           </Text>
           {orderId ? (
@@ -48,6 +51,7 @@ export default function CheckoutSuccessScreen() {
         </View>
       </View>
     </Screen>
+    </SafeAreaView>
   );
 }
 
@@ -59,7 +63,7 @@ const styles = StyleSheet.create({
     fontFamily: 'BricolageGrotesque_700Bold', marginBottom: 10, textAlign: 'center' },
   body: { fontSize: 15, color: colors.ink, textAlign: 'center', lineHeight: 22 },
   idBox: {
-    marginTop: 16, backgroundColor: colors.cream, borderRadius: 12,
+    marginTop: 16, backgroundColor: colors.cream, borderRadius: 16,
     padding: 12, width: '100%',
   },
   idLabel: { fontSize: 12, color: colors.sage, marginBottom: 4 },
