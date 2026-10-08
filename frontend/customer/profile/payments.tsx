@@ -1,6 +1,7 @@
 // Customer payments: outstanding dues banner + payment history.
 import React, { useCallback, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Alert } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
 import { Screen } from '../../../src/components/common/Screen';
 import { Card } from '../../../src/components/common/Card';
@@ -31,7 +32,8 @@ export default function PaymentsScreen() {
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
   return (
-    <Screen title="Payments" subtitle="Payment history and outstanding dues">
+    <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+<Screen title="Payments" subtitle="Payment history and outstanding dues">
       {loading ? (
         <View style={styles.center}><ActivityIndicator size="large" color={colors.forest} /></View>
       ) : (
@@ -68,6 +70,7 @@ export default function PaymentsScreen() {
         </ScrollView>
       )}
     </Screen>
+    </SafeAreaView>
   );
 }
 
