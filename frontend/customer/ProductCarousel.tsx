@@ -1,8 +1,11 @@
 // ProductCarousel — horizontal scroll of product cards (featured / value picks).
 import React from 'react';
+import { font } from './src/theme/theme';
 import { ScrollView, Pressable, View, Text, StyleSheet } from 'react-native';
 import { colors } from '../../theme/colors';
 import type { Product } from '../../types/customerModels';
+
+const F = font.family;
 
 interface Props {
   products: Product[];
@@ -47,15 +50,15 @@ const styles = StyleSheet.create({
     shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 8, elevation: 2,
   },
   thumb: {
-    height: 90, borderRadius: 14, backgroundColor: colors.cream,
+    height: 90, borderRadius: 16, backgroundColor: colors.cream,
     alignItems: 'center', justifyContent: 'center', marginBottom: 8,
   },
   thumbText: { fontSize: 32, color: colors.forest, fontFamily: 'BricolageGrotesque_700Bold' },
   name: { fontSize: 14, color: colors.ink, fontFamily: 'BricolageGrotesque_700Bold', minHeight: 36 },
-  manager: { fontSize: 12, color: colors.sage, marginTop: 2, fontFamily: 'BricolageGrotesque_400Regular' },
+  manager: { fontSize: 12, color: colors.sage, marginTop: 2, fontFamily: F },
   priceRow: { flexDirection: 'row', alignItems: 'baseline', marginTop: 6 },
   price: { fontSize: 16, color: colors.forest, fontFamily: 'BricolageGrotesque_700Bold' },
-  unit: { fontSize: 12, color: colors.sage, marginLeft: 2, fontFamily: 'BricolageGrotesque_400Regular' },
+  unit: { fontSize: 12, color: colors.sage, marginLeft: 2, fontFamily: F },
   offBadge: {
     position: 'absolute', top: 8, right: 8, backgroundColor: colors.amber,
     borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3,
