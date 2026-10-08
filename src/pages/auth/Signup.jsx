@@ -92,7 +92,7 @@ export default function Signup() {
         ))}
       </div>
 
-      <GoogleButton label="Sign up with Google" onError={setError} />
+      <GoogleButton label="Sign up with Google" role={role} onError={setError} />
       <OrLine />
       <form onSubmit={onSubmit} noValidate className="flex flex-col gap-4">
 

@@ -8,6 +8,7 @@ import AuthShell from '../../components/AuthShell'
 import Alert from '../../components/Alert'
 import Loader from '../../components/Loader'
 import ProfileProblem from '../../components/ProfileProblem'
+import { pickedRole } from '../../components/GoogleButton'
 
 const roles = [
   { id: 'area_manager', label: 'Area Manager', hint: 'Run a collection center or sell dairy products' },
@@ -19,7 +20,7 @@ const roles = [
 export default function Welcome() {
   const { session, profile, loading, refreshProfile, signOut } = useAuth()
   const nav = useNavigate()
-  const [role, setRole] = useState('area_manager')
+  const [role, setRole] = useState(() => (pickedRole() === 'business' ? 'business' : 'area_manager'))
   const [f, setF] = useState(null)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)

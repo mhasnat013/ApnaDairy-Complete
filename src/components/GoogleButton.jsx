@@ -2,10 +2,19 @@ import { useState } from 'react'
 import { supabase } from '../lib/supabase'
 
 // sign in or sign up with google. a new google account finishes its sign-up on /welcome.
-export default function GoogleButton({ label = 'Continue with Google', onError }) {
+// the account type picked on the sign-up page is kept for that page (google cannot carry it)
+const KEY = 'apnadairy.google_signup'
+export const pickedRole = () => {
+  try {
+    const v = JSON.parse(sessionStorage.getItem(KEY) ?? 'null')
+    return v && Date.now() - v.at < 30 * 60 * 1000 ? v.role : null
+  } catch { return null }
+}
+export default function GoogleButton({ label = 'Continue with Google', role, onError }) {
   const [busy, setBusy] = useState(false)
   const go = async () => {
     setBusy(true)
+    try { if (role) sessionStorage.setItem(KEY, JSON.stringify({ role, at: Date.now() })); else sessionStorage.removeItem(KEY) } catch { /* private mode: the welcome page asks again */ }
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: { redirectTo: `${window.location.origin}/welcome`, queryParams: { prompt: 'select_account' } },

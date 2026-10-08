@@ -1,9 +1,11 @@
-// where each role lands after login
+// where each role lands after login. a customer account on the portal is usually a new google sign-in, so it
+// goes to the sign-up form (which also links to the app for home buyers); farmers use the app
 export const homeFor = (role) =>
   ({
     super_admin: '/admin',
     area_manager: '/manager',
     business: '/business',
+    customer: '/welcome',
   })[role] ?? '/mobile-only'
 
 export const roleLabel = {

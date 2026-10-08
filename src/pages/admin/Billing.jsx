@@ -144,7 +144,7 @@ export default function AdminBilling() {
                   return (
                     <tr key={a.center_id}>
                       <td><button className="text-left font-semibold hover:text-forest hover:underline" onClick={() => setOpen(a)}>{a.center_name}</button>
-                        <p className="text-[12.5px] text-muted">{sellerType[a.type]}{a.city ? `, ${a.city}` : ''}{a.is_demo ? ' · sample' : ''}</p></td>
+                        <p className="text-[12.5px] text-muted">{sellerType[a.type]}{a.city ? `, ${a.city}` : ''}</p></td>
                       <td className="whitespace-nowrap"><AccountBadge a={a} /></td>
                       <td className="num text-right"><p className="font-semibold">{rs(d.outstanding)}</p>
                         <p className="text-[12px] text-muted">{d.due_bills ? `${d.due_bills} ${d.due_bills === 1 ? 'bill' : 'bills'}` : 'paid up'}</p>
