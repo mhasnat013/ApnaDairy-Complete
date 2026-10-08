@@ -1,8 +1,12 @@
 // GreetingHeader — personalized greeting + verified badge + dues banner.
 import React from 'react';
+import { font } from './src/theme/theme';
+import { formatRs } from './src/utils/format';
 import { View, Text, StyleSheet } from 'react-native';
 import { colors } from '../../theme/colors';
 import { StatusBadge } from '../common/StatusBadge';
+
+const F = font.family;
 
 interface Props {
   greeting: string;
@@ -29,7 +33,7 @@ export function GreetingHeader({ greeting, customerName, isVerified, pendingDues
       ) : null}
       {pendingDues > 0 ? (
         <View style={styles.dues}>
-          <Text style={styles.duesText}>Pending dues: Rs {pendingDues.toFixed(0)}</Text>
+          <Text style={styles.duesText}>Pending dues: {formatRs(pendingDues)}</Text>
           {onDuesPress ? <Text style={styles.duesLink} onPress={onDuesPress}>Pay now</Text> : null}
         </View>
       ) : null}
@@ -41,11 +45,11 @@ const styles = StyleSheet.create({
   wrap: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 4 },
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   textCol: { flex: 1, marginRight: 12 },
-  greeting: { fontSize: 15, color: colors.sage, fontFamily: 'BricolageGrotesque_400Regular' },
+  greeting: { fontSize: 15, color: colors.sage, fontFamily: F },
   name: { fontSize: 24, color: colors.ink, fontFamily: 'BricolageGrotesque_700Bold', marginTop: 2 },
-  hint: { fontSize: 13, color: colors.sage, marginTop: 8, fontFamily: 'BricolageGrotesque_400Regular' },
+  hint: { fontSize: 13, color: colors.sage, marginTop: 8, fontFamily: F },
   dues: {
-    marginTop: 12, backgroundColor: colors.amberTint, borderRadius: 14, padding: 12,
+    marginTop: 12, backgroundColor: colors.amberTint, borderRadius: 16, padding: 12,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
   },
   duesText: { fontSize: 14, color: colors.amberDark, fontFamily: 'BricolageGrotesque_700Bold' },
