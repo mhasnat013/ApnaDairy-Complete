@@ -190,10 +190,12 @@ def real_signup(payload: RealSignupIn) -> RealSignupOut:
         "status": "pending",
     }
     try:
-        table(client, "profiles").insert(row).execute()
+        # The handle_new_user() DB trigger auto-creates the profiles row on
+        # create_user — upsert so we never collide with the trigger's row.
+        table(client, "profiles").upsert(row, on_conflict="id").execute()
     except Exception as exc:
         # Avoid orphan auth users: best-effort cleanup, then fail loudly.
-        logger.error("profiles insert failed for %s: %s", user_id, exc)
+        logger.error("profiles upsert failed for %s: %s", user_id, exc)
         try:
             client.auth.admin.delete_user(user_id)
         except Exception:
