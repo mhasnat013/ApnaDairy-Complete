@@ -4,6 +4,7 @@
 // Data: GET /marketplace/products/{id}, POST /cart/items,
 // POST/DELETE /marketplace/wishlist/.
 import React, { useCallback, useEffect, useState } from 'react';
+import { formatRs } from '../../../src/utils/format';
 import {
   ActivityIndicator,
   ScrollView,
@@ -11,6 +12,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { getProduct, listWishlist, addToWishlist, removeFromWishlist } from '../../../src/services/customer/marketplaceService';
 import { addToCart } from '../../../src/services/customer/cartService';
@@ -21,10 +23,6 @@ import { font } from '../../../src/theme/theme';
 
 const F = font.family;
 
-function formatRs(value: number | null | undefined): string {
-  if (value == null) return '—';
-  return `Rs ${Number(value).toLocaleString('en-PK')}`;
-}
 
 // Freshness badge color: green = fresh, amber = use soon, red-ish = low.
 function freshnessStyle(days: number | null | undefined): { bg: string; label: string } {
@@ -41,7 +39,7 @@ function Stepper({ qty, onChange }: { qty: number; onChange: (q: number) => void
         onPress={() => onChange(Math.max(1, qty - 1))}
         accessibilityLabel="Decrease quantity"
         style={{
-          width: 48, height: 48, borderRadius: 24, backgroundColor: colors.ivory,
+          width: 48, height: 48, borderRadius: 20, backgroundColor: colors.ivory,
           alignItems: 'center', justifyContent: 'center',
         }}
       >
@@ -54,7 +52,7 @@ function Stepper({ qty, onChange }: { qty: number; onChange: (q: number) => void
         onPress={() => onChange(Math.min(99, qty + 1))}
         accessibilityLabel="Increase quantity"
         style={{
-          width: 48, height: 48, borderRadius: 24, backgroundColor: colors.forest,
+          width: 48, height: 48, borderRadius: 20, backgroundColor: colors.forest,
           alignItems: 'center', justifyContent: 'center',
         }}
       >
@@ -129,7 +127,7 @@ export default function ProductDetailScreen(): React.JSX.Element {
       <View style={{ flex: 1, backgroundColor: colors.cream, alignItems: 'center', justifyContent: 'center' }}>
         {error ? (
           <View style={{ padding: 24, alignItems: 'center' }}>
-            <Text style={{ fontFamily: 'BricolageGrotesque_400Regular', fontSize: 14, color: colors.ink, textAlign: 'center' }}>{error}</Text>
+            <Text style={{ fontFamily: F, fontSize: 14, color: colors.ink, textAlign: 'center' }}>{error}</Text>
             <TouchableOpacity onPress={() => router.back()} style={{ marginTop: 12 }}>
               <Text style={{ fontFamily: 'BricolageGrotesque_700Bold', fontSize: 15, color: colors.forest }}>Go back</Text>
             </TouchableOpacity>
@@ -145,16 +143,17 @@ export default function ProductDetailScreen(): React.JSX.Element {
   const fresh = freshnessStyle(product.freshness_days);
 
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: colors.cream }} contentContainerStyle={{ paddingBottom: 32 }}>
+    <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+<ScrollView style={{ flex: 1, backgroundColor: colors.cream }} contentContainerStyle={{ paddingBottom: 32 }}>
       {/* Image placeholder + back + wishlist */}
       <View style={{ height: 280, backgroundColor: colors.ivory, alignItems: 'center', justifyContent: 'center' }}>
-        <Text style={{ fontFamily: 'BricolageGrotesque_400Regular', fontSize: 14, color: colors.sage }}>Photo</Text>
+        <Text style={{ fontFamily: F, fontSize: 14, color: colors.sage }}>Photo</Text>
         <TouchableOpacity
           onPress={() => router.back()}
           accessibilityLabel="Back"
           style={{
             position: 'absolute', top: 52, left: 16,
-            width: 44, height: 44, borderRadius: 22, backgroundColor: colors.cream,
+            width: 44, height: 44, borderRadius: 20, backgroundColor: colors.cream,
             alignItems: 'center', justifyContent: 'center',
           }}
         >
@@ -165,13 +164,13 @@ export default function ProductDetailScreen(): React.JSX.Element {
           accessibilityLabel="Wishlist"
           style={{
             position: 'absolute', top: 52, right: 16,
-            width: 44, height: 44, borderRadius: 22, backgroundColor: colors.cream,
+            width: 44, height: 44, borderRadius: 20, backgroundColor: colors.cream,
             alignItems: 'center', justifyContent: 'center',
           }}
         >
           <View
             style={{
-              width: 18, height: 18, borderRadius: 9,
+              width: 18, height: 18, borderRadius: 16,
               backgroundColor: wishlisted ? colors.amber : 'transparent',
               borderWidth: 2, borderColor: wishlisted ? colors.amber : colors.sage,
             }}
@@ -190,7 +189,7 @@ export default function ProductDetailScreen(): React.JSX.Element {
         <Text style={{ fontFamily: 'BricolageGrotesque_700Bold', fontSize: 24, color: colors.ink }}>
           {product.name ?? 'Product'}
         </Text>
-        <Text style={{ fontFamily: 'BricolageGrotesque_400Regular', fontSize: 14, color: colors.sage, marginTop: 4 }}>
+        <Text style={{ fontFamily: F, fontSize: 14, color: colors.sage, marginTop: 4 }}>
           {[product.manager?.center_name, product.manager?.city].filter(Boolean).join(' • ')}
           {product.milk_type ? ` • ${product.milk_type}` : ''}
         </Text>
@@ -201,10 +200,10 @@ export default function ProductDetailScreen(): React.JSX.Element {
             {formatRs(price)}
           </Text>
           {product.unit ? (
-            <Text style={{ fontFamily: 'BricolageGrotesque_400Regular', fontSize: 15, color: colors.sage }}> / {product.unit}</Text>
+            <Text style={{ fontFamily: F, fontSize: 15, color: colors.sage }}> / {product.unit}</Text>
           ) : null}
           {(product.discount_pct ?? 0) > 0 ? (
-            <Text style={{ fontFamily: 'BricolageGrotesque_400Regular', fontSize: 14, color: colors.sage, marginLeft: 10, textDecorationLine: 'line-through' }}>
+            <Text style={{ fontFamily: F, fontSize: 14, color: colors.sage, marginLeft: 10, textDecorationLine: 'line-through' }}>
               {formatRs(product.price)}
             </Text>
           ) : null}
@@ -212,13 +211,13 @@ export default function ProductDetailScreen(): React.JSX.Element {
 
         {/* Description */}
         {product.description ? (
-          <Text style={{ fontFamily: 'BricolageGrotesque_400Regular', fontSize: 14, color: colors.ink, marginTop: 14, lineHeight: 22 }}>
+          <Text style={{ fontFamily: F, fontSize: 14, color: colors.ink, marginTop: 14, lineHeight: 22 }}>
             {product.description}
           </Text>
         ) : null}
 
         {/* Stock */}
-        <Text style={{ fontFamily: 'BricolageGrotesque_400Regular', fontSize: 13, color: colors.sage, marginTop: 10 }}>
+        <Text style={{ fontFamily: F, fontSize: 13, color: colors.sage, marginTop: 10 }}>
           {product.is_available === false ? 'Currently unavailable' : `Available: ${product.stock_qty ?? '—'} ${product.unit ?? ''}`}
         </Text>
 
@@ -247,9 +246,10 @@ export default function ProductDetailScreen(): React.JSX.Element {
         ) : null}
 
         {error ? (
-          <Text style={{ fontFamily: 'BricolageGrotesque_400Regular', fontSize: 13, color: colors.danger, marginTop: 12 }}>{error}</Text>
+          <Text style={{ fontFamily: F, fontSize: 13, color: colors.danger, marginTop: 12 }}>{error}</Text>
         ) : null}
       </View>
     </ScrollView>
+    </SafeAreaView>
   );
 }
