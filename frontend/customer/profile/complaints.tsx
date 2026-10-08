@@ -1,6 +1,7 @@
 // Customer complaints: list + new complaint form (optional photo).
 import React, { useCallback, useState } from 'react';
 import { View, Text, StyleSheet, Pressable, ScrollView, ActivityIndicator, Alert, TextInput, Modal } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Screen } from '../../../src/components/common/Screen';
 import { Card } from '../../../src/components/common/Card';
@@ -76,7 +77,8 @@ export default function ComplaintsScreen() {
   };
 
   return (
-    <Screen title="Complaints" subtitle="File a complaint">
+    <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+<Screen title="Complaints" subtitle="File a complaint">
       {loading ? (
         <View style={styles.center}><ActivityIndicator size="large" color={colors.forest} /></View>
       ) : (
@@ -135,6 +137,7 @@ export default function ComplaintsScreen() {
         </View>
       </Modal>
     </Screen>
+    </SafeAreaView>
   );
 }
 
@@ -158,11 +161,11 @@ const styles = StyleSheet.create({
   chipText: { fontSize: 14, color: colors.sage, textTransform: 'capitalize' },
   chipTextActive: { color: colors.ivory, fontWeight: '600' },
   input: {
-    backgroundColor: colors.cream, borderRadius: 12, padding: 14, marginBottom: 10,
+    backgroundColor: colors.cream, borderRadius: 16, padding: 14, marginBottom: 10,
     fontSize: 16, color: colors.ink, borderWidth: 1, borderColor: colors.line,
   },
   multiline: { minHeight: 100 },
-  photoBtn: { borderWidth: 1.5, borderStyle: 'dashed', borderColor: colors.line, borderRadius: 12, padding: 14, marginBottom: 12, alignItems: 'center' },
+  photoBtn: { borderWidth: 1.5, borderStyle: 'dashed', borderColor: colors.line, borderRadius: 16, padding: 14, marginBottom: 12, alignItems: 'center' },
   photoText: { fontSize: 14, color: colors.forest, fontWeight: '600' },
   cancel: { alignItems: 'center', marginTop: 12 },
   cancelText: { fontSize: 15, color: colors.sage, fontWeight: '600' },
