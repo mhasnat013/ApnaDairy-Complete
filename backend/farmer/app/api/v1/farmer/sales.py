@@ -76,6 +76,10 @@ def _sales_viewer(
         _profile, _farmer_profile, farmer_row = farmer_ctx
         if farmer_row is not None:
             return ("farmer", farmer_row["id"])
+        # Authenticated farmer, but no manager has accepted the registration
+        # yet. This is NOT an auth failure — return an empty list instead of
+        # 401 (which would log the user out of the app).
+        return ("none", "")
     if manager_ctx is not None:
         _profile, center = manager_ctx
         return ("manager", center["id"])
@@ -168,6 +172,8 @@ def refuse_sale(
 def list_sales(viewer=Depends(_sales_viewer)) -> list[dict]:
     """Sales history: the farmer's own sales, or the manager's center sales."""
     role, ident = viewer
+    if role == "none":
+        return []
     try:
         if role == "farmer":
             return sales_service.list_sales_for_farmer(ident)
