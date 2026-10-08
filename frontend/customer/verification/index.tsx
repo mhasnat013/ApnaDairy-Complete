@@ -11,6 +11,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { Screen } from '../../../src/components/common/Screen';
@@ -252,11 +253,13 @@ export default function VerificationScreen() {
   };
 
   return (
-    <Screen title="Verification" subtitle="ApnaDairy">
+    <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+<Screen title="Verification" subtitle="ApnaDairy">
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.list}>
         {renderBody()}
       </ScrollView>
     </Screen>
+    </SafeAreaView>
   );
 }
 
@@ -267,7 +270,7 @@ const styles = StyleSheet.create({
   body: { fontSize: 15, color: colors.sage, lineHeight: 22, marginBottom: 8 },
   label: { fontSize: 14, fontWeight: '600', color: colors.ink, marginTop: 10, marginBottom: 6 },
   input: {
-    backgroundColor: colors.ivory, borderRadius: 12, paddingHorizontal: 14, height: 48,
+    backgroundColor: colors.ivory, borderRadius: 16, paddingHorizontal: 14, height: 48,
     fontSize: 16, color: colors.ink, borderWidth: 1, borderColor: colors.line,
   },
   multiline: { height: 84, textAlignVertical: 'top', paddingTop: 12 },
