@@ -1,0 +1,46 @@
+-- ============================================================
+-- ApnaDairy B2C — 01_tables.sql
+-- All tables for the customer mobile app (B2C only, no B2B).
+-- Run FIRST, before 02_rls.sql / 03_storage.sql / 04_triggers.sql.
+-- ============================================================
+-- Planned tables (final design lands here in the schema-design step):
+--
+--  profiles              one row per auth user (customer). id = auth.users.id
+--                        full_name, phone, role='customer', status, created_at
+--  verification_docs     CNIC front/back + profile photo per user
+--                        user_id, doc_type, file_path, status, reviewed_by,
+--                        rejection_reason, submitted_at, reviewed_at
+--  addresses             saved delivery addresses per user
+--                        user_id, label, address_line, city, area, is_default
+--  area_managers         shop managers (visible in marketplace)
+--                        user_id, center_name, city, address, lat/lng,
+--                        verification_status, rating
+--  milk_batches          milk listed by managers; category A/B/C assigned by AI
+--                        manager_id, quantity_kg, price_per_kg, category,
+--                        freshness_score, verdict, measured_at, status
+--  byproducts            optional per-manager items (ghee, makhan, cheese, meat)
+--                        manager_id, name, price, unit, stock
+--  orders                ONE row per manager per checkout (never merged)
+--                        user_id, manager_id, items (jsonb), subtotal,
+--                        delivery_address, slot_type, slot_date, slot_window,
+--                        payment_method, payment_status, status, placed_at
+--  payments              payment attempts per order
+--                        order_id, method (cod/bank/card), amount,
+--                        screenshot_path (bank transfer), card_last4 (demo),
+--                        status, verified_by, verified_at
+--  riders                rider profiles held per manager
+--                        manager_id, name, phone, photo_path, vehicle
+--  deliveries            rider assignment + live tracking per order
+--                        order_id, rider_id, status, current_lat, current_lng,
+--                        eta, assigned_at, delivered_at
+--  rider_messages         two-way chat between customer and rider
+--                        delivery_id, sender, message, sent_at
+--  permanent_customers   monthly-customer requests + ledger
+--                        user_id, manager_id, cycle_days (15/30), status,
+--                        approved_by, balance, due_date
+--  ledger_entries        daily milk entries for permanent customers
+--                        permanent_customer_id, date, quantity_kg, amount
+--  complaints            user_id, category, order_id (nullable), text,
+--                        photo_path, status, created_at, resolved_at
+--
+-- (Write the CREATE TABLE statements below.)

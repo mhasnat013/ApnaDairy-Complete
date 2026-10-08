@@ -1,0 +1,14 @@
+INFO:     Started server process [26485]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:8001 (Press CTRL+C to quit)
+INFO:     127.0.0.1:56562 - "POST /api/v1/staff/orders/71a92aad-9c3d-48d6-8199-931a8cfb71ce/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56572 - "POST /api/v1/staff/orders/71a92aad-9c3d-48d6-8199-931a8cfb71ce/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:44114 - "POST /api/v1/staff/orders/71a92aad-9c3d-48d6-8199-931a8cfb71ce/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:44120 - "POST /api/v1/staff/orders/71a92aad-9c3d-48d6-8199-931a8cfb71ce/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:44136 - "GET /api/v1/orders/71a92aad-9c3d-48d6-8199-931a8cfb71ce HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36670 - "GET /health HTTP/1.1" 200 OK
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [26485]

@@ -1,0 +1,13 @@
+-- ============================================================
+-- ApnaDairy B2C — seed.sql
+-- Demo data for the supervisor demo ONLY. Never run on real data.
+-- Run AFTER all schema files.
+-- ============================================================
+-- Planned seed:
+--  * 2 area managers (Lahore, Islamabad) with center names + ratings
+--  * 6 milk batches (mix of A/B/C with freshness scores + verdicts)
+--  * 4 byproducts (desi ghee, makhan, cheese)
+--  * 1 demo customer (verified) with an address
+--  * 1 rider assigned to a manager
+--
+-- (Write the INSERT statements below once 01_tables.sql is final.)

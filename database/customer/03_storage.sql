@@ -1,0 +1,15 @@
+-- ============================================================
+-- ApnaDairy B2C — 03_storage.sql
+-- Storage buckets + policies. Run AFTER 01_tables.sql.
+-- ============================================================
+-- Buckets (all PRIVATE):
+--  verification-docs   CNIC front/back, profile photo. 5 MB max.
+--                      User uploads own files; SuperAdmin reads all.
+--                      (Bucket already exists in the project — this file
+--                      documents/re-applies its policies.)
+--  payment-screenshots Bank-transfer proof screenshots. 5 MB max.
+--                      User uploads for own orders; SuperAdmin reads all.
+--  profile-photos      Customer profile pictures. 2 MB max.
+--                      Owner read/write; public read for rider/manager views.
+--
+-- (Write the INSERT INTO storage.buckets + storage policy statements below.)

@@ -1,0 +1,18 @@
+-- ============================================================
+-- ApnaDairy B2C — 02_rls.sql
+-- Row Level Security policies. Run AFTER 01_tables.sql.
+-- ============================================================
+-- Principles:
+--  * Enable RLS on every table (no unrestricted access — the old schema
+--    had 31 security warnings; this one starts clean).
+--  * Customers: read/write ONLY their own rows (profiles, addresses, orders,
+--    payments, complaints, verification_docs, ledger).
+--  * Public catalog reads: active managers, active batches, byproducts —
+--    readable by anyone (even unverified explorers).
+--  * Managers: read/write only their own batches, orders, riders, deliveries.
+--  * SuperAdmin: full access (service_role / admin flag).
+--  * Unverified users: browsing allowed; buying blocked at the APP layer
+--    (locked buttons), not the database layer.
+--
+-- (Write the ALTER TABLE ... ENABLE ROW LEVEL SECURITY + CREATE POLICY
+--  statements below.)

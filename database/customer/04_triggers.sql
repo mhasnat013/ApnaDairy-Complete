@@ -1,0 +1,11 @@
+-- ============================================================
+-- ApnaDairy B2C — 04_triggers.sql
+-- Database triggers & helper functions. Run AFTER 01_tables.sql.
+-- ============================================================
+-- Planned:
+--  * handle_new_user() — on auth.users insert, create matching profiles row
+--    (id, email, role='customer', status='unverified').
+--  * set_updated_at() — keep updated_at fresh on profiles/orders/etc.
+--  * order totals guard — recompute order subtotal from items jsonb.
+--
+-- (Write the CREATE FUNCTION + CREATE TRIGGER statements below.)
