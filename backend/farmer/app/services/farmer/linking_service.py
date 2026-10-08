@@ -49,11 +49,41 @@ def _is_unique_violation(exc: Exception) -> bool:
     return getattr(exc, "code", "") == "23505" or "23505" in str(exc)
 
 
-def list_cities() -> list[str]:
-    """Return distinct non-null area-manager cities, sorted."""
+# Major Pakistani cities shown in the farmer app's city picker, even when no
+# area manager is registered there yet. The static list guarantees the picker
+# always offers every region; manager_count tells the UI whether to show
+# "N manager(s)" or "No managers yet".
+PAKISTAN_CITIES = [
+    "Abbottabad", "Bahawalpur", "Chakwal", "Dera Ghazi Khan", "Faisalabad",
+    "Gilgit", "Gujranwala", "Gujrat", "Hyderabad", "Islamabad", "Jacobabad",
+    "Jhelum", "Karachi", "Kasur", "Khairpur", "Khanewal", "Khushab",
+    "Khuzdar", "Kohat", "Lahore", "Larkana", "Mardan", "Mianwali",
+    "Mirpur Khas", "Multan", "Muzaffarabad", "Nawabshah", "Nowshera", "Okara",
+    "Peshawar", "Quetta", "Rahim Yar Khan", "Rawalpindi", "Sahiwal",
+    "Sargodha", "Sialkot", "Sukkur", "Swat", "Turbat", "Vehari",
+]
+
+
+def list_cities() -> list[dict]:
+    """Return every major Pakistani city with its area-manager count.
+
+    Cities WITH managers come first (highest count first), then the rest
+    alphabetically. Matching against area_managers.city is case-insensitive.
+    """
     web = get_web_client()
     rows = table(web, "area_managers").select("city").execute().data or []
-    return sorted({r["city"] for r in rows if r.get("city")})
+    counts: dict[str, int] = {}
+    for r in rows:
+        city = (r.get("city") or "").strip()
+        if city:
+            key = city.lower()
+            counts[key] = counts.get(key, 0) + 1
+    result = [
+        {"city": name, "manager_count": counts.get(name.lower(), 0)}
+        for name in PAKISTAN_CITIES
+    ]
+    result.sort(key=lambda d: (d["manager_count"] == 0, -d["manager_count"], d["city"]))
+    return result
 
 
 def list_managers_by_city(city: str) -> list[CityManagerOut]:
