@@ -1,13 +1,14 @@
 """AI chatbot service: dairy-assistant proxy via Groq (llama-3.3-70b-versatile).
 
-Honest demo fallback: when GROQ_API_KEY is not configured, returns a clearly
-marked demo reply instead of failing. Never invents order data — order-aware
-answers only use real rows from the mobile project.
+When GROQ_API_KEY is not configured, raises 503 (no demo/fake replies —
+project rule). Never invents order data — order-aware answers only use real
+rows from the mobile project.
 """
 import os
 from typing import Any, Dict, Optional
 
 import httpx
+from fastapi import HTTPException
 
 SYSTEM_PROMPT = (
     "You are the ApnaDairy customer assistant, a helpful dairy-shop helper for "
@@ -48,13 +49,10 @@ def chat_reply(
     api_key = os.environ.get("GROQ_API_KEY", "")
     context = _order_context(customer_id, order_id)
     if not api_key:
-        return {
-            "reply": (
-                "This is a demo response — the AI assistant is coming soon. "
-                "Check the Orders tab for your order or file a complaint."
-            ),
-            "demo": True,
-        }
+        raise HTTPException(
+            status_code=503,
+            detail="AI assistant is currently unavailable. Please try again later.",
+        )
     try:
         resp = httpx.post(
             "https://api.groq.com/openai/v1/chat/completions",
