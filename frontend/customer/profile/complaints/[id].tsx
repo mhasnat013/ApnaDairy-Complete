@@ -1,6 +1,7 @@
 // Complaint detail: info + message thread + follow-up input.
 import React, { useCallback, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Alert, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { Screen } from '../../../../src/components/common/Screen';
 import { Card } from '../../../../src/components/common/Card';
@@ -45,7 +46,8 @@ export default function ComplaintDetailScreen() {
   };
 
   return (
-    <Screen title="Complaint" subtitle={complaint?.subject || ''}>
+    <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+<Screen title="Complaint" subtitle={complaint?.subject || ''}>
       {loading ? (
         <View style={styles.center}><ActivityIndicator size="large" color={colors.forest} /></View>
       ) : !complaint ? (
@@ -87,6 +89,7 @@ export default function ComplaintDetailScreen() {
         </KeyboardAvoidingView>
       )}
     </Screen>
+    </SafeAreaView>
   );
 }
 
@@ -109,7 +112,7 @@ const styles = StyleSheet.create({
   empty: { textAlign: 'center', color: colors.sage, marginVertical: 16, fontSize: 15 },
   composer: { paddingVertical: 8 },
   input: {
-    backgroundColor: colors.ivory, borderRadius: 12, padding: 14, marginBottom: 10,
+    backgroundColor: colors.ivory, borderRadius: 16, padding: 14, marginBottom: 10,
     fontSize: 16, color: colors.ink, borderWidth: 1, borderColor: colors.line, minHeight: 48,
   },
 });
