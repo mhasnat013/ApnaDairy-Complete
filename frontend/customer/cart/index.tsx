@@ -3,6 +3,7 @@
 // and "Proceed to Checkout" (routes to checkout flow when built).
 // Data: GET /cart/, PUT /cart/items/{id}, DELETE /cart/items/{id}.
 import React, { useCallback, useEffect, useState } from 'react';
+import { formatRs } from '../../src/utils/format';
 import {
   ActivityIndicator,
   FlatList,
@@ -11,6 +12,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 import { getCart, updateCartItem, removeCartItem, clearCart } from '../../../src/services/customer/cartService';
 import type { Cart, CartItem } from '../../../src/types/customerModels';
@@ -20,9 +22,6 @@ import { font } from '../../../src/theme/theme';
 
 const F = font.family;
 
-function formatRs(value: number): string {
-  return `Rs ${Number(value).toLocaleString('en-PK')}`;
-}
 
 function QtyStepper({ qty, onChange, small }: { qty: number; onChange: (q: number) => void; small?: boolean }): React.JSX.Element {
   const size = small ? 36 : 44;
@@ -125,7 +124,7 @@ export default function CartScreen(): React.JSX.Element {
     return (
       <View style={{ flex: 1, backgroundColor: colors.cream, alignItems: 'center', justifyContent: 'center' }}>
         <ActivityIndicator size="large" color={colors.forest} />
-        <Text style={{ fontFamily: 'BricolageGrotesque_400Regular', fontSize: 14, color: colors.sage, marginTop: 12 }}>Loading...</Text>
+        <Text style={{ fontFamily: F, fontSize: 14, color: colors.sage, marginTop: 12 }}>Loading...</Text>
       </View>
     );
   }
@@ -133,11 +132,12 @@ export default function CartScreen(): React.JSX.Element {
   const empty = cart.items.length === 0;
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.cream }}>
+    <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+<View style={{ flex: 1, backgroundColor: colors.cream }}>
       <View style={{ padding: 16, paddingBottom: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
         <View>
           <Text style={{ fontFamily: 'BricolageGrotesque_700Bold', fontSize: 24, color: colors.ink }}>Cart</Text>
-          <Text style={{ fontFamily: 'BricolageGrotesque_400Regular', fontSize: 13, color: colors.sage, marginTop: 2 }}>
+          <Text style={{ fontFamily: F, fontSize: 13, color: colors.sage, marginTop: 2 }}>
             {cart.total_items} items
           </Text>
         </View>
@@ -150,14 +150,14 @@ export default function CartScreen(): React.JSX.Element {
 
       {error ? (
         <View style={{ marginHorizontal: 16, backgroundColor: colors.dangerTint, borderRadius: 16, padding: 14, marginBottom: 8 }}>
-          <Text style={{ fontFamily: 'BricolageGrotesque_400Regular', fontSize: 14, color: colors.ink }}>{error}</Text>
+          <Text style={{ fontFamily: F, fontSize: 14, color: colors.ink }}>{error}</Text>
         </View>
       ) : null}
 
       {empty ? (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 }}>
           <Text style={{ fontFamily: 'BricolageGrotesque_700Bold', fontSize: 18, color: colors.ink }}>Your cart is empty</Text>
-          <Text style={{ fontFamily: 'BricolageGrotesque_400Regular', fontSize: 14, color: colors.sage, marginTop: 8, textAlign: 'center' }}>
+          <Text style={{ fontFamily: F, fontSize: 14, color: colors.sage, marginTop: 8, textAlign: 'center' }}>
             Choose fresh milk and traditional dairy products from the marketplace.
           </Text>
           <View style={{ marginTop: 20, width: '100%' }}>
@@ -182,7 +182,7 @@ export default function CartScreen(): React.JSX.Element {
                   <Text style={{ fontFamily: 'BricolageGrotesque_700Bold', fontSize: 15, color: colors.ink }} numberOfLines={2}>
                     {item.product_name}
                   </Text>
-                  <Text style={{ fontFamily: 'BricolageGrotesque_400Regular', fontSize: 13, color: colors.sage, marginTop: 2 }}>
+                  <Text style={{ fontFamily: F, fontSize: 13, color: colors.sage, marginTop: 2 }}>
                     {formatRs(item.unit_price)} per
                   </Text>
                   <Text style={{ fontFamily: 'BricolageGrotesque_700Bold', fontSize: 16, color: colors.forest, marginTop: 4 }}>
@@ -206,7 +206,7 @@ export default function CartScreen(): React.JSX.Element {
             }}
           >
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
-              <Text style={{ fontFamily: 'BricolageGrotesque_400Regular', fontSize: 14, color: colors.sage }}>Subtotal</Text>
+              <Text style={{ fontFamily: F, fontSize: 14, color: colors.sage }}>Subtotal</Text>
               <Text style={{ fontFamily: 'BricolageGrotesque_600SemiBold', fontSize: 14, color: colors.ink }}>
                 {formatRs(cart.total_amount)}
               </Text>
@@ -222,5 +222,6 @@ export default function CartScreen(): React.JSX.Element {
         </View>
       )}
     </View>
+    </SafeAreaView>
   );
 }
