@@ -12,6 +12,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { fetchOrders, trackOrder, type Order, type Delivery } from '../../../src/services/customer/orderService';
 import { AppButton } from '../../../src/components/common/AppButton';
@@ -73,19 +74,20 @@ export default function RiderScreen(): React.JSX.Element {
   }
 
   return (
-    <ScrollView
+    <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+<ScrollView
       style={{ flex: 1, backgroundColor: colors.cream }}
       contentContainerStyle={{ padding: 16, paddingBottom: 32 }}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.forest} />}
     >
       <Text style={{ fontFamily: 'BricolageGrotesque_700Bold', fontSize: 24, color: colors.ink }}>Rider</Text>
-      <Text style={{ fontFamily: 'BricolageGrotesque_400Regular', fontSize: 13, color: colors.sage, marginTop: 2, marginBottom: 16 }}>
+      <Text style={{ fontFamily: F, fontSize: 13, color: colors.sage, marginTop: 2, marginBottom: 16 }}>
         Delivery information
       </Text>
 
       {error ? (
         <View style={{ backgroundColor: colors.dangerTint, borderRadius: 16, padding: 14, marginBottom: 12 }}>
-          <Text style={{ fontFamily: 'BricolageGrotesque_400Regular', fontSize: 14, color: colors.ink }}>{error}</Text>
+          <Text style={{ fontFamily: F, fontSize: 14, color: colors.ink }}>{error}</Text>
         </View>
       ) : null}
 
@@ -94,7 +96,7 @@ export default function RiderScreen(): React.JSX.Element {
           <Text style={{ fontFamily: 'BricolageGrotesque_700Bold', fontSize: 17, color: colors.ink }}>
             No active delivery
           </Text>
-          <Text style={{ fontFamily: 'BricolageGrotesque_400Regular', fontSize: 14, color: colors.sage, marginTop: 8, textAlign: 'center' }}>
+          <Text style={{ fontFamily: F, fontSize: 14, color: colors.sage, marginTop: 8, textAlign: 'center' }}>
             When your order is on its way, the rider's details will appear here.
           </Text>
           <View style={{ marginTop: 16, width: '100%' }}>
@@ -103,13 +105,13 @@ export default function RiderScreen(): React.JSX.Element {
         </View>
       ) : (
         <View style={{ backgroundColor: colors.ivory, borderRadius: 20, padding: 20 }}>
-          <Text style={{ fontFamily: 'BricolageGrotesque_400Regular', fontSize: 13, color: colors.sage }}>Order #{order.id.slice(0, 8)}</Text>
+          <Text style={{ fontFamily: F, fontSize: 13, color: colors.sage }}>Order #{order.id.slice(0, 8)}</Text>
           {delivery?.rider ? (
             <View style={{ marginTop: 12 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                 <View
                   style={{
-                    width: 56, height: 56, borderRadius: 28, backgroundColor: colors.forest,
+                    width: 56, height: 56, borderRadius: 20, backgroundColor: colors.forest,
                     alignItems: 'center', justifyContent: 'center', marginRight: 14,
                   }}
                 >
@@ -121,7 +123,7 @@ export default function RiderScreen(): React.JSX.Element {
                   <Text style={{ fontFamily: 'BricolageGrotesque_700Bold', fontSize: 18, color: colors.ink }}>
                     {delivery.rider.name ?? 'Rider'}
                   </Text>
-                  <Text style={{ fontFamily: 'BricolageGrotesque_400Regular', fontSize: 13, color: colors.sage, marginTop: 2 }}>
+                  <Text style={{ fontFamily: F, fontSize: 13, color: colors.sage, marginTop: 2 }}>
                     {delivery.rider.phone ?? ''}
                   </Text>
                 </View>
@@ -141,7 +143,7 @@ export default function RiderScreen(): React.JSX.Element {
               ) : null}
             </View>
           ) : (
-            <Text style={{ fontFamily: 'BricolageGrotesque_400Regular', fontSize: 14, color: colors.sage, marginTop: 12 }}>
+            <Text style={{ fontFamily: F, fontSize: 14, color: colors.sage, marginTop: 12 }}>
               A rider has not been assigned yet.
             </Text>
           )}
@@ -156,5 +158,6 @@ export default function RiderScreen(): React.JSX.Element {
         </View>
       )}
     </ScrollView>
+    </SafeAreaView>
   );
 }
