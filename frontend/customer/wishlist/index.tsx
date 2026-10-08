@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Screen } from '../../../src/components/common/Screen';
 import { Card } from '../../../src/components/common/Card';
@@ -125,7 +126,8 @@ export default function WishlistScreen() {
   }
 
   return (
-    <Screen title="Wishlist" subtitle="Your saved products">
+    <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+<Screen title="Wishlist" subtitle="Your saved products">
       {loading ? (
         <View style={styles.center}>
           <ActivityIndicator size="large" color={colors.forest} />
@@ -160,6 +162,7 @@ export default function WishlistScreen() {
         />
       )}
     </Screen>
+    </SafeAreaView>
   );
 }
 
