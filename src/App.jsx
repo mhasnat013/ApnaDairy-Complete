@@ -26,8 +26,10 @@ const NewRequirement = lazy(() => import('./pages/business/NewRequirement'))
 const RequirementDetail = lazy(() => import('./pages/business/RequirementDetail'))
 const BusinessOrders = lazy(() => import('./pages/business/BusinessOrders'))
 import PublicRequests from './pages/PublicRequests'
+import PublicMarketplace from './pages/Marketplace'
 import Home from './pages/Home'
 const ManagerHome = lazy(() => import('./pages/manager/ManagerHome'))
+const BusinessMarketplace = lazy(() => import('./pages/business/Marketplace'))
 const BusinessHome = lazy(() => import('./pages/business/BusinessHome'))
 const Collection = lazy(() => import('./pages/manager/Collection'))
 const RecordMilk = lazy(() => import('./pages/manager/RecordMilk'))
@@ -71,6 +73,7 @@ export default function App() {
           <Route path="/set-password" element={<ResetPassword invite />} />
           <Route path="/welcome" element={<Welcome />} />
           <Route path="/requests" element={<PublicRequests />} />
+          <Route path="/marketplace" element={<PublicMarketplace />} />
           <Route path="/privacy" element={<Legal kind="privacy" />} />
           <Route path="/terms" element={<Legal kind="terms" />} />
 
@@ -125,6 +128,7 @@ export default function App() {
           <Route element={<ProtectedRoute allow={['business']} />}>
             <Route path="/business" element={<DashboardLayout />}>
               <Route index element={<BusinessHome />} />
+              <Route path="marketplace" element={<BusinessMarketplace />} />
               <Route path="requirements" element={<Requirements />} />
               <Route path="requirements/new" element={<NewRequirement />} />
               <Route path="requirements/:id" element={<RequirementDetail />} />

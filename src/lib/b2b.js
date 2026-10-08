@@ -8,9 +8,9 @@ export const GRADES = ['standard', 'fresh', 'premium']
 export const gradeRule = (q) => (q === 'premium' ? 'Premium' : `${qualityLabel[q] ?? 'Standard'} or better`)
 export const gradeOk = (got, need) => GRADES.indexOf(got) >= GRADES.indexOf(need ?? 'standard')
 export const qualityHint = {
-  standard: 'Passes the IoT milk test',
-  fresh: 'IoT quality score 82 or more',
-  premium: 'IoT quality score 88 or more'
+  standard: 'AI tested, rated Poor or better (never spoiled)',
+  fresh: 'AI Model 1 rates it Acceptable or better',
+  premium: 'AI Model 1 rates it Good'
 }
 export const productQualityHint = { standard: 'Good everyday quality', premium: 'Best grade, pure and rich' }
 export const orderSteps = ['confirmed', 'dispatched', 'delivered']

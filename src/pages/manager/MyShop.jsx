@@ -56,7 +56,9 @@ export default function MyShop() {
 
   return (
     <>
-      <PageHeader title="My shop" description={data?.byproduct ? "What customers see in the ApnaDairy app: your shop, your products and what customers and businesses say about you." : "What customers see in the ApnaDairy app: your milk on sale, your shop and what other customers say about it."} />
+      <PageHeader title="My shop" description={data?.byproduct ? "What customers see in the ApnaDairy app and the website marketplace: your shop, your products and what customers and businesses say about you." : "What customers see in the ApnaDairy app and the website marketplace: your milk on sale, your shop and what other customers say about it."}>
+        {data?.center && <Link to={`/marketplace?shop=${data.center.id}${data.byproduct ? '&tab=products' : ''}`} className="btn-secondary"><Icon name="store" size={17} />See it on the marketplace</Link>}
+      </PageHeader>
       <Alert>{error}</Alert>
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_340px] xl:gap-7">
         <div className="min-w-0">
@@ -173,6 +175,7 @@ function ListingCard({ listing, pub, fresh, grade, reload, onEdit }) {
           <div className="flex flex-wrap items-center gap-2"><p className="display text-[20px] text-forest-deep">{listing.name}</p><GradeChip grade={grade} /></div>
           <p className={`mt-1 inline-flex items-center gap-1.5 text-[13px] font-medium ${status[0] === 'green' ? 'text-forest' : status[0] === 'amber' ? 'text-amber' : status[0] === 'red' ? 'text-danger' : 'text-muted'}`}>
             <span className={`h-2 w-2 rounded-full ${status[0] === 'green' ? 'bg-forest-2' : status[0] === 'amber' ? 'bg-haldi' : status[0] === 'red' ? 'bg-danger' : 'bg-line'}`} />{status[1]}</p>
+          {(listing.listed_at || listing.created_at) && <p className="mt-0.5 text-[12.5px] text-muted">Listed {dateTimeShort(listing.listed_at ?? listing.created_at)}</p>}
           {listing.description && <p className="mt-1 truncate text-[13px] text-muted">“{listing.description}”</p>}
         </div>
         </div>

@@ -109,7 +109,11 @@ Farmer kinds:
   - Milk is sold for at most 2 days after collection.
   - Expired milk never appears in this list.
   - A day-2 discount shows up as `discount_pct`.
-- `rpc('place_shop_order', { p_items: [{ listing_id, quantity }], p_address, p_phone })` places an order from one shop and returns the order id.
+- `public_listings` also carries what AI Model 1 found in that milk: `model_quality` (Good, Acceptable, Poor), `spoilage_pct`, `model_shelf_left_h` and `tested_at`.
+- The website's view-only marketplace reads two catalog views, which the app can use too:
+  - `marketplace_milk`: milk listings with litres available, plus `listed_at`, `test_ph` and `test_temperature_c`.
+  - `marketplace_products`: dairy products from product sellers.
+- `rpc('place_shop_order', { p_items: [{ listing_id, quantity }], p_address, p_phone })` places an order from one shop and returns the order id. The website never calls this: its "Order" buttons point people to the app.
 - The customer's orders are in `shop_orders`, with their items in `shop_order_items`.
 
 ## Rules the app should not try to enforce itself

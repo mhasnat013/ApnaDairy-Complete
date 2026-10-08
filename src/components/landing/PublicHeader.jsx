@@ -9,6 +9,7 @@ import JoinButton from './JoinButton'
 const links = [
   ['/#how', 'How it works'],
   ['/#modules', 'Platform'],
+  ['/marketplace', 'Marketplace'],
   ['/requests', 'Bulk requests'],
   ['/#who', "Who it's for"],
 ]

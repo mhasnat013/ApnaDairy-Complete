@@ -43,6 +43,7 @@ export const navFor = {
   ],
   business: [
     { to: '/business', label: 'Overview', icon: 'grid', end: true, ready: true },
+    { to: '/business/marketplace', label: 'Marketplace', icon: 'store', ready: true },
     { to: '/business/requirements', label: 'My requirements', icon: 'box', ready: true },
     { to: '/business/orders', label: 'Bulk orders', icon: 'truck', ready: true },
     { to: '/business/support', label: 'Support', icon: 'inbox', ready: true, support: true },

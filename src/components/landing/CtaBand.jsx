@@ -12,6 +12,7 @@ export default function CtaBand() {
             <p className="mt-5 max-w-lg text-[18px] text-forest-deep/80">Sign up, upload your documents, and start buying, testing and selling on one record once you're verified.</p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Link to="/signup" className="btn-primary h-[52px] px-7 text-[16px]">Join ApnaDairy</Link>
+              <Link to="/marketplace" className="btn-secondary h-[52px] border-forest-deep/20 bg-transparent px-7 text-[16px] hover:bg-forest-deep/5">Browse the marketplace</Link>
               <Link to="/requests" className="btn-secondary h-[52px] border-forest-deep/20 bg-transparent px-7 text-[16px] hover:bg-forest-deep/5">Browse bulk requests</Link>
             </div>
           </Reveal>

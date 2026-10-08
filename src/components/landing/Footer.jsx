@@ -12,6 +12,7 @@ export default function Footer() {
         <nav className="grid grid-cols-2 gap-x-10 gap-y-2 text-[15px] sm:grid-cols-3 sm:gap-x-14" aria-label="Footer">
           <a href="/#how" className="text-muted hover:text-ink">How it works</a>
           <a href="/#modules" className="text-muted hover:text-ink">Platform</a>
+          <Link to="/marketplace" className="text-muted hover:text-ink">Marketplace</Link>
           <Link to="/requests" className="text-muted hover:text-ink">Bulk requests</Link>
           <Link to="/signup" className="text-muted hover:text-ink">Join</Link>
           <Link to="/login" className="text-muted hover:text-ink">Sign in</Link>

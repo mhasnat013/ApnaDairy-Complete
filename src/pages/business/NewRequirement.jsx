@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useUi } from '../../context/UiContext'
 import { milkLabel, qualityLabel, qualityHint, productLabel, PRODUCTS, defaultUnit, qtyText, perUnit, GRADES } from '../../lib/b2b'
@@ -19,12 +19,20 @@ const productHint = { ghee: 'Pure desi ghee', butter: 'White or yellow butter', 
 export default function NewRequirement() {
   const nav = useNavigate()
   const { toast } = useUi()
+  const [params] = useSearchParams()
   const [today] = useState(() => iso(new Date()))
-  const [f, setF] = useState(() => ({
-    product: 'milk', unit: 'litre', milk_type: 'cow', quantity_l: '', required_date: iso(plusDays(7)), quality: 'standard',
-    target_price: '', deadline_date: iso(plusDays(5)), deadline_time: '18:00',
-    delivery_city: '', delivery_address: '', notes: '',
-  }))
+  // "request in bulk" on a marketplace listing fills in its milk, grade and city
+  const [f, setF] = useState(() => {
+    const product = PRODUCTS.includes(params.get('product')) ? params.get('product') : 'milk'
+    return {
+      product, unit: product === 'milk' ? 'litre' : defaultUnit[product],
+      milk_type: Object.keys(milkLabel).includes(params.get('milk_type')) ? params.get('milk_type') : 'cow',
+      quantity_l: '', required_date: iso(plusDays(7)),
+      quality: GRADES.includes(params.get('quality')) ? params.get('quality') : 'standard',
+      target_price: '', deadline_date: iso(plusDays(5)), deadline_time: '18:00',
+      delivery_city: (params.get('city') ?? '').slice(0, 60), delivery_address: '', notes: '',
+    }
+  })
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const set = (k) => (e) => setF((prev) => ({ ...prev, [k]: e?.target ? e.target.value : e }))
@@ -105,7 +113,7 @@ export default function NewRequirement() {
               <span className="label">Quality</span>
               <ChoiceCards name="Quality" value={f.quality} onChange={set('quality')}
                 options={GRADES.map((v) => ({ value: v, label: qualityLabel[v], hint: qualityHint[v] }))} />
-              <p className="hint">The grade comes from the center's IoT milk test. Milk is tested again before dispatch, and only milk of this grade or better can be sent to you.</p>
+              <p className="hint">The grade comes from the center's IoT milk test and AI Model 1 when the milk is bought. Bulk milk goes out of the center's tested stock, of this grade or better.</p>
             </div>
           )}
 

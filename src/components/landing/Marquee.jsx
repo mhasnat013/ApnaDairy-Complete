@@ -7,7 +7,7 @@ const items = [
   'Farmers see the price before they sell',
   'Open bids anyone can see',
   'Every batch traced to its farm',
-  'Bulk milk tested again before dispatch',
+  'Bulk milk sent from AI-tested stock',
 ]
 
 export default function Marquee() {
