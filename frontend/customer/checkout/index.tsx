@@ -1,6 +1,8 @@
 // Customer checkout: address selector, payment method, server-priced summary.
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { formatRs } from '../../src/utils/format';
 import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator, Alert } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Screen } from '../../../src/components/common/Screen';
 import { Card } from '../../../src/components/common/Card';
@@ -103,7 +105,8 @@ export default function CheckoutScreen() {
   }
 
   return (
-    <Screen title="Checkout" subtitle="Review and place your order">
+    <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+<Screen title="Checkout" subtitle="Review and place your order">
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         {error ? (
           <Card style={styles.errorCard}>
@@ -173,13 +176,13 @@ export default function CheckoutScreen() {
               <Text style={styles.lineName}>
                 {it.product_name} × {it.quantity}
               </Text>
-              <Text style={styles.lineAmount}>Rs {it.line_total.toFixed(2)}</Text>
+              <Text style={styles.lineAmount}>{formatRs(it.line_total)}</Text>
             </View>
           ))}
           <View style={styles.divider} />
           <View style={styles.lineRow}>
             <Text style={styles.totalLabel}>Total (server-calculated)</Text>
-            <Text style={styles.totalAmount}>Rs {(cart?.total_amount ?? 0).toFixed(2)}</Text>
+            <Text style={styles.totalAmount}>{formatRs((cart?.total_amount ?? 0))}</Text>
           </View>
           <Text style={styles.muted}>Prices are calculated by the server — never edited on device.</Text>
         </Card>
@@ -194,6 +197,7 @@ export default function CheckoutScreen() {
         </View>
       </ScrollView>
     </Screen>
+    </SafeAreaView>
   );
 }
 
@@ -208,12 +212,12 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'flex-start' },
   flex: { flex: 1 },
   radio: {
-    width: 22, height: 22, borderRadius: 11, borderWidth: 2,
+    width: 22, height: 22, borderRadius: 16, borderWidth: 2,
     borderColor: colors.sage, marginRight: 12, marginTop: 2,
     alignItems: 'center', justifyContent: 'center',
   },
   radioActive: { borderColor: colors.forest },
-  radioDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.forest },
+  radioDot: { width: 10, height: 10, borderRadius: 16, backgroundColor: colors.forest },
   addrLabel: { fontSize: 16, color: colors.ink, fontFamily: 'BricolageGrotesque_700Bold' },
   addrText: { fontSize: 14, color: colors.ink, marginTop: 2 },
   muted: { fontSize: 13, color: colors.sage, marginTop: 4 },
