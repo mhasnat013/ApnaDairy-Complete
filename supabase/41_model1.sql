@@ -327,6 +327,12 @@ as $$
 $$;
 
 -- customers see the model's findings next to each listing
+-- (43_dynamic_pricing.sql adds the pricing columns to this view; running this file again leaves that newer view alone)
+do $do$
+begin
+  if not exists (select 1 from information_schema.columns
+                  where table_schema = 'public' and table_name = 'public_listings' and column_name = 'pricing_mode') then
+    execute $v$
 create or replace view public.public_listings as
  select pr.id,
     pr.area_manager_id as shop_id,
@@ -362,6 +368,9 @@ create or replace view public.public_listings as
      cross join lateral listing_model(pr.area_manager_id, pr.milk_type) lm
   where pr.category = 'milk' and pr.is_available and pr.expired_at is null
     and (pr.milk_expires_at is null or pr.milk_expires_at > now());
+$v$;
+  end if;
+end $do$;
 
 -- ---------- 8. admin: how many tests model 1 answered ----------
 drop function if exists public.device_activity();

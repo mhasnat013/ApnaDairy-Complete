@@ -257,15 +257,18 @@ export const myBulkReviews = async () => must(await supabase.from('bulk_reviews'
   .select('*, business:business_profiles(business_name, business_type), order:bulk_orders(quantity_l, delivery_date, delivered_at, requirement:bulk_requirements(milk_type))')
   .order('created_at', { ascending: false }).limit(100))
 export const milkListings = async () => must(await supabase.from('products').select('*').eq('area_manager_id', await mySellerId()).eq('category', 'milk'))
-export const createListing = async (type, price, litres, description, discount = 0) => must(await supabase.from('products').insert({
+export const createListing = async (type, price, litres, description, discount = 0, mode = 'manual') => must(await supabase.from('products').insert({
   name: `Fresh ${({ cow: 'cow', buffalo: 'buffalo', mixed: 'mixed' })[type]} milk`, category: 'milk', milk_type: type, unit: 'litre',
   price: Number(price), listed_l: Number(litres), description: description || null, is_available: true, discount_pct: Number(discount) || 0,
+  pricing_mode: mode,
 }).select().single())
-// milk listings last as long as their milk (2 days at most, supabase/36); the discount is free until then
+// milk listings last as long as their milk (2 days at most, supabase/36); the discount is free until then.
+// pricing_mode 'dynamic' lets the price drop by itself as the milk gets older (supabase/43)
 export const saveListing = async (l) => must(await supabase.from('products').update({
   price: Number(l.price), is_available: !!l.is_available,
   listed_l: Number(l.listed_l) || 0, description: l.description || null,
   ...(l.discount_pct != null ? { discount_pct: Number(l.discount_pct) || 0 } : {}),
+  ...(l.pricing_mode ? { pricing_mode: l.pricing_mode } : {}),
 }).eq('id', l.id))
 // retest milk still on the app; returns the ai's suggested discount, or takes failed milk off the app
 export const retestListing = (productId, readingId) => rpc('retest_listing', { p_product: productId, p_reading: readingId })

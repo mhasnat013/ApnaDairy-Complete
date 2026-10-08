@@ -108,7 +108,9 @@ Farmer kinds:
 - `supabase.from('public_listings').select('*')` lists the milk on sale, with `price_per_l` (after any discount), `quality`, `freshness_score`, `available_l`, `min_order_l`, `max_order_l` and `expires_at`.
   - Milk is sold for at most 2 days after collection.
   - Expired milk never appears in this list.
-  - A day-2 discount shows up as `discount_pct`.
+  - A discount shows up as `discount_pct`, and `price_per_l` is already the price after it.
+  - `pricing_mode` is `manual` (the center sets the discount) or `dynamic` (the price drops by itself as the milk gets older).
+  - For a dynamic listing, `price_stage` is `tested`, `good`, `standard`, `cooking` or `last_hours` (0, 10, 20, 30, 40% off), and `next_drop_at` is when the next drop comes (null in the last stage).
 - `public_listings` also carries what AI Model 1 found in that milk: `model_quality` (Good, Acceptable, Poor), `spoilage_pct`, `model_shelf_left_h` and `tested_at`.
 - The website's view-only marketplace reads two catalog views, which the app can use too:
   - `marketplace_milk`: milk listings with litres available, plus `listed_at`, `test_ph` and `test_temperature_c`.

@@ -11,10 +11,17 @@ import Icon from './Icon'
 import ProductImage from './ProductImage'
 import AppPrompt from './AppPrompt'
 import { MilkChurn } from './Farm'
+import { STAGES, stageOf, priceAt } from '../lib/pricing'
 
 // the product catalog: what milk and dairy products are on sale right now. view only:
 // "Order" explains that buying happens in the mobile app. businesses can turn a listing into a bulk request.
 const gradeTone = { premium: 'bg-haldi-soft text-amber', fresh: 'bg-mint-soft text-forest', standard: 'bg-cream-2 text-muted' }
+// dynamic pricing: the stage label, and the price after the next drop
+const dynStage = (r) => (r.pricing_mode === 'dynamic' && r.price_stage ? stageOf(r.price_stage) : null)
+const nextDrop = (r) => {
+  const i = STAGES.findIndex((s) => s.key === r.price_stage)
+  return r.next_drop_at && STAGES[i + 1] ? { at: r.next_drop_at, price: priceAt(r.list_price, STAGES[i + 1].pct) } : null
+}
 const hoursLeft = (d) => (d ? (new Date(d) - Date.now()) / 36e5 : null)
 const leftText = (h) => (h == null ? '' : h < 1 ? 'under an hour left' : h < 48 ? `${Math.round(h)} h left` : `${Math.round(h / 24)} days left`)
 const MILK_SORTS = {
@@ -161,6 +168,7 @@ function Actions({ r, milk, business, onBuy, compact = false }) {
 function MilkCard({ r, i, business, onBuy }) {
   const h = hoursLeft(r.expires_at)
   const aiLeft = r.model_shelf_left_h == null ? null : Number(r.model_shelf_left_h)
+  const stage = dynStage(r), drop = stage && nextDrop(r)
   return (
     <article className="panel flex min-w-0 animate-rise flex-col p-5" style={{ animationDelay: `${Math.min(i, 8) * 50}ms` }}>
       <div className="flex items-start gap-3">
@@ -179,7 +187,9 @@ function MilkCard({ r, i, business, onBuy }) {
         {r.quality && <span className={`rounded-full px-2.5 py-1 text-[12.5px] font-semibold ${gradeTone[r.quality]}`}>{qualityLabel[r.quality]}</span>}
         {r.model_quality && <span className="rounded-full bg-cream px-2.5 py-1 text-[12.5px] font-medium"><Icon name="spark" size={12} className="mr-1 inline text-forest" />AI: {r.model_quality}</span>}
         {Number(r.discount_pct) > 0 && <span className="rounded-full bg-haldi px-2.5 py-1 text-[12.5px] font-bold text-forest-deep">{r.discount_pct}% off</span>}
+        {stage && <span className="rounded-full bg-mint-soft px-2.5 py-1 text-[12.5px] font-semibold text-forest"><Icon name="clock" size={12} className="mr-1 inline" />{stage.label}</span>}
       </div>
+      {stage && <p className="mt-2 text-[12.5px] text-muted">Dynamic price: it gets lower as the milk gets older.{drop ? <> Drops to <b className="num text-ink">{rs(drop.price)}</b> at <span className="num">{dateTimeShort(drop.at)}</span>.</> : ' Lowest price now.'}</p>}
       <p className="display num mt-3 text-[30px] leading-none">{qtyText(r.available_l)} <span className="text-[14px] font-medium text-muted">available</span></p>
       {r.freshness_score != null && (
         <div className="mt-3 flex items-center gap-2">
@@ -243,7 +253,7 @@ function MilkTable({ rows, business, onBuy }) {
             <td className="num text-right">{r.freshness_score ?? '—'}</td>
             <td className="num text-right">{r.spoilage_pct != null ? `${Math.round(r.spoilage_pct)}%` : '—'}</td>
             <td className="num text-[13px]">{r.test_ph != null ? `pH ${Number(r.test_ph).toFixed(2)}` : '—'}{r.test_temperature_c != null ? ` · ${Number(r.test_temperature_c).toFixed(0)} °C` : ''}</td>
-            <td className="num text-right font-semibold">{rs(r.price_per_l)}{Number(r.discount_pct) > 0 && <p className="text-[12px] font-normal text-muted">{r.discount_pct}% off</p>}</td>
+            <td className="num text-right font-semibold">{rs(r.price_per_l)}{Number(r.discount_pct) > 0 && <p className="text-[12px] font-normal text-muted">{r.discount_pct}% off</p>}{dynStage(r) && <p className="text-[12px] font-normal text-forest">{dynStage(r).label}</p>}</td>
             <td className="num text-[13px]">{r.listed_at ? dateTimeShort(r.listed_at) : '—'}</td>
             <td className="num text-[13px]">{r.expires_at ? dateTimeShort(r.expires_at) : '—'}<p className="text-[12px] text-muted">{leftText(hoursLeft(r.expires_at))}</p></td>
             <td><Actions r={r} milk business={business} onBuy={onBuy} compact /></td>

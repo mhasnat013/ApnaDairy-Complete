@@ -43,6 +43,12 @@ grant execute on function public.listing_tests(uuid, milk_kind) to anon, authent
 
 -- ---------- 3. the catalog ----------
 -- milk on sale now: every listing with litres available, with when it was listed and what it was tested at
+-- (43_dynamic_pricing.sql adds the pricing columns to this view; running this file again leaves that newer view alone)
+do $do$
+begin
+  if not exists (select 1 from information_schema.columns
+                  where table_schema = 'public' and table_name = 'marketplace_milk' and column_name = 'pricing_mode') then
+    execute $v$
 create or replace view public.marketplace_milk as
  select l.id, l.shop_id, l.shop_name, l.city, l.rating, l.review_count, l.cover_path,
         l.name, l.milk_type, l.quality, l.description, l.list_price, l.discount_pct, l.price_per_l, l.available_l,
@@ -53,6 +59,9 @@ create or replace view public.marketplace_milk as
    join products p on p.id = l.id
    cross join lateral listing_tests(l.shop_id, l.milk_type) t
   where l.available_l > 0;
+$v$;
+  end if;
+end $do$;
 
 -- dairy products on sale now (desi ghee, butter, yogurt...) from product sellers
 create or replace view public.marketplace_products as

@@ -19,6 +19,7 @@ import { HillsStrip } from '../../components/Farm'
 import { qtyText, perUnit } from '../../lib/b2b'
 import { phoneError, numberError, firstError, prettyPhone } from '../../lib/validate'
 import ProductImage from '../../components/ProductImage'
+import { STAGES, stageNow, priceAt } from '../../lib/pricing'
 
 const TYPES = ['buffalo', 'cow', 'mixed']
 
@@ -91,6 +92,8 @@ function Listings({ data, guide, reload }) {
   const [sheet, setSheet] = useState(() => (focus ? { type: focus } : null))
   if (!data) return <div className="grid gap-4">{[1, 2].map((t) => <div key={t} className="skeleton h-48 rounded-[20px]" />)}</div>
   const fresh = (t) => Math.floor(Number(data.shelf.find((x) => x.milk_type === t)?.sellable_l ?? 0) * 2) / 2
+  // when the oldest fresh milk of this type expires (48 h after its test), for the dynamic pricing times
+  const oldestEnds = (t) => { const h = data.shelf.find((x) => x.milk_type === t)?.oldest_hours; return h == null ? null : new Date(Date.now() + (48 - Number(h)) * 36e5) }
   const listings = TYPES.map((t) => data.listings.find((x) => x.milk_type === t)).filter(Boolean)
   const open = (v) => setSheet(v)
   const close = () => { setSheet(null); if (focus) setParams({}) }
@@ -119,7 +122,7 @@ function Listings({ data, guide, reload }) {
       ))}
 
       {sheet && (editing || listings.length < TYPES.length) && <ListingSheet key={`${editing?.id ?? 'new'}-${sheet.type ?? ''}`} open listing={editing} startType={sheet?.type}
-        taken={listings.map((l) => l.milk_type)} fresh={fresh} grades={data.grades} guide={guide} platform={data.platform}
+        taken={listings.map((l) => l.milk_type)} fresh={fresh} oldestEnds={oldestEnds} grades={data.grades} guide={guide} platform={data.platform}
         pub={editing ? data.pub.find((x) => x.milk_type === editing.milk_type) : null} onClose={close} onSaved={reload} />}
     </div>
   )
@@ -158,7 +161,10 @@ function ListingCard({ listing, pub, fresh, grade, reload, onEdit }) {
   const onApp = pub && !expired ? Number(pub.available_l) : 0
   const hoursLeft = listing.milk_expires_at ? (new Date(listing.milk_expires_at) - Date.now()) / 36e5 : null
   const day = listing.milk_from ? milkDay(listing.milk_from) : null
-  const price = Math.round(Number(listing.price) * (100 - (Number(listing.discount_pct) || 0)) / 100)
+  const dyn = listing.pricing_mode === 'dynamic'
+  const st = dyn && !expired ? stageNow(listing.milk_expires_at) : null
+  const price = dyn ? (pub && !expired ? Number(pub.price_per_l) : priceAt(listing.price, st?.pct ?? 0))
+    : Math.round(Number(listing.price) * (100 - (Number(listing.discount_pct) || 0)) / 100)
   const toggle = async () => {
     setBusy(true)
     try { await saveListing({ ...listing, listed_l: listing.listed_l ?? onApp, is_available: !listing.is_available }); toast(listing.is_available ? `${listing.name} hidden from the app.` : `${listing.name} is on the app.`); await reload() } catch (e) { toast(e.message, 'error') }
@@ -189,18 +195,31 @@ function ListingCard({ listing, pub, fresh, grade, reload, onEdit }) {
       </div>
       <div className="mt-4 grid grid-cols-3 gap-2">
         <Stat label="On the app" value={litres(onApp)} hint={`${litres(fresh)} fresh in stock`} />
-        <Stat label="Price" value={rs(price)} hint={Number(listing.discount_pct) ? `per litre, ${listing.discount_pct}% off` : 'per litre'} />
+        <Stat label="Price" value={rs(price)} hint={dyn ? (st?.pct ? `per litre, ${st.pct}% off now` : 'per litre, dynamic') : Number(listing.discount_pct) ? `per litre, ${listing.discount_pct}% off` : 'per litre'} />
         <Stat label={expired ? 'Expired' : 'Sells until'} value={listing.milk_expires_at ? dateTimeShort(listing.milk_expires_at) : '—'}
           hint={expired ? 'list fresh milk again' : hoursLeft == null ? 'no fresh milk' : `${day ? `day ${Math.min(day, 2)} · ` : ''}${Math.max(1, Math.round(hoursLeft))} h left`} />
       </div>
+      {st && !st.expired && <DynamicLine st={st} price={listing.price} />}
       {!expired && pub?.model_quality && <ModelLine pub={pub} />}
-      {!expired && day >= 2 && !Number(listing.discount_pct) && (
+      {!expired && !dyn && day >= 2 && !Number(listing.discount_pct) && (
         <button className="mt-3 text-left text-[13.5px] font-semibold text-amber underline" onClick={onEdit}>Day 2: give a discount to sell it before it expires</button>
       )}
       {!expired && onApp <= 0 && listing.is_available && fresh > 0 && (
         <button className="mt-3 text-[13.5px] font-semibold text-forest underline" onClick={onEdit}>Add litres: {litres(fresh)} of fresh milk is in stock</button>
       )}
     </section>
+  )
+}
+
+// dynamic pricing: the stage now and the next drop
+function DynamicLine({ st, price }) {
+  const next = STAGES[STAGES.findIndex((s) => s.key === st.key) + 1]
+  return (
+    <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-2xl bg-mint-soft px-4 py-3 text-[13px]">
+      <span className="flex items-center gap-1.5 font-semibold text-forest-deep"><Icon name="clock" size={14} className="text-forest" />Dynamic pricing</span>
+      <span className="font-semibold text-forest">{st.label}{st.pct ? ` · ${st.pct}% off` : ' · full price'}</span>
+      <span className="text-muted">{next && st.next ? `· drops to ${rs(priceAt(price, next.pct))} at ${dateTimeShort(st.next)}` : '· lowest price until the milk expires'}</span>
+    </div>
   )
 }
 
@@ -223,21 +242,26 @@ function ModelLine({ pub }) {
 }
 
 // one form to create a listing or change it
-function ListingSheet({ open, listing, startType, taken, fresh, grades, guide, platform, pub, onClose, onSaved }) {
+function ListingSheet({ open, listing, startType, taken, fresh, oldestEnds, grades, guide, platform, pub, onClose, onSaved }) {
   const { toast } = useUi()
   const free = TYPES.filter((t) => !taken.includes(t))
   const first = listing?.milk_type ?? (free.includes(startType) ? startType : free.find((t) => fresh(t) > 0) ?? free[0])
   const [type, setType] = useState(first)
   const g = guide(type)
   const [f, setF] = useState(() => listing
-    ? { litres: String(listing.expired_at ? Math.floor(fresh(listing.milk_type)) : listing.listed_l == null ? Number(pub?.available_l ?? Math.floor(fresh(listing.milk_type))) : Number(listing.listed_l)), price: String(Number(listing.price)), discount: String(listing.expired_at ? 0 : listing.discount_pct ?? 0), description: listing.description ?? '' }
-    : { litres: String(fresh(first) || ''), price: String(guide(first)?.suggest ?? ({ cow: 205, buffalo: 240, mixed: 210 })[first] ?? ''), discount: '0', description: '' })
+    ? { litres: String(listing.expired_at ? Math.floor(fresh(listing.milk_type)) : listing.listed_l == null ? Number(pub?.available_l ?? Math.floor(fresh(listing.milk_type))) : Number(listing.listed_l)), price: String(Number(listing.price)), discount: String(listing.expired_at ? 0 : listing.discount_pct ?? 0), description: listing.description ?? '', mode: listing.pricing_mode ?? 'manual' }
+    : { litres: String(fresh(first) || ''), price: String(guide(first)?.suggest ?? ({ cow: 205, buffalo: 240, mixed: 210 })[first] ?? ''), discount: '0', description: '', mode: 'manual' })
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value })
   const max = fresh(type)
   const pick = (t) => { setType(t); setF({ ...f, litres: String(fresh(t) || ''), price: String(guide(t)?.suggest ?? f.price) }) }
-  const final = Math.round(Number(f.price || 0) * (100 - (Number(f.discount) || 0)) / 100)
+  const dyn = f.mode === 'dynamic'
+  // the listing keeps its milk's expiry; a new listing (or more litres) takes the oldest fresh milk in stock
+  const live = listing && !listing.expired_at && listing.milk_expires_at && new Date(listing.milk_expires_at) > new Date()
+  const st = stageNow(live && !(Number(f.litres) > Number(listing.listed_l ?? 0)) ? listing.milk_expires_at : oldestEnds(type))
+  const pctNow = dyn ? (st && !st.expired ? st.pct : 0) : Number(f.discount) || 0
+  const final = priceAt(f.price, pctNow)
 
   const submit = async (e) => {
     e.preventDefault()
@@ -247,15 +271,15 @@ function ListingSheet({ open, listing, startType, taken, fresh, grades, guide, p
     if (l > max) return setErr(`You have ${litres(max)} of fresh ${milkLabel[type].toLowerCase()} milk. List that much or less.`)
     if (!(Number(f.price) > 0)) return setErr('Enter your price per litre.')
     if (g && Number(f.price) > g.max) return setErr(`The most you can charge is ${rs(g.max)} a litre (${g.maxPct}% above what you pay farmers).`)
-    const d = Number(f.discount || 0)
+    const d = dyn ? 0 : Number(f.discount || 0)
     if (!(d >= 0 && d <= 90) || !Number.isInteger(d)) return setErr('The discount can be 0 to 90%.')
     setBusy(true)
     try {
       if (listing) {
-        await saveListing({ ...listing, listed_l: l, price: f.price, description: f.description.trim(), discount_pct: d })
+        await saveListing({ ...listing, listed_l: l, price: f.price, description: f.description.trim(), discount_pct: d, pricing_mode: f.mode })
         toast('Listing saved.')
       } else {
-        await createListing(type, f.price, l, f.description.trim(), d)
+        await createListing(type, f.price, l, f.description.trim(), d, f.mode)
         toast(`${litres(l)} of ${milkLabel[type].toLowerCase()} milk is on the app.`)
       }
       onSaved(); onClose()
@@ -299,30 +323,74 @@ function ListingSheet({ open, listing, startType, taken, fresh, grades, guide, p
               </div>
               <span className="hint">Every order takes its litres off this number. Milk sells for 2 days at most after it was collected; then the listing ends and the milk is discarded automatically.</span></div>
 
-            <div className="grid gap-4 sm:grid-cols-[1fr_140px]">
+            <div className="field"><span className="label">How should the price change?</span>
+              <div className="grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label="Pricing">
+                {[['manual', 'Free discount', 'You give any discount, any time, to sell your milk quickly.'],
+                  ['dynamic', 'Dynamic pricing', 'The price drops by itself as the milk gets older, until it expires.']].map(([k, t, d]) => (
+                  <button key={k} type="button" role="radio" aria-checked={f.mode === k} onClick={() => setF({ ...f, mode: k })}
+                    className={`rounded-2xl border-[1.5px] px-3.5 py-3 text-left transition-all ${f.mode === k ? 'border-forest bg-mint-soft' : 'border-line bg-white hover:border-[#cdbd98]'}`}>
+                    <span className="block font-semibold">{t}</span>
+                    <span className="block text-[12.5px] text-muted">{d}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className={`grid gap-4 ${dyn ? '' : 'sm:grid-cols-[1fr_140px]'}`}>
               <div className="field"><label htmlFor="lp">Price per litre</label>
                 <div className="flex items-center gap-2"><span className="text-muted">Rs</span>
                   <input id="lp" className={`input num w-full ${g && Number(f.price) > g.max ? 'border-danger' : ''}`} type="number" min="1" value={f.price} onChange={set('price')} /></div>
                 {g && <span className="hint">You pay farmers {rs(Math.round(g.cost))}. Fair price {rs(g.suggest)}, at most {rs(g.max)}.
                   {Number(f.price) !== g.suggest && <button type="button" className="ml-1 font-semibold text-forest underline" onClick={() => setF({ ...f, price: String(g.suggest) })}>Use {rs(g.suggest)}</button>}</span>}
               </div>
-              <div className="field"><label htmlFor="ld">Discount</label>
+              {!dyn && <div className="field"><label htmlFor="ld">Discount</label>
                 <div className="flex items-center gap-2"><input id="ld" className="input num w-20" type="number" min="0" max="90" step="1" value={f.discount} onChange={set('discount')} /><span className="text-muted">%</span></div>
-                <span className="hint">Usually on day 2, to sell the milk before it expires.</span></div>
+                <span className="hint">Usually on day 2, to sell the milk before it expires.</span></div>}
             </div>
+
+            {dyn && <Schedule price={f.price} st={st} />}
 
             <div className="field"><label htmlFor="lx">Description <span className="font-normal text-muted">(optional)</span></label>
               <input id="lx" className="input" maxLength={140} placeholder="e.g. Thick buffalo milk, collected this morning" value={f.description} onChange={set('description')} /></div>
 
             <div className="rounded-2xl border border-line bg-cream px-4 py-3.5 text-[13.5px]">
               <p className="text-[12px] font-semibold uppercase tracking-wide text-muted">Customers will see</p>
-              <div className="mt-2 flex items-start gap-3"><ProductImage category="milk" size={44} /><p><b className="num">{litres(Number(f.litres) || 0)}</b> of {milkLabel[type].toLowerCase()} milk{grades[type] ? `, ${gradeLabel[grades[type]].toLowerCase()} grade` : ''}, at <b className="num">{rs(final)}</b> a litre{Number(f.discount) > 0 ? ` (${f.discount}% off)` : ''}.</p></div>
+              <div className="mt-2 flex items-start gap-3"><ProductImage category="milk" size={44} /><p><b className="num">{litres(Number(f.litres) || 0)}</b> of {milkLabel[type].toLowerCase()} milk{grades[type] ? `, ${gradeLabel[grades[type]].toLowerCase()} grade` : ''}, at <b className="num">{rs(final)}</b> a litre{pctNow > 0 ? ` (${pctNow}% off)` : ''}{dyn ? ', dropping by itself as the milk gets older' : ''}.</p></div>
               {platform && <p className="mt-1 text-muted">They can order {Number(platform.order_min_l)} to {Number(platform.order_max_l)} L at a time, set by ApnaDairy.</p>}
             </div>
           </>
         )}
       </form>
     </Sheet>
+  )
+}
+
+// the dynamic pricing steps, with the real times for this milk
+function Schedule({ price, st }) {
+  const steps = st?.steps
+  return (
+    <div className="overflow-hidden rounded-2xl border border-line">
+      <table className="w-full text-[13px]">
+        <thead className="bg-cream text-left text-[12px] text-muted"><tr>
+          <th className="px-3 py-2 font-semibold">{steps ? 'From' : 'After the test'}</th><th className="px-3 py-2 font-semibold">Customers see</th>
+          <th className="px-3 py-2 text-right font-semibold">Off</th><th className="px-3 py-2 text-right font-semibold">Price / L</th></tr></thead>
+        <tbody>
+          {(steps ?? STAGES).map((s) => {
+            const now = st && !st.expired && st.key === s.key
+            return (
+              <tr key={s.key} className={`border-t border-line ${now ? 'bg-mint-soft font-semibold' : ''}`}>
+                <td className="num px-3 py-2">{s.starts ? dateTimeShort(s.starts) : `${s.from} h`}{now && <span className="ml-1.5 rounded-full bg-forest px-1.5 py-0.5 text-[10.5px] text-cream">now</span>}</td>
+                <td className="px-3 py-2">{s.label}</td>
+                <td className="num px-3 py-2 text-right">{s.pct ? `${s.pct}%` : '—'}</td>
+                <td className="num px-3 py-2 text-right">{rs(priceAt(price, s.pct))}</td>
+              </tr>
+            )
+          })}
+          <tr className="border-t border-line text-muted"><td className="num px-3 py-2">{steps ? dateTimeShort(steps[steps.length - 1].ends) : '48 h'}</td><td className="px-3 py-2" colSpan={3}>Expires and is discarded</td></tr>
+        </tbody>
+      </table>
+      <p className="border-t border-line bg-cream px-3 py-2 text-[12px] text-muted">Times count from the test of the oldest milk on this listing. The tested grade stays the same; the stage shows how fresh it is now.</p>
+    </div>
   )
 }
 
