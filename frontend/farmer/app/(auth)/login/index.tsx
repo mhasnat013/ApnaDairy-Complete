@@ -1,9 +1,8 @@
-// Login screen for the ApnaDairy farmer app (v2).
+// Login screen for the ApnaDairy unified app (v2).
 // Role MUST be picked first via the segmented control — it is saved with the
 // session (saveSession) and can never be changed afterwards.
-// Farmer lane is fully wired to the real web-Supabase auth service.
-// The Customer option is selectable only (yellow selected state); customer
-// sign-in is not part of this farmer build, so it shows a notice instead.
+// Farmer lane is wired to the real web-Supabase auth service.
+// Customer lane is wired to the real customer (B2C) backend API.
 import React, { useState } from 'react';
 import {
   View,
@@ -21,6 +20,7 @@ import { AppButton } from '../../../src/components/common/AppButton';
 import { Logo } from '../../../src/components/common/Logo';
 import { colors } from '../../../src/theme/colors';
 import { loginWithSupabase, Role } from '../../../src/services/authService';
+import { loginCustomer } from '../../../src/services/customerAuthService';
 import { startGoogleOAuth } from '../../../src/api/googleAuth';
 
 /** Two-option segmented control: Farmer | Customer. Nothing pre-selected.
@@ -55,19 +55,21 @@ export default function LoginScreen() {
   const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  /** Validate, call the real farmer auth service, save session, route home. */
+  /** Validate, call the real auth service for the chosen role, route home. */
   const handleLogin = async () => {
     if (!role) {
       setError('Select Farmer or Customer first.');
       return;
     }
-    if (role === 'customer') {
-      setError('Customer sign-in is not available in this farmer app. Please select Farmer.');
-      return;
-    }
     setError(null);
     setLoading(true);
     try {
+      if (role === 'customer') {
+        // Real customer login via the B2C backend API.
+        await loginCustomer(email.trim(), password);
+        router.replace('/(customer)/home');
+        return;
+      }
       // Real Supabase Auth on the web project: the backend validates the JWT
       // and confirms a linked farmer profile (failure -> session cleared).
       await loginWithSupabase(email.trim(), password, role);
@@ -80,6 +82,7 @@ export default function LoginScreen() {
   };
 
   /** Real Google sign-in (Supabase PKCE). Existing farmer -> home directly;
+   *  existing customer -> customer home directly;
    *  new Google user -> Continue-as screen to pick the role (immutable). */
   const handleGoogle = async () => {
     setError(null);
@@ -87,7 +90,7 @@ export default function LoginScreen() {
     try {
       const outcome = await startGoogleOAuth();
       if (outcome.kind === 'customer') {
-        setError('This Google account is registered as a Customer. Customer access is not available in this farmer app.');
+        router.replace('/(customer)/home');
       } else if (outcome.kind === 'farmer') {
         router.replace('/(tabs)/home');
       } else {
