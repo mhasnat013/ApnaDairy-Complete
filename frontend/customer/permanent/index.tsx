@@ -1,6 +1,7 @@
 // Permanent (monthly) customer — subscription request + monthly ledger.
 // Only verified customers may request; backend returns 403 otherwise.
 import React, { useCallback, useEffect, useState } from 'react';
+import { formatRs } from '../../src/utils/format';
 import {
   ActivityIndicator,
   Pressable,
@@ -10,6 +11,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Screen } from '../../../src/components/common/Screen';
 import { Card } from '../../../src/components/common/Card';
@@ -180,7 +182,7 @@ export default function PermanentScreen() {
             <View style={styles.balanceRow}>
               <Text style={styles.balanceLabel}>Ledger balance</Text>
               <Text style={[styles.balanceValue, ledger.balance > 0 && styles.balanceDue]}>
-                Rs {ledger.balance.toFixed(2)}
+                {formatRs(ledger.balance)}
               </Text>
             </View>
           ) : null}
@@ -196,7 +198,7 @@ export default function PermanentScreen() {
                   <Text style={styles.entryDate}>{fmtDate(e.created_at)}</Text>
                 </View>
                 <Text style={[styles.entryAmount, e.amount < 0 && styles.balanceDue]}>
-                  Rs {Math.abs(e.amount).toFixed(2)}
+                  {formatRs(Math.abs(e.amount))}
                 </Text>
               </View>
             ))
@@ -209,11 +211,13 @@ export default function PermanentScreen() {
   };
 
   return (
-    <Screen title="Permanent customer" subtitle="ApnaDairy">
+    <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+<Screen title="Permanent customer" subtitle="ApnaDairy">
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.list}>
         {renderBody()}
       </ScrollView>
     </Screen>
+    </SafeAreaView>
   );
 }
 
@@ -224,13 +228,13 @@ const styles = StyleSheet.create({
   body: { fontSize: 15, color: colors.sage, lineHeight: 22, marginBottom: 8 },
   label: { fontSize: 14, fontWeight: '600', color: colors.ink, marginTop: 10, marginBottom: 6 },
   input: {
-    backgroundColor: colors.ivory, borderRadius: 12, paddingHorizontal: 14, height: 48,
+    backgroundColor: colors.ivory, borderRadius: 16, paddingHorizontal: 14, height: 48,
     fontSize: 16, color: colors.ink, borderWidth: 1, borderColor: colors.line,
   },
   error: { color: colors.danger, fontSize: 14, textAlign: 'center', marginVertical: 4 },
   cycleRow: { flexDirection: 'row', gap: 10 },
   cycleBtn: {
-    flex: 1, borderRadius: 12, borderWidth: 2, borderColor: colors.line,
+    flex: 1, borderRadius: 16, borderWidth: 2, borderColor: colors.line,
     paddingVertical: 12, alignItems: 'center', backgroundColor: colors.ivory,
   },
   cycleActive: { borderColor: colors.forest, backgroundColor: colors.cream },
