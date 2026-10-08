@@ -61,7 +61,7 @@ class RealSignupIn(BaseModel):
     """Real signup fields: creates the auth user + the web profiles row."""
 
     full_name: str = Field(min_length=1)
-    email: str = Field(min_length=3)
+    email: str = Field(min_length=3, pattern=r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
     phone: str = Field(min_length=1)
     password: str = Field(min_length=6)
 
