@@ -1,6 +1,7 @@
 // Customer addresses: list, add, edit, delete, set default.
 import React, { useCallback, useState } from 'react';
 import { View, Text, StyleSheet, Pressable, ScrollView, ActivityIndicator, Alert, TextInput, Switch, Modal } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
 import { Screen } from '../../../src/components/common/Screen';
 import { Card } from '../../../src/components/common/Card';
@@ -86,7 +87,8 @@ export default function AddressesScreen() {
   };
 
   return (
-    <Screen title="Addresses" subtitle="Delivery addresses">
+    <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+<Screen title="Addresses" subtitle="Delivery addresses">
       {loading ? (
         <View style={styles.center}><ActivityIndicator size="large" color={colors.forest} /></View>
       ) : (
@@ -147,6 +149,7 @@ export default function AddressesScreen() {
         </View>
       </Modal>
     </Screen>
+    </SafeAreaView>
   );
 }
 
@@ -166,7 +169,7 @@ const styles = StyleSheet.create({
   sheet: { backgroundColor: colors.ivory, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, paddingBottom: 32 },
   sheetTitle: { fontSize: 20, color: colors.ink, fontFamily: 'BricolageGrotesque_700Bold', marginBottom: 16 },
   input: {
-    backgroundColor: colors.cream, borderRadius: 12, padding: 14, marginBottom: 10,
+    backgroundColor: colors.cream, borderRadius: 16, padding: 14, marginBottom: 10,
     fontSize: 16, color: colors.ink, borderWidth: 1, borderColor: colors.line,
   },
   switchRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginVertical: 8 },
