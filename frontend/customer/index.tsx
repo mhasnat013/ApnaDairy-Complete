@@ -2,6 +2,7 @@
 import React, { useEffect } from 'react';
 import { router } from 'expo-router';
 import { View, ActivityIndicator } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors } from '../../src/theme/colors';
 
 export default function CustomerIndex(): React.JSX.Element {
@@ -9,8 +10,10 @@ export default function CustomerIndex(): React.JSX.Element {
     router.replace('/customer/home');
   }, []);
   return (
-    <View style={{ flex: 1, backgroundColor: colors.cream, alignItems: 'center', justifyContent: 'center' }}>
+    <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+<View style={{ flex: 1, backgroundColor: colors.cream, alignItems: 'center', justifyContent: 'center' }}>
       <ActivityIndicator size="large" color={colors.forest} />
     </View>
+    </SafeAreaView>
   );
 }
