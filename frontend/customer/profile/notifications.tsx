@@ -1,6 +1,7 @@
 // Customer notifications: list, mark read, unread count.
 import React, { useCallback, useState } from 'react';
 import { View, Text, StyleSheet, Pressable, ScrollView, ActivityIndicator, Alert } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
 import { Screen } from '../../../src/components/common/Screen';
 import { Card } from '../../../src/components/common/Card';
@@ -51,7 +52,8 @@ export default function NotificationsScreen() {
   };
 
   return (
-    <Screen title="Notifications" subtitle={unread > 0 ? `${unread} unread` : 'All caught up'}>
+    <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+<Screen title="Notifications" subtitle={unread > 0 ? `${unread} unread` : 'All caught up'}>
       {loading ? (
         <View style={styles.center}><ActivityIndicator size="large" color={colors.forest} /></View>
       ) : (
@@ -83,6 +85,7 @@ export default function NotificationsScreen() {
         </ScrollView>
       )}
     </Screen>
+    </SafeAreaView>
   );
 }
 
@@ -94,7 +97,7 @@ const styles = StyleSheet.create({
   card: { marginBottom: 10 },
   unreadCard: { borderWidth: 1.5, borderColor: colors.amber },
   row: { flexDirection: 'row', alignItems: 'flex-start' },
-  dot: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.amber, marginTop: 6, marginRight: 10 },
+  dot: { width: 10, height: 10, borderRadius: 16, backgroundColor: colors.amber, marginTop: 6, marginRight: 10 },
   info: { flex: 1 },
   title: { fontSize: 16, color: colors.ink, fontFamily: 'BricolageGrotesque_600SemiBold' },
   titleUnread: { fontWeight: '700' },
