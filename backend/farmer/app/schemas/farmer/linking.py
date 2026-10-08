@@ -6,6 +6,13 @@
 from pydantic import BaseModel, ConfigDict, Field
 
 
+class CityOut(BaseModel):
+    """One city in the farmer's city picker, with manager availability."""
+
+    city: str
+    manager_count: int
+
+
 class CityManagerOut(BaseModel):
     """One area manager listed for a city (farmer browse step)."""
 
