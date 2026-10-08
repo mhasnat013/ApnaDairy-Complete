@@ -11,9 +11,9 @@ import { useRouter } from 'expo-router';
 import { Screen } from '../../src/components/common/Screen';
 import { AppButton } from '../../src/components/common/AppButton';
 import { colors } from '../../src/theme/colors';
-import { getSupabaseClient, clearSession } from '../../src/api/client';
+import { clearSession } from '../../src/api/client';
 import { linkGoogleProfile } from '../../src/api/googleAuth';
-import { Role } from '../../src/services/authService';
+import { Role, getWebSupabaseClient } from '../../src/services/authService';
 
 /** One big selectable role card. The selected card uses the landing-page
  *  yellow (amber token) so the choice is unmistakable. */
@@ -46,7 +46,7 @@ export default function ContinueAsScreen() {
     let alive = true;
     (async () => {
       try {
-        const { data } = await getSupabaseClient().auth.getUser();
+        const { data } = await getWebSupabaseClient().auth.getUser();
         const user = data?.user;
         if (!alive) return;
         if (!user) {
@@ -95,7 +95,7 @@ export default function ContinueAsScreen() {
   /** Leave without choosing: drop the Google session, back to login. */
   const handleBack = async () => {
     try {
-      await getSupabaseClient().auth.signOut();
+      await getWebSupabaseClient().auth.signOut();
     } finally {
       await clearSession();
       router.replace('/(auth)/login');
