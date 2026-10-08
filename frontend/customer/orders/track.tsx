@@ -1,6 +1,7 @@
 // Delivery tracking: rider card, status timeline, call + message rider.
 import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Linking, Pressable } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Screen } from '../../../src/components/common/Screen';
 import { Card } from '../../../src/components/common/Card';
@@ -105,7 +106,8 @@ export default function TrackOrderScreen() {
   const rider = delivery?.rider;
 
   return (
-    <Screen title="Track order" subtitle={oid ? `Order #${oid.slice(0, 8)}` : undefined}>
+    <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+<Screen title="Track order" subtitle={oid ? `Order #${oid.slice(0, 8)}` : undefined}>
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <Card style={styles.headCard}>
           <View style={styles.row}>
@@ -210,6 +212,7 @@ export default function TrackOrderScreen() {
         </Pressable>
       </ScrollView>
     </Screen>
+    </SafeAreaView>
   );
 }
 
@@ -228,7 +231,7 @@ const styles = StyleSheet.create({
   riderName: { fontSize: 18, color: colors.ink, fontFamily: 'BricolageGrotesque_700Bold' },
   riderRow: { flexDirection: 'row', alignItems: 'center' },
   avatar: {
-    width: 52, height: 52, borderRadius: 26,
+    width: 52, height: 52, borderRadius: 20,
     backgroundColor: colors.forest, alignItems: 'center', justifyContent: 'center',
     marginRight: 14,
   },
@@ -237,7 +240,7 @@ const styles = StyleSheet.create({
   ctaHalf: { flex: 1, marginHorizontal: 6 },
   journeyRow: { flexDirection: 'row', marginBottom: 4 },
   journeyRail: { alignItems: 'center', marginRight: 14, width: 16 },
-  journeyDot: { width: 14, height: 14, borderRadius: 7, backgroundColor: colors.line, borderWidth: 2, borderColor: colors.line },
+  journeyDot: { width: 14, height: 14, borderRadius: 16, backgroundColor: colors.line, borderWidth: 2, borderColor: colors.line },
   journeyDotDone: { backgroundColor: colors.forest, borderColor: colors.forest },
   journeyDotCurrent: { backgroundColor: colors.amber, borderColor: colors.amber },
   journeyLine: { width: 2, flex: 1, minHeight: 22, backgroundColor: colors.line, marginVertical: 2 },
@@ -249,7 +252,7 @@ const styles = StyleSheet.create({
   muted: { fontSize: 14, color: colors.sage, lineHeight: 20 },
   cta: { marginTop: 16 },
   timelineRow: { flexDirection: 'row', marginBottom: 12 },
-  dot: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.amber, marginTop: 5, marginRight: 12 },
+  dot: { width: 10, height: 10, borderRadius: 16, backgroundColor: colors.amber, marginTop: 5, marginRight: 12 },
   timelineMsg: { fontSize: 14, color: colors.ink },
   refresh: { marginTop: 20, alignItems: 'center', paddingVertical: 12 },
   refreshText: { fontSize: 15, color: colors.forest, fontFamily: 'BricolageGrotesque_700Bold' },
