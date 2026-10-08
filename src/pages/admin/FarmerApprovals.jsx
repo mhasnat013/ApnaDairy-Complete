@@ -62,7 +62,7 @@ export default function FarmerApprovals({ status }) {
                   <p className="text-[17px] font-semibold">{f.full_name}</p>
                   <Badge status={f.status} />
                 </div>
-                <p className="num text-[13.5px] text-muted">{f.phone ?? 'No phone'}</p>
+                <p className="num text-[13.5px] text-muted">{f.phone ?? 'No phone'}{f.cnic ? ` · CNIC ${f.cnic}` : ''}</p>
                 <p className="truncate text-[13.5px] text-muted">{f.email}</p>
               </div>
             </div>

@@ -48,6 +48,7 @@ export default function FarmerRequests({ rows, reload }) {
                 <div className="min-w-0 flex-1">
                   <p className="text-[17px] font-semibold">{r.full_name}</p>
                   <p className="num text-[13.5px] text-muted">{r.phone}</p>
+                  {r.cnic && <p className="num text-[13px] text-muted">CNIC {r.cnic}</p>}
                   <p className="text-[13px] text-muted">Asked {relative(r.created_at)}</p>
                 </div>
               </div>

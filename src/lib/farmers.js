@@ -6,6 +6,7 @@ const must = ({ data, error }) => { if (error) throw error; return data }
 // a short-lived link to a farmer's private picture
 export async function farmerPhotoUrl(path) {
   if (!path) return null
+  if (/^(https?:)?\//.test(path)) return path   // a picture already hosted with the site
   const { data } = await supabase.storage.from('farmer-photos').createSignedUrl(path, 3600)
   return data?.signedUrl ?? null
 }
