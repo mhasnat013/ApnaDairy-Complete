@@ -1,6 +1,7 @@
 // Customer profile tab: identity card, verification banner, menu navigation.
 import React, { useCallback, useState } from 'react';
 import { View, Text, StyleSheet, Pressable, ScrollView, ActivityIndicator, Alert } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Screen } from '../../../src/components/common/Screen';
 import { Card } from '../../../src/components/common/Card';
@@ -74,7 +75,8 @@ export default function CustomerProfileScreen() {
   const name = [profile?.first_name, profile?.last_name].filter(Boolean).join(' ') || 'Customer';
 
   return (
-    <Screen title="Profile" subtitle="ApnaDairy">
+    <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+<Screen title="Profile" subtitle="ApnaDairy">
       {loading ? (
         <View style={styles.center}><ActivityIndicator size="large" color={colors.forest} /></View>
       ) : (
@@ -123,6 +125,7 @@ export default function CustomerProfileScreen() {
         </ScrollView>
       )}
     </Screen>
+    </SafeAreaView>
   );
 }
 
@@ -131,7 +134,7 @@ const styles = StyleSheet.create({
   scroll: { paddingBottom: 32 },
   identityRow: { flexDirection: 'row', alignItems: 'center' },
   avatar: {
-    width: 64, height: 64, borderRadius: 32, backgroundColor: colors.forest,
+    width: 64, height: 64, borderRadius: 20, backgroundColor: colors.forest,
     alignItems: 'center', justifyContent: 'center', marginRight: 16,
   },
   avatarText: { color: colors.ivory, fontSize: 26, fontFamily: 'BricolageGrotesque_700Bold' },
@@ -139,7 +142,7 @@ const styles = StyleSheet.create({
   name: { fontSize: 20, color: colors.ink, fontFamily: 'BricolageGrotesque_700Bold' },
   sub: { fontSize: 14, color: colors.sage, marginTop: 2 },
   banner: {
-    marginTop: 16, borderWidth: 1.5, borderRadius: 12, padding: 12,
+    marginTop: 16, borderWidth: 1.5, borderRadius: 16, padding: 12,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
   },
   bannerText: { fontSize: 15, fontFamily: 'BricolageGrotesque_700Bold' },
