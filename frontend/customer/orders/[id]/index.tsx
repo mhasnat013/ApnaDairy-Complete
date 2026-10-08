@@ -1,6 +1,8 @@
 // Order detail: items, totals, payment status, timeline, cancel / reorder / track.
 import React, { useCallback, useEffect, useState } from 'react';
+import { formatRs } from '../../../src/utils/format';
 import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Alert } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Screen } from '../../../../src/components/common/Screen';
 import { Card } from '../../../../src/components/common/Card';
@@ -102,12 +104,13 @@ export default function OrderDetailScreen() {
   const cancellable = CANCELLABLE.has(order.status);
 
   return (
-    <Screen title={`Order #${order.id.slice(0, 8)}`}>
+    <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+<Screen title={`Order #${order.id.slice(0, 8)}`}>
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <Card style={styles.headCard}>
           <View style={styles.row}>
             <OrderStatusChip status={order.status} />
-            <Text style={styles.total}>Rs {order.total_amount.toFixed(2)}</Text>
+            <Text style={styles.total}>{formatRs(order.total_amount)}</Text>
           </View>
           <Text style={styles.meta}>
             Placed {order.created_at ? new Date(order.created_at).toLocaleString() : '—'}
@@ -123,15 +126,15 @@ export default function OrderDetailScreen() {
             <View key={it.id} style={styles.lineRow}>
               <View style={styles.flex}>
                 <Text style={styles.itemName}>{it.product_name || 'Product'}</Text>
-                <Text style={styles.muted}>Qty {it.quantity} × Rs {it.unit_price.toFixed(2)}</Text>
+                <Text style={styles.muted}>Qty {it.quantity} × {formatRs(it.unit_price)}</Text>
               </View>
-              <Text style={styles.lineAmount}>Rs {it.line_total.toFixed(2)}</Text>
+              <Text style={styles.lineAmount}>{formatRs(it.line_total)}</Text>
             </View>
           ))}
           <View style={styles.divider} />
           <View style={styles.lineRow}>
             <Text style={styles.totalLabel}>Total</Text>
-            <Text style={styles.totalAmount}>Rs {order.total_amount.toFixed(2)}</Text>
+            <Text style={styles.totalAmount}>{formatRs(order.total_amount)}</Text>
           </View>
         </Card>
 
@@ -168,6 +171,7 @@ export default function OrderDetailScreen() {
         </View>
       </ScrollView>
     </Screen>
+    </SafeAreaView>
   );
 }
 
@@ -191,7 +195,7 @@ const styles = StyleSheet.create({
   totalLabel: { fontSize: 16, color: colors.ink, fontFamily: 'BricolageGrotesque_700Bold' },
   totalAmount: { fontSize: 18, color: colors.forest, fontFamily: 'BricolageGrotesque_700Bold' },
   timelineRow: { flexDirection: 'row', marginBottom: 12 },
-  dot: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.amber, marginTop: 5, marginRight: 12 },
+  dot: { width: 10, height: 10, borderRadius: 16, backgroundColor: colors.amber, marginTop: 5, marginRight: 12 },
   timelineMsg: { fontSize: 14, color: colors.ink },
   cta: { marginTop: 24 },
   gap: { height: 12 },
