@@ -13,11 +13,26 @@ router = APIRouter(prefix="/api/v1/farmer/profile", tags=["farmer-profile"])
 
 @router.get("/", response_model=ProfileOut)
 def read_own_profile(ctx: tuple = Depends(current_farmer)) -> ProfileOut:
-    """Return the calling farmer's own profile."""
+    """Return the calling farmer's own profile.
+
+    New users have no `farmers` row yet (manager hasn't accepted the
+    registration). Fall back to the basic `profiles` row so the Profile
+    tab works from day one instead of 404ing.
+    """
+    profile, _farmer_profile, _farmer_row = ctx
     try:
         return profile_service.get_profile(require_web_farmer_id(ctx))
-    except KeyError:
-        raise HTTPException(status_code=404, detail="Farmer profile not found")
+    except (KeyError, HTTPException):
+        if not profile or not profile.get("id"):
+            raise HTTPException(status_code=404, detail="Farmer profile not found")
+        return ProfileOut(
+            id=profile["id"],
+            name=profile.get("full_name") or "",
+            phone=profile.get("phone") or "",
+            email=profile.get("email"),
+            verification_status="INCOMPLETE",
+            role="farmer",
+        )
 
 
 # RULE: profile edits write farmer-safe fields only (name/phone/village/farm_name
