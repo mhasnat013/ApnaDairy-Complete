@@ -1,7 +1,10 @@
 // ManagerCard — area manager / shop row card for the home feed.
 import React from 'react';
+import { font } from './src/theme/theme';
 import { Pressable, View, Text, StyleSheet } from 'react-native';
 import { colors } from '../../theme/colors';
+
+const F = font.family;
 
 export interface HomeManager {
   id: string;
@@ -41,12 +44,12 @@ const styles = StyleSheet.create({
     shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 8, elevation: 2,
   },
   avatar: {
-    width: 48, height: 48, borderRadius: 24, backgroundColor: colors.cream,
+    width: 48, height: 48, borderRadius: 20, backgroundColor: colors.cream,
     alignItems: 'center', justifyContent: 'center', marginRight: 12,
   },
   avatarText: { fontSize: 20, color: colors.forest, fontFamily: 'BricolageGrotesque_700Bold' },
   col: { flex: 1 },
   name: { fontSize: 16, color: colors.ink, fontFamily: 'BricolageGrotesque_700Bold' },
-  sub: { fontSize: 13, color: colors.sage, marginTop: 2, fontFamily: 'BricolageGrotesque_400Regular' },
+  sub: { fontSize: 13, color: colors.sage, marginTop: 2, fontFamily: F },
   arrow: { fontSize: 24, color: colors.sage, marginLeft: 8 },
 });
