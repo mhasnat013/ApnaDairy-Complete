@@ -58,7 +58,7 @@ export default function RecordMilk() {
   const [, setTick] = useState(0)
   const cancelTest = useRef(false)
   useEffect(() => () => { cancelTest.current = true }, [])
-  // the ai model's server sleeps when unused: wake it now, so it answers as soon as the test finishes
+  // load ai model 1 now, so it answers as soon as the test finishes
   useEffect(() => { wakeModel1().catch(() => {}) }, [])
   useEffect(() => {
     if (!test) return

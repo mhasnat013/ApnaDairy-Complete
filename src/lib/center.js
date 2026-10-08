@@ -341,7 +341,7 @@ export const adminInvites = async () => must(await supabase.from('admin_invites'
 export const removeAdmin = (id) => rpc('set_admin', { p_user: id, p_make_admin: false })
 // ask ai model 1 directly (the try-it sliders); the answer is saved so assessMilk uses it
 export const predictModel1 = (temperature, ph, ec) => iot({ action: 'predict', temperature, ph, ec }).then((d) => d.prediction)
-// wake the model server before a test finishes (a free server sleeps when unused)
+// load ai model 1 in the server function ahead of a test, so the result is ready when the test finishes
 export const wakeModel1 = () => iot({ action: 'wake' })
 export const takeDeviceSample = (session) => iot({ action: 'sample', session }).then((d) => d.sample)
 export const finishDeviceTest = (session) => iot({ action: 'finish', session }).then((d) => d.reading)

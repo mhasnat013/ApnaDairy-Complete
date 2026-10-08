@@ -96,14 +96,14 @@ function ModelServer({ okTests, byModel, lastError }) {
     try { setCheck(await wakeModel1()) } catch (e) { setCheck({ ok: false, error: e.message }) }
   }
   return (
-    <Card className="mt-5" title="AI Model 1 server" subtitle="The trained model runs on its own server. Each finished device test is sent to it; if it cannot answer, the backup rules give the result instead.">
+    <Card className="mt-5" title="AI Model 1" subtitle="The team's trained model runs inside ApnaDairy's server function and grades every finished device test. If it cannot be loaded, the backup rules give the result instead.">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-[14px]"><b className="num">{byModel}</b> of <b className="num">{okTests}</b> device tests in the last 7 days were answered by the trained model{okTests > byModel ? `, ${okTests - byModel} by the backup rules` : ''}.</p>
-        <button className="btn-secondary btn-sm" onClick={run} disabled={check?.busy}><Icon name="spark" size={14} />{check?.busy ? 'Waking it up…' : 'Check the model server'}</button>
+        <button className="btn-secondary btn-sm" onClick={run} disabled={check?.busy}><Icon name="spark" size={14} />{check?.busy ? 'Checking…' : 'Check the model'}</button>
       </div>
       {check && !check.busy && (
         <p className={`mt-3 rounded-2xl px-4 py-3 text-[13px] ${check.ok ? 'bg-mint-soft text-forest' : 'bg-[#f8e2dc] text-danger'}`}>
-          {check.ok ? 'The model server is awake and answering.' : `The model server did not answer: ${check.error}. Check the MODEL1_URL and MODEL1_KEY secrets and that the Hugging Face Space is running.`}
+          {check.ok ? 'The model is loaded and answering.' : `The model could not be loaded: ${check.error}. Check that the iot-reading function is deployed and the website is online.`}
         </p>
       )}
       {!check && lastError && okTests > byModel && <p className="mt-3 text-[12.5px] text-muted">Last problem: {lastError}</p>}

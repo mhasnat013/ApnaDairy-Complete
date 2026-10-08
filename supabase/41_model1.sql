@@ -2,9 +2,10 @@
 -- run after 40_public_requests.sql (safe to run again).
 --
 -- model 1 (ai/model1, the team's trained models: svm for quality, random forests for freshness, shelf life and
--- spoilage risk) runs as a python service. the iot-reading edge function sends each averaged device test
--- (temperature, ph, ec) to it and keeps the answer in model1_predictions. the database reads that answer here.
--- if the service could not answer a test, the same four outputs are worked out by the backup rules.
+-- spoilage risk) runs inside the iot-reading edge function, exported from the .joblib files with identical answers.
+-- the function runs it on each averaged device test (temperature, ph, ec) and keeps the answer in
+-- model1_predictions. the database reads that answer here. if the model could not run for a test, the same
+-- four outputs are worked out by the backup rules.
 --
 -- what the model decides:
 --   grade:  Good = premium, Acceptable = fresh, Poor = standard (bought at the lower price), Spoiled = not bought
