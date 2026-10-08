@@ -2,6 +2,7 @@
 // Marketplace: product list with search, category filter, and sort.
 // Data: GET /marketplace/products/ via marketplaceService.
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { formatRs } from '../../src/utils/format';
 import {
   ActivityIndicator,
   FlatList,
@@ -11,6 +12,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { listProducts } from '../../../src/services/customer/marketplaceService';
 import type { Product } from '../../../src/types/customerModels';
@@ -19,10 +21,6 @@ import { font } from '../../../src/theme/theme';
 
 const F = font.family;
 
-function formatRs(value: number | null | undefined): string {
-  if (value == null) return '—';
-  return `Rs ${Number(value).toLocaleString('en-PK')}`;
-}
 
 const CATEGORIES = ['Sab', 'Doodh', 'Dahi', 'Makhan', 'Desi Ghee', 'Paneer'];
 // English display labels for the category chips. The chip VALUES stay unchanged:
@@ -33,6 +31,8 @@ const CATEGORY_LABELS: Record<string, string> = {
   Doodh: 'Milk',
   Dahi: 'Yogurt',
   Makhan: 'Butter',
+  'Desi Ghee': 'Desi Ghee',
+  Paneer: 'Paneer',
 };
 const SORTS: Array<{ key: 'newest' | 'price_asc' | 'price_desc'; label: string }> = [
   { key: 'newest', label: 'Newest' },
@@ -53,17 +53,17 @@ function ProductRow({ item, onPress }: { item: Product; onPress: () => void }): 
     >
       <View
         style={{
-          width: 76, height: 76, borderRadius: 14, backgroundColor: colors.cream,
+          width: 76, height: 76, borderRadius: 16, backgroundColor: colors.cream,
           alignItems: 'center', justifyContent: 'center', marginRight: 12,
         }}
       >
-        <Text style={{ fontFamily: 'BricolageGrotesque_400Regular', fontSize: 11, color: colors.sage }}>Photo</Text>
+        <Text style={{ fontFamily: F, fontSize: 11, color: colors.sage }}>Photo</Text>
       </View>
       <View style={{ flex: 1, justifyContent: 'center' }}>
         <Text style={{ fontFamily: 'BricolageGrotesque_700Bold', fontSize: 15, color: colors.ink }} numberOfLines={1}>
           {item.name ?? 'Product'}
         </Text>
-        <Text style={{ fontFamily: 'BricolageGrotesque_400Regular', fontSize: 12, color: colors.sage, marginTop: 2 }} numberOfLines={1}>
+        <Text style={{ fontFamily: F, fontSize: 12, color: colors.sage, marginTop: 2 }} numberOfLines={1}>
           {[item.manager?.center_name, item.unit ? `/${item.unit}` : null].filter(Boolean).join(' ')}
         </Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
@@ -149,10 +149,11 @@ export default function MarketplaceScreen(): React.JSX.Element {
   }, []);
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.cream }}>
+    <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+<View style={{ flex: 1, backgroundColor: colors.cream }}>
       <View style={{ padding: 16, paddingBottom: 8 }}>
         <Text style={{ fontFamily: 'BricolageGrotesque_700Bold', fontSize: 24, color: colors.ink }}>Marketplace</Text>
-        <Text style={{ fontFamily: 'BricolageGrotesque_400Regular', fontSize: 13, color: colors.sage, marginTop: 2 }}>
+        <Text style={{ fontFamily: F, fontSize: 13, color: colors.sage, marginTop: 2 }}>
           Fresh milk and traditional dairy products
         </Text>
         <TextInput
@@ -164,7 +165,7 @@ export default function MarketplaceScreen(): React.JSX.Element {
           returnKeyType="search"
           style={{
             backgroundColor: colors.ivory, borderRadius: 999, marginTop: 12,
-            paddingHorizontal: 18, minHeight: 48, fontFamily: 'BricolageGrotesque_400Regular', fontSize: 15, color: colors.ink }}
+            paddingHorizontal: 18, minHeight: 48, fontFamily: F, fontSize: 15, color: colors.ink }}
         />
       </View>
 
@@ -224,7 +225,7 @@ export default function MarketplaceScreen(): React.JSX.Element {
         </View>
       ) : error ? (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-          <Text style={{ fontFamily: 'BricolageGrotesque_400Regular', fontSize: 14, color: colors.ink, textAlign: 'center' }}>{error}</Text>
+          <Text style={{ fontFamily: F, fontSize: 14, color: colors.ink, textAlign: 'center' }}>{error}</Text>
           <TouchableOpacity onPress={onRefresh} style={{ marginTop: 12 }}>
             <Text style={{ fontFamily: 'BricolageGrotesque_700Bold', fontSize: 15, color: colors.forest }}>
               Try again
@@ -240,11 +241,12 @@ export default function MarketplaceScreen(): React.JSX.Element {
           renderItem={({ item }) => <ProductRow item={item} onPress={() => openProduct(item.id)} />}
           ListEmptyComponent={
             <View style={{ alignItems: 'center', marginTop: 48 }}>
-              <Text style={{ fontFamily: 'BricolageGrotesque_400Regular', fontSize: 15, color: colors.sage }}>No products found.</Text>
+              <Text style={{ fontFamily: F, fontSize: 15, color: colors.sage }}>No products found.</Text>
             </View>
           }
         />
       )}
     </View>
+    </SafeAreaView>
   );
 }
