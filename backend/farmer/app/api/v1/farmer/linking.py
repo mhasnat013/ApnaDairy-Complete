@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from app.core.deps import current_farmer
 from app.schemas.farmer.linking import (
     CityManagerOut,
+    CityOut,
     ManagerRequestCreate,
     ManagerRequestOut,
 )
@@ -36,9 +37,9 @@ def _farmer_profile_id(ctx: tuple) -> str:
     return profile["id"]
 
 
-@router.get("/cities", response_model=list[str])
-def read_cities(ctx: tuple = Depends(current_farmer)) -> list[str]:
-    """List distinct cities that have area managers (sorted)."""
+@router.get("/cities", response_model=list[CityOut])
+def read_cities(ctx: tuple = Depends(current_farmer)) -> list[dict]:
+    """List all major Pakistani cities with area-manager counts (sorted)."""
     _farmer_profile_id(ctx)  # auth gate
     return linking_service.list_cities()
 
