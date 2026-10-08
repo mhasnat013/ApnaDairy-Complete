@@ -1,6 +1,7 @@
 // Customer AI chatbot — chat with the ApnaDairy dairy assistant.
 // Route: /customer/chat (pushed from profile menu or home; not a tab).
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { font } from '../../src/theme/theme';
 import {
   View,
   Text,
@@ -12,9 +13,12 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Screen } from '../../../src/components/common/Screen';
 import { colors } from '../../../src/theme/colors';
 import { askAssistant } from '../../../src/services/customer/chatService';
+
+const F = font.family;
 
 interface Message {
   id: string;
@@ -113,7 +117,8 @@ export default function ChatScreen() {
   };
 
   return (
-    <Screen title="AI Assistant" subtitle="ApnaDairy">
+    <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+<Screen title="AI Assistant" subtitle="ApnaDairy">
       <KeyboardAvoidingView
         style={styles.container}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -177,6 +182,7 @@ export default function ChatScreen() {
         </View>
       </KeyboardAvoidingView>
     </Screen>
+    </SafeAreaView>
   );
 }
 
@@ -185,7 +191,7 @@ const styles = StyleSheet.create({
   list: { paddingVertical: 12, gap: 10 },
   bubble: {
     maxWidth: '82%',
-    borderRadius: 18,
+    borderRadius: 20,
     paddingHorizontal: 14,
     paddingVertical: 10,
   },
@@ -201,7 +207,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.line,
   },
-  msgText: { fontSize: 15, lineHeight: 22, fontFamily: 'BricolageGrotesque_400Regular' },
+  msgText: { fontSize: 15, lineHeight: 22, fontFamily: F },
   userText: { color: colors.ivory },
   botText: { color: colors.ink },
   demoTag: {
@@ -244,7 +250,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     marginTop: 8,
   },
-  suggestionText: { fontSize: 14, color: colors.forest, fontFamily: 'BricolageGrotesque_400Regular' },
+  suggestionText: { fontSize: 14, color: colors.forest, fontFamily: F },
   typing: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8 },
   typingText: { fontSize: 13, color: colors.sage, fontStyle: 'italic' },
   errorText: { color: colors.danger, fontSize: 13, textAlign: 'center', marginBottom: 8 },
@@ -262,13 +268,13 @@ const styles = StyleSheet.create({
     backgroundColor: colors.ivory,
     borderWidth: 1,
     borderColor: colors.line,
-    borderRadius: 22,
+    borderRadius: 20,
     paddingHorizontal: 16,
     paddingVertical: 12,
     fontSize: 15,
     color: colors.ink,
     maxHeight: 120,
-    fontFamily: 'BricolageGrotesque_400Regular' },
+    fontFamily: F },
   sendBtn: {
     backgroundColor: colors.forest,
     borderRadius: 999,
