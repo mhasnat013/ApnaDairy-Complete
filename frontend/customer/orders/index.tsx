@@ -1,6 +1,8 @@
 // My Orders — list of the customer's orders with status chips.
 import React, { useCallback, useEffect, useState } from 'react';
+import { formatRs } from '../../src/utils/format';
 import { View, Text, StyleSheet, FlatList, Pressable, ActivityIndicator, RefreshControl } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Screen } from '../../../src/components/common/Screen';
 import { Card } from '../../../src/components/common/Card';
@@ -51,7 +53,7 @@ export default function OrdersScreen() {
               #{item.id.slice(0, 8)}
             </Text>
             <Text style={styles.meta}>
-              {item.items.length} item{item.items.length === 1 ? '' : 's'} · Rs {item.total_amount.toFixed(2)}
+              {item.items.length} item{item.items.length === 1 ? '' : 's'} · {formatRs(item.total_amount)}
             </Text>
             <Text style={styles.date}>
               {item.created_at ? new Date(item.created_at).toLocaleDateString() : ''}
@@ -65,7 +67,8 @@ export default function OrdersScreen() {
   );
 
   return (
-    <Screen title="My Orders" subtitle="Track your milk orders">
+    <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+<Screen title="My Orders" subtitle="Track your milk orders">
       <View style={styles.filters}>
         <FlatList
           horizontal
@@ -108,6 +111,7 @@ export default function OrdersScreen() {
         />
       )}
     </Screen>
+    </SafeAreaView>
   );
 }
 
